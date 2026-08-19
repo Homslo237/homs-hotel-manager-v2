@@ -4,6 +4,7 @@ import Connexion from './screens/Connexion'
 import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
+import Caisse from './screens/Caisse'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -23,12 +24,7 @@ export default function App() {
       {onglet === 'dashboard' && <Dashboard />}
       {onglet === 'chambres' && <Chambres />}
       {onglet === 'sejours' && <Sejours />}
-      {onglet === 'caisse' && (
-        <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666' }}>
-          <h2>Caisse</h2>
-          <p>Bientôt disponible</p>
-        </div>
-      )}
+      {onglet === 'caisse' && <Caisse />}
       {onglet === 'menu' && (
         <div style={{ padding: '20px' }}>
           <h2 style={{ color: '#1B3A6B', marginBottom: '20px' }}>Menu</h2>
