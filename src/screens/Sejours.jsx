@@ -1,36 +1,48 @@
 import { useState } from 'react'
-import { Search, Plus, Calendar, LogIn, LogOut } from 'lucide-react'
+import { Search, Plus, Calendar, LogIn, Clock } from 'lucide-react'
 
 const sejours = [
   {
     id: 1, client: 'M. Kouassi Ama', chambre: '205',
     categorie: 'Confort', arrivee: '18/08/2026',
-    depart: '21/08/2026', nuits: 3, statut: 'en_cours',
-    montant: '105 000'
+    depart: '21/08/2026', duree: '3 nuits', type: 'nuit',
+    statut: 'en_cours', montant: '105 000'
   },
   {
     id: 2, client: 'Mme Diallo Fatou', chambre: '101',
     categorie: 'Standard', arrivee: '17/08/2026',
-    depart: '19/08/2026', nuits: 2, statut: 'en_cours',
-    montant: '50 000'
+    depart: '19/08/2026', duree: '2 nuits', type: 'nuit',
+    statut: 'en_cours', montant: '50 000'
   },
   {
     id: 3, client: 'M. Bamba Seydou', chambre: '302',
     categorie: 'Suite', arrivee: '18/08/2026',
-    depart: '20/08/2026', nuits: 2, statut: 'en_cours',
-    montant: '130 000'
+    depart: '20/08/2026', duree: '2 nuits', type: 'nuit',
+    statut: 'en_cours', montant: '130 000'
   },
   {
     id: 4, client: 'Mme Mbeki Grace', chambre: '104',
     categorie: 'Standard', arrivee: '19/08/2026',
-    depart: '22/08/2026', nuits: 3, statut: 'a_venir',
-    montant: '75 000'
+    depart: '19/08/2026', duree: '3 heures', type: 'heure',
+    statut: 'en_cours', montant: '7 500'
   },
   {
-    id: 5, client: 'M. Dupont Jean', chambre: '201',
+    id: 5, client: 'M. Nguessan Paul', chambre: '202',
+    categorie: 'Confort', arrivee: '19/08/2026',
+    depart: '19/08/2026', duree: '2 heures', type: 'heure',
+    statut: 'en_cours', montant: '5 000'
+  },
+  {
+    id: 6, client: 'Mme Traoré Aïcha', chambre: '103',
+    categorie: 'Standard', arrivee: '19/08/2026',
+    depart: '19/08/2026', duree: '1 heure', type: 'heure',
+    statut: 'en_cours', montant: '2 500'
+  },
+  {
+    id: 7, client: 'M. Dupont Jean', chambre: '201',
     categorie: 'Confort', arrivee: '16/08/2026',
-    depart: '18/08/2026', nuits: 2, statut: 'termine',
-    montant: '70 000'
+    depart: '18/08/2026', duree: '2 nuits', type: 'nuit',
+    statut: 'termine', montant: '70 000'
   },
 ]
 
@@ -43,6 +55,7 @@ const statuts = {
 export default function Sejours() {
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState('tous')
+  const [typeFiltre, setTypeFiltre] = useState('tous')
 
   const filtres = [
     { id: 'tous', label: 'Tous' },
@@ -55,11 +68,13 @@ export default function Sejours() {
     const matchRecherche = s.client.toLowerCase().includes(recherche.toLowerCase()) ||
       s.chambre.includes(recherche)
     const matchFiltre = filtre === 'tous' || s.statut === filtre
-    return matchRecherche && matchFiltre
+    const matchType = typeFiltre === 'tous' || s.type === typeFiltre
+    return matchRecherche && matchFiltre && matchType
   })
 
   const enCours = sejours.filter(s => s.statut === 'en_cours').length
-  const aVenir = sejours.filter(s => s.statut === 'a_venir').length
+  const parHeure = sejours.filter(s => s.type === 'heure' && s.statut === 'en_cours').length
+  const parNuit = sejours.filter(s => s.type === 'nuit' && s.statut === 'en_cours').length
 
   return (
     <div style={{ paddingBottom: '80px' }}>
@@ -71,7 +86,7 @@ export default function Sejours() {
           Séjours
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', marginTop: '4px' }}>
-          {enCours} en cours · {aVenir} à venir
+          {enCours} en cours · {parHeure} à l'heure · {parNuit} à la nuit
         </p>
       </div>
 
@@ -82,17 +97,30 @@ export default function Sejours() {
             padding: '14px', color: 'white', textAlign: 'center'
           }}>
             <LogIn size={20} style={{ marginBottom: '4px' }} />
-            <div style={{ fontSize: '22px', fontWeight: '700' }}>{enCours}</div>
-            <div style={{ fontSize: '11px', opacity: 0.9 }}>En cours</div>
+            <div style={{ fontSize: '22px', fontWeight: '700' }}>{parNuit}</div>
+            <div style={{ fontSize: '11px', opacity: 0.9 }}>À la nuit</div>
           </div>
           <div style={{
-            background: '#C9A84C', borderRadius: '12px',
+            background: '#E8634A', borderRadius: '12px',
             padding: '14px', color: 'white', textAlign: 'center'
           }}>
-            <Calendar size={20} style={{ marginBottom: '4px' }} />
-            <div style={{ fontSize: '22px', fontWeight: '700' }}>{aVenir}</div>
-            <div style={{ fontSize: '11px', opacity: 0.9 }}>À venir</div>
+            <Clock size={20} style={{ marginBottom: '4px' }} />
+            <div style={{ fontSize: '22px', fontWeight: '700' }}>{parHeure}</div>
+            <div style={{ fontSize: '11px', opacity: 0.9 }}>À l'heure</div>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          {['tous', 'nuit', 'heure'].map(t => (
+            <button key={t} onClick={() => setTypeFiltre(t)} style={{
+              padding: '6px 14px', borderRadius: '20px', fontSize: '12px',
+              fontWeight: '600',
+              background: typeFiltre === t ? '#E8634A' : '#F0F0F0',
+              color: typeFiltre === t ? 'white' : '#666',
+            }}>
+              {t === 'tous' ? 'Tous types' : t === 'nuit' ? '🌙 Nuit' : '⏱️ Heure'}
+            </button>
+          ))}
         </div>
 
         <div style={{ position: 'relative', marginBottom: '12px' }}>
@@ -132,7 +160,7 @@ export default function Sejours() {
               background: 'white', borderRadius: '12px',
               padding: '16px', marginBottom: '10px',
               boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-              borderLeft: `4px solid ${st.couleur}`
+              borderLeft: `4px solid ${s.type === 'heure' ? '#E8634A' : st.couleur}`
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontWeight: '700', fontSize: '15px', color: '#1B3A6B' }}>
@@ -146,10 +174,10 @@ export default function Sejours() {
                   {st.label}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#666', marginBottom: '8px' }}>
-                <span>🏨 Chambre {s.chambre}</span>
+              <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#666', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <span>🏨 Ch. {s.chambre}</span>
                 <span>📋 {s.categorie}</span>
-                <span>🌙 {s.nuits} nuits</span>
+                <span>{s.type === 'heure' ? '⏱️' : '🌙'} {s.duree}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: '#999' }}>
