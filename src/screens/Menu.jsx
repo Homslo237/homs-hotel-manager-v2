@@ -29,7 +29,6 @@ export default function Menu({ onDeconnexion }) {
   return (
     <div style={{ background: '#F5F7FA', minHeight: '100vh', paddingBottom: '80px' }}>
 
-      {/* En-tête profil */}
       <div style={{
         background: 'linear-gradient(135deg, #1B3A6B, #2C5282)',
         padding: '32px 20px 24px',
@@ -110,7 +109,6 @@ export default function Menu({ onDeconnexion }) {
           </div>
         ))}
 
-        {/* Bouton déconnexion */}
         <div
           onClick={onDeconnexion}
           style={{
@@ -139,20 +137,13 @@ export default function Menu({ onDeconnexion }) {
           <ChevronRight size={16} color="#D1D5DB" />
         </div>
 
-        {/* Logo Homslovision */}
         <div style={{ textAlign: 'center', paddingTop: '8px' }}>
           <img
-            src="/logo-homslovision.png"
+            src="/logo-homslovision-blanc.png"
             alt="Homslovision"
             style={{ height: '32px', opacity: 0.7 }}
             onError={e => e.target.style.display='none'}
           />
-          <p style={{ color: '#9CA3AF', fontSize: '11px', marginTop: '8px' }}>
-            HOMS Hotel Manager v1.0
-          </p>
-          <p style={{ color: '#9CA3AF', fontSize: '11px' }}>
-            © 2026 Homslovision — Le futur maintenant
-          </p>
         </div>
       </div>
     </div>
