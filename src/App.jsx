@@ -5,6 +5,7 @@ import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
 import Caisse from './screens/Caisse'
+import Menu from './screens/Menu'
 import NavBar from './components/NavBar'
 
 export default function App() {
@@ -26,28 +27,12 @@ export default function App() {
       {onglet === 'sejours' && <Sejours />}
       {onglet === 'caisse' && <Caisse />}
       {onglet === 'menu' && (
-        <div style={{ padding: '20px' }}>
-          <h2 style={{ color: '#1B3A6B', marginBottom: '20px' }}>Menu</h2>
-          <button
-            onClick={() => setEcran('connexion')}
-            style={{
-              background: '#E74C3C', color: 'white',
-              padding: '12px 24px', borderRadius: '8px',
-              fontSize: '16px', width: '100%'
-            }}>
-            Se déconnecter
-          </button>
-          <div style={{ textAlign: 'center', marginTop: '40px' }}>
-            <img src="/logo-homslovision.png" alt="Homslovision"
-              style={{ height: '40px' }}
-              onError={e => e.target.style.display='none'} />
-            <p style={{ color: '#999', fontSize: '12px', marginTop: '8px' }}>
-              Le futur maintenant
-            </p>
-          </div>
-        </div>
+        <Menu onDeconnexion={() => {
+          setEcran('connexion')
+          setOnglet('dashboard')
+        }} />
       )}
       <NavBar onglet={onglet} setOnglet={setOnglet} />
     </div>
   )
-}
+      }
