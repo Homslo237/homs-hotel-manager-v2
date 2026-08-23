@@ -2,13 +2,14 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1B3A6B" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HOMS" />
     <meta name="description" content="HOMS Hôtel Manager — Gestion hôtelière PME Afrique" />
+    <meta name="format-detection" content="telephone=no" />
 
     <title>HOMS Hôtel Manager</title>
 
@@ -24,8 +25,42 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
     <style>
-      /* Évite le flash blanc au démarrage */
-      html, body { background-color: #0A1628; margin: 0; padding: 0; }
+      /* Reset complet pour PWA plein écran */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html {
+        height: 100%;
+        width: 100%;
+        overflow-x: hidden;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        background-color: #0A1628;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        /* Empêche le zoom sur double-tap iOS */
+        touch-action: manipulation;
+      }
+      #root {
+        height: 100%;
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+      /* Empêche la sélection de texte sur les boutons */
+      button {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* Scrollbar invisible sur mobile */
+      ::-webkit-scrollbar { display: none; }
+      * { scrollbar-width: none; }
     </style>
   </head>
   <body>
@@ -39,8 +74,6 @@
           navigator.serviceWorker.register('/sw.js')
             .then((reg) => {
               console.log('[HOMS] Service Worker enregistré ✅', reg.scope)
-
-              // Notification de mise à jour disponible
               reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing
                 newWorker.addEventListener('statechange', () => {
