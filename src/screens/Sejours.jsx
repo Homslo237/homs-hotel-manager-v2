@@ -601,24 +601,24 @@ export default function Sejours({ onNouveauSejour }) {
               </div>
 
               {/* Montant + boutons */}
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'14px' }}>{s.montant} FCFA</span>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'nowrap', gap:'6px' }}>
+                <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px', whiteSpace:'nowrap' }}>{s.montant} FCFA</span>
                 <div style={{ display:'flex', gap:'6px' }}>
                   {/* Reçu entrée */}
                   <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
-                    style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'11px' }}>
-                    <Printer size={12}/> Entrée
+                    style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                    <Printer size={11}/> Entrée
                   </button>
                   {/* Prolonger ou Check-out */}
                   {s.statut==='en_cours' && (
                     <>
                       <button onClick={()=>setSejourAProlonger(s)}
-                        style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'11px' }}>
-                        <RefreshCw size={12}/> Prolonger
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        <RefreshCw size={11}/> Prolonger
                       </button>
                       <button onClick={()=>handleCheckout(s)}
-                        style={{ display:'flex', alignItems:'center', gap:'3px', padding:'6px 10px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'11px' }}>
-                        <LogOut size={12}/> Sortie
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        <LogOut size={11}/> Sortie
                       </button>
                     </>
                   )}
@@ -629,13 +629,14 @@ export default function Sejours({ onNouveauSejour }) {
         })}
       </div>
 
-      {/* Bouton + */}
+      {/* Bouton + centré en bas, toujours visible */}
       <button onClick={()=>setShowFormulaire(true)} style={{
-        position:'fixed', bottom:'80px', right:'20px',
+        position:'fixed', bottom:'80px', left:'50%',
+        transform:'translateX(-50%)',
         width:'56px', height:'56px', borderRadius:'28px',
         background:'#1B3A6B', color:'white',
         display:'flex', alignItems:'center', justifyContent:'center',
-        boxShadow:'0 4px 12px rgba(27,58,107,0.4)', zIndex:50, border:'none', cursor:'pointer'
+        boxShadow:'0 4px 20px rgba(27,58,107,0.5)', zIndex:50, border:'none', cursor:'pointer'
       }}>
         <Plus size={24}/>
       </button>
