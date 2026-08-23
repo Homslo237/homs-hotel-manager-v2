@@ -27,10 +27,11 @@ const ACCES = {
 }
 
 export default function App() {
-  const [ecran,       setEcran]       = useState('splash')
-  const [onglet,      setOnglet]      = useState('dashboard')
-  const [utilisateur, setUtilisateur] = useState(null) // { email, role }
-  const [cle,         setCle]         = useState(0)    // Force le re-render animé
+  const [ecran,          setEcran]          = useState('splash')
+  const [onglet,         setOnglet]         = useState('dashboard')
+  const [utilisateur,    setUtilisateur]    = useState(null) // { email, role }
+  const [cle,            setCle]            = useState(0)    // Force le re-render animé
+  const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false) // Ouvre formulaire séjour
 
   // Injection des styles de transition
   useEffect(() => {
@@ -89,7 +90,10 @@ export default function App() {
           <Chambres />
         )}
         {onglet === 'sejours' && accesRole.includes('sejours') && (
-          <Sejours />
+          <Sejours
+            ouvrirFormulaire={ouvrirFormulaire}
+            onFormulaireOuvert={() => setOuvrirFormulaire(false)}
+          />
         )}
         {onglet === 'caisse' && accesRole.includes('caisse') && (
           <Caisse />
@@ -107,7 +111,10 @@ export default function App() {
         onglet={onglet}
         setOnglet={changerOnglet}
         role={utilisateur?.role}
+        onAjouterSejour={() => {
+          setOuvrirFormulaire(true)
+        }}
       />
     </div>
   )
-}
+        }
