@@ -1,3 +1,60 @@
-Fichier 1 — index.html (à la racine) :
-Sur GitHub, clique sur index.html (dans la racine, pas dans src)
-✏️ → sélectionne tout → supprime → colle → Commit changes
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1B3A6B" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HOMS" />
+    <meta name="description" content="HOMS Hôtel Manager — Gestion hôtelière PME Afrique" />
+
+    <title>HOMS Hôtel Manager</title>
+
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Icône pour iOS (Apple) -->
+    <link rel="apple-touch-icon" href="/logo-homs.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+      /* Évite le flash blanc au démarrage */
+      html, body { background-color: #0A1628; margin: 0; padding: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Enregistrement du Service Worker PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('[HOMS] Service Worker enregistré ✅', reg.scope)
+
+              // Notification de mise à jour disponible
+              reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[HOMS] Nouvelle version disponible !')
+                  }
+                })
+              })
+            })
+            .catch((err) => {
+              console.log('[HOMS] Service Worker non enregistré :', err)
+            })
+        })
+      }
+    </script>
+  </body>
+</html>
