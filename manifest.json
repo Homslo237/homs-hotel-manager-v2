@@ -1,0 +1,44 @@
+{
+  "name": "HOMS Hôtel Manager",
+  "short_name": "HOMS",
+  "description": "Gestion hôtelière PME Afrique — Une vision d'ensemble",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A1628",
+  "theme_color": "#1B3A6B",
+  "orientation": "portrait",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/logo-homs.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-homs.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Séjours",
+      "short_name": "Séjours",
+      "description": "Voir les séjours en cours",
+      "url": "/",
+      "icons": [{ "src": "/logo-homs.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Caisse",
+      "short_name": "Caisse",
+      "description": "Caisse du jour",
+      "url": "/",
+      "icons": [{ "src": "/logo-homs.png", "sizes": "96x96" }]
+    }
+  ]
+}
+
