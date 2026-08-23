@@ -3,10 +3,12 @@
   "short_name": "HOMS",
   "description": "Gestion hôtelière PME Afrique — Une vision d'ensemble",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
   "background_color": "#0A1628",
   "theme_color": "#1B3A6B",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "lang": "fr",
   "icons": [
     {
@@ -22,7 +24,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [],
   "categories": ["business", "productivity"],
   "shortcuts": [
     {
@@ -41,4 +42,3 @@
     }
   ]
 }
-
