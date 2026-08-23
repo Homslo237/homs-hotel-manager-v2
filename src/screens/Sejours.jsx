@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Plus, Clock, LogIn, X, RefreshCw, Printer, Share2, LogOut } from 'lucide-react'
 
 // ─── Config par défaut (modifiable dans Menu → Directeur) ────────────────────
@@ -434,12 +434,20 @@ const statuts = {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Sejours({ onNouveauSejour }) {
+export default function Sejours({ onNouveauSejour, ouvrirFormulaire, onFormulaireOuvert }) {
   const [sejours, setSejours] = useState(sejoursInitiaux)
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState('tous')
   const [typeFiltre, setTypeFiltre] = useState('tous')
   const [showFormulaire, setShowFormulaire] = useState(false)
+
+  // Ouvrir le formulaire depuis la NavBar (bouton +)
+  useEffect(() => {
+    if (ouvrirFormulaire) {
+      setShowFormulaire(true)
+      if (onFormulaireOuvert) onFormulaireOuvert()
+    }
+  }, [ouvrirFormulaire])
   const [sejourAProlonger, setSejourAProlonger] = useState(null)
   const [recuVisible, setRecuVisible] = useState(null)   // { texte, titre }
 
@@ -629,17 +637,7 @@ export default function Sejours({ onNouveauSejour }) {
         })}
       </div>
 
-      {/* Bouton + centré en bas, toujours visible */}
-      <button onClick={()=>setShowFormulaire(true)} style={{
-        position:'fixed', bottom:'80px', left:'50%',
-        transform:'translateX(-50%)',
-        width:'56px', height:'56px', borderRadius:'28px',
-        background:'#1B3A6B', color:'white',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        boxShadow:'0 4px 20px rgba(27,58,107,0.5)', zIndex:50, border:'none', cursor:'pointer'
-      }}>
-        <Plus size={24}/>
-      </button>
+      {/* Bouton + géré par la NavBar */}
 
       {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter}/>}
       {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
