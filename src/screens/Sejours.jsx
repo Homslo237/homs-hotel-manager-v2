@@ -1,4 +1,92 @@
 import { useState, useEffect } from 'react'
+// ─── Styles Confetti ──────────────────────────────────────────────────────────
+const CONFETTI_STYLES = `
+  @keyframes confettiFall {
+    0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+  @keyframes confettiPop {
+    0%   { transform: scale(0) rotate(0deg);   opacity: 1; }
+    50%  { transform: scale(1.2) rotate(180deg); opacity: 1; }
+    100% { transform: scale(0.8) rotate(360deg); opacity: 0; }
+  }
+  @keyframes successPulse {
+    0%   { transform: scale(0.8); opacity: 0; }
+    50%  { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+`
+
+// ─── Particules confetti ──────────────────────────────────────────────────────
+const COULEURS_CONFETTI = ['#C9A84C','#F5D98A','#2ECC71','#1B3A6B','#E8634A','#fff','#FFD700']
+const FORMES = ['●', '■', '▲', '★', '◆']
+
+function Confetti({ onFin }) {
+  useEffect(() => {
+    // Injecter styles
+    const el = document.createElement('style')
+    el.textContent = CONFETTI_STYLES
+    document.head.appendChild(el)
+    // Disparaître après 3s
+    const t = setTimeout(onFin, 3000)
+    return () => { clearTimeout(t); document.head.removeChild(el) }
+  }, [])
+
+  const particules = Array.from({ length: 60 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    couleur: COULEURS_CONFETTI[Math.floor(Math.random() * COULEURS_CONFETTI.length)],
+    forme: FORMES[Math.floor(Math.random() * FORMES.length)],
+    taille: Math.random() * 14 + 8,
+    duree: Math.random() * 1.5 + 1.5,
+    delai: Math.random() * 0.8,
+  }))
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 999,
+      pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Message succès centré */}
+      <div style={{
+        position: 'absolute', top: '35%', left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'linear-gradient(135deg, #1B3A6B, #2C5282)',
+        borderRadius: '20px', padding: '20px 32px',
+        textAlign: 'center', zIndex: 1000,
+        boxShadow: '0 8px 32px rgba(27,58,107,0.5)',
+        animation: 'successPulse 0.4s ease both',
+        border: '2px solid #C9A84C',
+        pointerEvents: 'none',
+      }}>
+        <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
+        <div style={{ color: '#C9A84C', fontWeight: '800', fontSize: '18px' }}>
+          Séjour enregistré !
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginTop: '4px' }}>
+          Bienvenue au client 🏨
+        </div>
+      </div>
+
+      {/* Particules */}
+      {particules.map(p => (
+        <div key={p.id} style={{
+          position: 'absolute',
+          left: `${p.x}%`,
+          top: '-20px',
+          color: p.couleur,
+          fontSize: `${p.taille}px`,
+          animation: `confettiFall ${p.duree}s ease-in ${p.delai}s both`,
+          lineHeight: 1,
+        }}>
+          {p.forme}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+
 import { Search, Plus, Clock, LogIn, X, RefreshCw, Printer, Share2, LogOut } from 'lucide-react'
 
 // ─── Config par défaut (modifiable dans Menu → Directeur) ────────────────────
@@ -440,6 +528,7 @@ export default function Sejours({ onNouveauSejour, ouvrirFormulaire, onFormulair
   const [filtre, setFiltre] = useState('tous')
   const [typeFiltre, setTypeFiltre] = useState('tous')
   const [showFormulaire, setShowFormulaire] = useState(false)
+  const [showConfetti,   setShowConfetti]   = useState(false)
 
   // Ouvrir le formulaire depuis la NavBar (bouton +)
   useEffect(() => {
@@ -639,6 +728,7 @@ export default function Sejours({ onNouveauSejour, ouvrirFormulaire, onFormulair
 
       {/* Bouton + géré par la NavBar */}
 
+      {showConfetti && <Confetti onFin={() => setShowConfetti(false)}/>}
       {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter}/>}
       {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
       {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
