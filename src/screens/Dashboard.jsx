@@ -115,17 +115,17 @@ function GraphiqueCA({ data, visible }) {
 
 // ─── Jauge circulaire taux occupation ─────────────────────────────────────────
 function JaugeCirculaire({ pct, couleur, label, valeur, visible }) {
-  const r = 28
+  const r = 22
   const circonference = 2 * Math.PI * r
   const offset = circonference - (visible ? pct / 100 : 0) * circonference
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
-      <div style={{ position:'relative', width:'72px', height:'72px' }}>
-        <svg width="72" height="72" style={{ transform:'rotate(-90deg)' }}>
-          <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6"/>
-          <circle cx="36" cy="36" r={r} fill="none"
-            stroke={couleur} strokeWidth="6"
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', flex:1 }}>
+      <div style={{ position:'relative', width:'56px', height:'56px' }}>
+        <svg width="56" height="56" style={{ transform:'rotate(-90deg)' }}>
+          <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5"/>
+          <circle cx="28" cy="28" r={r} fill="none"
+            stroke={couleur} strokeWidth="5"
             strokeDasharray={circonference}
             strokeDashoffset={offset}
             strokeLinecap="round"
@@ -133,10 +133,10 @@ function JaugeCirculaire({ pct, couleur, label, valeur, visible }) {
           />
         </svg>
         <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontSize:'14px', fontWeight:'800', color:couleur }}>{valeur}</span>
+          <span style={{ fontSize:'12px', fontWeight:'800', color:couleur }}>{valeur}</span>
         </div>
       </div>
-      <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.6)', textAlign:'center' }}>{label}</div>
+      <div style={{ fontSize:'9px', color:'rgba(255,255,255,0.6)', textAlign:'center' }}>{label}</div>
     </div>
   )
 }
@@ -210,7 +210,7 @@ export default function Dashboard({ utilisateur }) {
             <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'2px' }}>
               Bonjour 👋 <span style={{ color:'#C9A84C', fontWeight:'600' }}>{prenom}</span>
             </p>
-            <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'800', letterSpacing:'0.5px' }}>
+            <h1 style={{ color:'#C9A84C', fontSize:'18px', fontWeight:'800', letterSpacing:'0.5px', lineHeight:'1.2' }}>
               Tableau de bord
             </h1>
             <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'10px', marginTop:'4px', letterSpacing:'2px' }}>
@@ -218,7 +218,7 @@ export default function Dashboard({ utilisateur }) {
             </p>
           </div>
           <div style={{ textAlign:'right' }}>
-            <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'22px', letterSpacing:'1px' }}>
+            <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'1px' }}>
               {heureActuelle}
             </div>
             <div style={{ color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'2px' }}>
@@ -232,7 +232,7 @@ export default function Dashboard({ utilisateur }) {
         </div>
 
         {/* ── Jauges circulaires ── */}
-        <div style={{ display:'flex', justifyContent:'space-around', marginTop:'20px', paddingTop:'16px', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display:'flex', justifyContent:'space-around', marginTop:'20px', paddingTop:'16px', borderTop:'1px solid rgba(255,255,255,0.1)', overflowX:'hidden', gap:'4px' }}>
           <JaugeCirculaire pct={tauxOcc}                             couleur="#2ECC71" label="Occupation"  valeur={`${tauxOcc}%`} visible={visible}/>
           <JaugeCirculaire pct={chambresData.disponibles/chambresData.total*100} couleur="#C9A84C" label="Disponibles" valeur={chambresData.disponibles} visible={visible}/>
           <JaugeCirculaire pct={chambresData.nettoyer/chambresData.total*100}    couleur="#E8634A" label="Nettoyage"   valeur={chambresData.nettoyer}    visible={visible}/>
@@ -376,80 +376,4 @@ export default function Dashboard({ utilisateur }) {
             </span>
           </div>
           {arriveesDuJour.map((a,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:'4px solid #2ECC71', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay:`${i*0.1}s` }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                <div style={{ width:'36px', height:'36px', borderRadius:'10px', background:'#F0FFF4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>
-                  {i===0?'👨':'👩'}
-                </div>
-                <div>
-                  <div style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{a.nom}</div>
-                  <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {a.chambre} · {a.categorie}</div>
-                </div>
-              </div>
-              <div style={{ background:'#F0FFF4', borderRadius:'10px', padding:'6px 12px', color:'#2ECC71', fontWeight:'800', fontSize:'13px' }}>
-                {a.heure}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Départs ── */}
-        <div style={{ marginBottom:'16px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#FFF3E0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <LogOut size={16} color="#E8634A"/>
-            </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Départs du jour</h3>
-            <span style={{ background:'#E8634A', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {departsDuJour.length}
-            </span>
-          </div>
-          {departsDuJour.map((d,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${d.statut==='fait'?'#CCC':'#E8634A'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay:`${i*0.1}s`, opacity: d.statut==='fait' ? 0.7 : 1 }}>
-              <div>
-                <div style={{ fontWeight:'700', fontSize:'14px', color:d.statut==='fait'?'#999':'#1B3A6B' }}>{d.nom}</div>
-                <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {d.chambre}</div>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px' }}>
-                <div style={{ background:d.statut==='fait'?'#F5F5F5':'#FFF3E0', borderRadius:'10px', padding:'6px 12px', color:d.statut==='fait'?'#999':'#E8634A', fontWeight:'800', fontSize:'13px' }}>
-                  {d.heure}
-                </div>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:d.statut==='fait'?'#2ECC71':'#E8634A' }}>
-                  {d.statut==='fait' ? '✅ Parti' : '⏳ En attente'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Séjours en cours ── */}
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Moon size={16} color="#1B3A6B"/>
-            </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
-            <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {sejoursEnCours.length}
-            </span>
-          </div>
-          {sejoursEnCours.map((s,i) => (
-            <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay:`${i*0.08}s` }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
-                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montant)} F</span>
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#888' }}>
-                <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
-                <span style={{ color:s.type==='heure'?'#E8634A':'#1B3A6B', fontWeight:'600' }}>
-                  Départ : {s.type==='nuit' ? s.dateDepart : s.heureDepart}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-      </div>
-    </div>
-  )
-}
+            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 
