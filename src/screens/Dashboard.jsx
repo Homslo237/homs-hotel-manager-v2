@@ -56,13 +56,7 @@ const caJours = [
   { jour:'Auj', montant:258500 },
 ]
 
-const sejoursEnCours = [
-  { id:1, client:'M. Kouassi Ama',   chambre:'205', categorie:'Confort',  type:'nuit',  montant:105000, dateDepart:'24/08/2026', heureDepart:'12:00' },
-  { id:2, client:'Mme Diallo Fatou', chambre:'101', categorie:'Standard', type:'nuit',  montant:50000,  dateDepart:'23/08/2026', heureDepart:'12:00' },
-  { id:3, client:'M. Bamba Seydou',  chambre:'302', categorie:'Suite',    type:'heure', montant:19500,  dateDepart:'22/08/2026', heureDepart:'15:30' },
-  { id:4, client:'Mme Kouassi',      chambre:'201', categorie:'Confort',  type:'nuit',  montant:70000,  dateDepart:'25/08/2026', heureDepart:'12:00' },
-  { id:5, client:'M. Mbeki Carlos',  chambre:'203', categorie:'Confort',  type:'heure', montant:14000,  dateDepart:'22/08/2026', heureDepart:'13:00' },
-]
+// sejours viennent des props
 
 const arriveesDuJour = [
   { nom:'M. Dupont Jean',    chambre:'104', heure:'14h00', categorie:'Standard' },
@@ -164,7 +158,7 @@ function CompteurAnime({ valeur, duree = 1200, visible }) {
 }
 
 // ─── Dashboard principal ──────────────────────────────────────────────────────
-export default function Dashboard({ utilisateur }) {
+export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16 }) {
   const [heureActuelle, setHeureActuelle] = useState(heure())
   const [visible, setVisible] = useState(false)
   const [refresh, setRefresh] = useState(false)
@@ -184,8 +178,8 @@ export default function Dashboard({ utilisateur }) {
     return () => clearInterval(interval)
   }, [])
 
-  const soldeNet = caisse.totalSejours + caisse.totalEntrees - caisse.totalSorties
-  const tauxOcc  = Math.round((chambresData.occupees / chambresData.total) * 100)
+  const soldeNet = caisse.totalSejours||0 + caisse.totalEntrees||0 - caisse.totalSorties||0
+  const tauxOcc  = Math.round((chambresStats.occupees / chambresStats.total) * 100)
 
   const handleRefresh = () => {
     setRefresh(true)
@@ -238,9 +232,9 @@ export default function Dashboard({ utilisateur }) {
         {/* ── Jauges circulaires ── */}
         <div style={{ display:'flex', justifyContent:'space-around', marginTop:'20px', paddingTop:'16px', borderTop:'1px solid rgba(255,255,255,0.1)', overflowX:'hidden', gap:'4px' }}>
           <JaugeCirculaire pct={tauxOcc}                             couleur="#2ECC71" label="Occupation"  valeur={`${tauxOcc}%`} visible={visible}/>
-          <JaugeCirculaire pct={chambresData.disponibles/chambresData.total*100} couleur="#C9A84C" label="Disponibles" valeur={chambresData.disponibles} visible={visible}/>
-          <JaugeCirculaire pct={chambresData.nettoyer/chambresData.total*100}    couleur="#E8634A" label="Nettoyage"   valeur={chambresData.nettoyer}    visible={visible}/>
-          <JaugeCirculaire pct={chambresData.problemes/chambresData.total*100}   couleur="#E74C3C" label="Problèmes"   valeur={chambresData.problemes}    visible={visible}/>
+          <JaugeCirculaire pct={chambresStats.disponibles/chambresStats.total*100} couleur="#C9A84C" label="Disponibles" valeur={chambresStats.disponibles} visible={visible}/>
+          <JaugeCirculaire pct={chambresStats.nettoyer/chambresStats.total*100}    couleur="#E8634A" label="Nettoyage"   valeur={chambresStats.nettoyer}    visible={visible}/>
+          <JaugeCirculaire pct={chambresStats.problemes/chambresStats.total*100}   couleur="#E74C3C" label="Problèmes"   valeur={chambresStats.problemes}    visible={visible}/>
         </div>
       </div>
 
@@ -276,19 +270,19 @@ export default function Dashboard({ utilisateur }) {
           <div style={{ marginTop:'12px', paddingTop:'12px', borderTop:'1px solid rgba(255,255,255,0.1)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', fontSize:'11px' }}>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>🌙 Nuits</div>
-              <div style={{ color:'#C9A84C', fontWeight:'700' }}>{fmt(caisse.totalNuits)} F</div>
+              <div style={{ color:'#C9A84C', fontWeight:'700' }}>{fmt(caisse.totalNuits||0)} F</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>⏱️ Heures</div>
-              <div style={{ color:'#E8634A', fontWeight:'700' }}>{fmt(caisse.totalHeures)} F</div>
+              <div style={{ color:'#E8634A', fontWeight:'700' }}>{fmt(caisse.totalHeures||0)} F</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>📥 Entrées</div>
-              <div style={{ color:'#2ECC71', fontWeight:'700' }}>+{fmt(caisse.totalEntrees)} F</div>
+              <div style={{ color:'#2ECC71', fontWeight:'700' }}>+{fmt(caisse.totalEntrees||0)} F</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>📤 Sorties</div>
-              <div style={{ color:'#FF8A80', fontWeight:'700' }}>-{fmt(caisse.totalSorties)} F</div>
+              <div style={{ color:'#FF8A80', fontWeight:'700' }}>-{fmt(caisse.totalSorties||0)} F</div>
             </div>
           </div>
         </div>
@@ -296,13 +290,13 @@ export default function Dashboard({ utilisateur }) {
         {/* ── 4 cases chambres animées ── */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
           {[
-            { label:'Disponibles', valeur:chambresData.disponibles, couleur:'#2ECC71', icone:Home,          bg:'#F0FFF4', delay:'0s'   },
-            { label:'Occupées',    valeur:chambresData.occupees,    couleur:'#1B3A6B', icone:Briefcase,     bg:'#EEF2FF', delay:'0.1s' },
-            { label:'À nettoyer',  valeur:chambresData.nettoyer,    couleur:'#C9A84C', icone:Sparkles,      bg:'#FFFBF0', delay:'0.2s' },
-            { label:'Problèmes',   valeur:chambresData.problemes,   couleur:'#E74C3C', icone:AlertTriangle, bg:'#FFF5F5', delay:'0.3s' },
+            { label:'Disponibles', valeur:chambresStats.disponibles, couleur:'#2ECC71', icone:Home,          bg:'#F0FFF4', delay:'0s'   },
+            { label:'Occupées',    valeur:chambresStats.occupees,    couleur:'#1B3A6B', icone:Briefcase,     bg:'#EEF2FF', delay:'0.1s' },
+            { label:'À nettoyer',  valeur:chambresStats.nettoyer,    couleur:'#C9A84C', icone:Sparkles,      bg:'#FFFBF0', delay:'0.2s' },
+            { label:'Problèmes',   valeur:chambresStats.problemes,   couleur:'#E74C3C', icone:AlertTriangle, bg:'#FFF5F5', delay:'0.3s' },
           ].map((s,i) => {
             const Icone = s.icone
-            const pct = Math.round((s.valeur / chambresData.total) * 100)
+            const pct = Math.round((s.valeur / chambresStats.total) * 100)
             return (
               <div key={i} className="card-anim" style={{
                 background:'white', borderRadius:'16px', padding:'16px',
@@ -315,7 +309,7 @@ export default function Dashboard({ utilisateur }) {
                     <Icone size={20} color={s.couleur}/>
                   </div>
                   <span style={{ fontSize:'11px', color:'#888', background:'#F5F5F5', padding:'2px 8px', borderRadius:'10px' }}>
-                    /{chambresData.total}
+                    /{chambresStats.total}
                   </span>
                 </div>
                 <div style={{ fontSize:'30px', fontWeight:'900', color:s.couleur, lineHeight:1 }}>
@@ -340,7 +334,7 @@ export default function Dashboard({ utilisateur }) {
         </div>
 
         {/* ── Séjours à l'heure ── */}
-        {sejoursEnCours.filter(s=>s.type==='heure').length > 0 && (
+        {sejours.filter(s=>s.type==='heure').length > 0 && (
           <div style={{ background:'linear-gradient(135deg, #FFF8F0, #FFF3E8)', borderRadius:'16px', padding:'14px 16px', marginBottom:'16px', border:'1px solid #E8634A22', boxShadow:'0 2px 12px rgba(232,99,74,0.1)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
               <div style={{ position:'relative' }}>
@@ -348,10 +342,10 @@ export default function Dashboard({ utilisateur }) {
                 <div style={{ position:'absolute', inset:'-3px', borderRadius:'50%', border:'2px solid #E8634A', animation:'pulse-ring 2s ease-out infinite' }}/>
               </div>
               <span style={{ fontWeight:'800', fontSize:'13px', color:'#E8634A' }}>
-                Séjours à l'heure · {sejoursEnCours.filter(s=>s.type==='heure').length} en cours
+                Séjours à l'heure · {sejours.filter(s=>s.type==='heure').length} en cours
               </span>
             </div>
-            {sejoursEnCours.filter(s=>s.type==='heure').map((s,i)=>(
+            {sejours.filter(s=>s.type==='heure').map((s,i)=>(
               <div key={s.id} className="fade-slide" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'white', borderRadius:'10px', marginBottom:'6px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', animationDelay: (i*0.1)+'s' }}>
                 <div>
                   <div style={{ fontSize:'13px', fontWeight:'700', color:'#1B3A6B' }}>{s.client.split(' ').pop()}</div>
@@ -434,10 +428,10 @@ export default function Dashboard({ utilisateur }) {
             </div>
             <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
             <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {sejoursEnCours.length}
+              {sejours.length}
             </span>
           </div>
-          {sejoursEnCours.map((s,i) => (
+          {sejours.map((s,i) => (
             <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: (i*0.08)+'s' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
                 <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
