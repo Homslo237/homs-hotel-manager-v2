@@ -205,27 +205,31 @@ export default function Dashboard({ utilisateur }) {
         <div style={{ position:'absolute', top:'-30px', right:'-30px', width:'120px', height:'120px', borderRadius:'50%', background:'rgba(201,168,76,0.08)' }}/>
         <div style={{ position:'absolute', bottom:'-20px', left:'-20px', width:'80px', height:'80px', borderRadius:'50%', background:'rgba(201,168,76,0.05)' }}/>
 
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', position:'relative' }}>
+        {/* Ligne 1 : Bonjour + Heure */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
+          <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', margin:0 }}>
+            Bonjour 👋 <span style={{ color:'#C9A84C', fontWeight:'700' }}>{prenom}</span>
+          </p>
+          <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'1px' }}>
+            {heureActuelle}
+          </div>
+        </div>
+        {/* Ligne 2 : Titre + Date + Actualiser */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
-            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'2px' }}>
-              Bonjour 👋 <span style={{ color:'#C9A84C', fontWeight:'600' }}>{prenom}</span>
-            </p>
-            <h1 style={{ color:'#C9A84C', fontSize:'18px', fontWeight:'800', letterSpacing:'0.5px', lineHeight:'1.2' }}>
+            <h1 style={{ color:'#C9A84C', fontSize:'16px', fontWeight:'800', letterSpacing:'0.5px', margin:0, whiteSpace:'nowrap' }}>
               Tableau de bord
             </h1>
-            <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'10px', marginTop:'4px', letterSpacing:'2px' }}>
+            <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'9px', marginTop:'3px', letterSpacing:'2px' }}>
               UNE VISION D'ENSEMBLE
             </p>
           </div>
-          <div style={{ textAlign:'right' }}>
-            <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'1px' }}>
-              {heureActuelle}
-            </div>
-            <div style={{ color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'2px' }}>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px' }}>
+            <div style={{ color:'rgba(255,255,255,0.4)', fontSize:'11px' }}>
               {new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' })}
             </div>
-            <button onClick={handleRefresh} style={{ marginTop:'6px', background:'rgba(255,255,255,0.12)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px', marginLeft:'auto' }}>
-              <RefreshCw size={13} color="#C9A84C" style={{ animation: refresh ? 'spin 0.6s linear infinite' : 'none' }}/>
+            <button onClick={handleRefresh} style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:'8px', padding:'5px 8px', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
+              <RefreshCw size={12} color="#C9A84C" style={{ animation: refresh ? 'spin 0.6s linear infinite' : 'none' }}/>
               <span style={{ color:'rgba(255,255,255,0.5)', fontSize:'10px' }}>Actualiser</span>
             </button>
           </div>
@@ -372,84 +376,4 @@ export default function Dashboard({ utilisateur }) {
               Arrivées du jour
             </h3>
             <span style={{ background:'#2ECC71', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {arriveesDuJour.length}
-            </span>
-          </div>
-          {arriveesDuJour.map((a,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:'4px solid #2ECC71', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                <div style={{ width:'36px', height:'36px', borderRadius:'10px', background:'#F0FFF4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>
-                  {i===0?'👨':'👩'}
-                </div>
-                <div>
-                  <div style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{a.nom}</div>
-                  <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {a.chambre} · {a.categorie}</div>
-                </div>
-              </div>
-              <div style={{ background:'#F0FFF4', borderRadius:'10px', padding:'6px 12px', color:'#2ECC71', fontWeight:'800', fontSize:'13px' }}>
-                {a.heure}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Départs ── */}
-        <div style={{ marginBottom:'16px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#FFF3E0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <LogOut size={16} color="#E8634A"/>
-            </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Départs du jour</h3>
-            <span style={{ background:'#E8634A', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {departsDuJour.length}
-            </span>
-          </div>
-          {departsDuJour.map((d,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${d.statut==='fait'?'#CCC':'#E8634A'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s', opacity: d.statut==='fait' ? 0.7 : 1 }}>
-              <div>
-                <div style={{ fontWeight:'700', fontSize:'14px', color:d.statut==='fait'?'#999':'#1B3A6B' }}>{d.nom}</div>
-                <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {d.chambre}</div>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px' }}>
-                <div style={{ background:d.statut==='fait'?'#F5F5F5':'#FFF3E0', borderRadius:'10px', padding:'6px 12px', color:d.statut==='fait'?'#999':'#E8634A', fontWeight:'800', fontSize:'13px' }}>
-                  {d.heure}
-                </div>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:d.statut==='fait'?'#2ECC71':'#E8634A' }}>
-                  {d.statut==='fait' ? '✅ Parti' : '⏳ En attente'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Séjours en cours ── */}
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Moon size={16} color="#1B3A6B"/>
-            </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
-            <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {sejoursEnCours.length}
-            </span>
-          </div>
-          {sejoursEnCours.map((s,i) => (
-            <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: (i*0.08)+'s' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
-                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montant)} F</span>
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#888' }}>
-                <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
-                <span style={{ color:s.type==='heure'?'#E8634A':'#1B3A6B', fontWeight:'600' }}>
-                  Départ : {s.type==='nuit' ? s.dateDepart : s.heureDepart}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-      </div>
-    </div>
-  )
-}
+              {arriveesDuJour.leng
