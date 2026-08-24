@@ -348,7 +348,7 @@ export default function Dashboard({ utilisateur }) {
               </span>
             </div>
             {sejoursEnCours.filter(s=>s.type==='heure').map((s,i)=>(
-              <div key={s.id} className="fade-slide" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'white', borderRadius:'10px', marginBottom:'6px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', animationDelay:`${i*0.1}s` }}>
+              <div key={s.id} className="fade-slide" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'white', borderRadius:'10px', marginBottom:'6px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', animationDelay: (i*0.1)+'s' }}>
                 <div>
                   <div style={{ fontSize:'13px', fontWeight:'700', color:'#1B3A6B' }}>{s.client.split(' ').pop()}</div>
                   <div style={{ fontSize:'11px', color:'#888' }}>Ch. {s.chambre} · {s.categorie}</div>
@@ -376,4 +376,4 @@ export default function Dashboard({ utilisateur }) {
             </span>
           </div>
           {arriveesDuJour.map((a,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 
+            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px
