@@ -404,10 +404,10 @@ function ModalPassation({ sejours, entrees, sorties, onClose }) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Caisse() {
-  const [sejours]         = useState(encaissementsSejours)
-  const [entrees, setEntrees] = useState([])
-  const [sorties, setSorties] = useState([])
+export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses=[], onAjouterEntree, onAjouterSortie, caisse={} }) {
+  // Les données viennent de App.jsx (état global)
+  const entrees = entreesDiverses
+  const sorties = sortiesDiverses
   const [onglet, setOnglet]   = useState('sejours')
   const [showEntree, setShowEntree]       = useState(false)
   const [showSortie, setShowSortie]       = useState(false)
