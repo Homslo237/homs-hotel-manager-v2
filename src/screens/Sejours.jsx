@@ -432,7 +432,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
         <div style={{ marginBottom:'14px' }}>
           <label style={labelStyle}>Type de séjour</label>
           <div style={{ display:'flex', borderRadius:'10px', overflow:'hidden', border:'2px solid #E0E0E0' }}>
-            {[{val:'nuit',label:'🌙 À la nuit'},{val:'heure',label:"⏱️ À l'heure"}].map(t=>(
+            {[{val:'nuit',label:'🌙 À la nuit'},{val:'heure',label:'⏱️ A l heure'}].map(t=>(
               <button key={t.val} onClick={()=>setForm({...form,typeSejour:t.val})} style={{
                 flex:1, padding:'12px', fontWeight:'700', fontSize:'13px', border:'none', cursor:'pointer',
                 background:form.typeSejour===t.val?'#1B3A6B':'white',
@@ -446,14 +446,275 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
         {form.typeSejour==='nuit' ? (
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' }}>
             <div>
-              <label style={labelStyle}>Date d'arrivée</label>
+              <label style={labelStyle}>Date arrivee</label>
               <input type="date" value={form.dateArrivee.split('/').reverse().join('-')}
                 onChange={e=>{const[a,m,j]=e.target.value.split('-');setForm({...form,dateArrivee:`${j}/${m}/${a}`})}}
                 style={inputStyle}/>
             </div>
             <div>
-              <label style={labelStyle}>Date de départ</label>
+              <label style={labelStyle}>Date depart</label>
               <input type="date" value={form.dateDepart.split('/').reverse().join('-')}
                 onChange={e=>{const[a,m,j]=e.target.value.split('-');setForm({...form,dateDepart:`${j}/${m}/${a}`})}}
                 style={inputStyle}/>
-            </di
+            </div>
+          </div>
+        ):(
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' }}>
+            <div>
+              <label style={labelStyle}>Heure arrivee</label>
+              <input type="time" value={form.heureArrivee} onChange={e=>setForm({...form,heureArrivee:e.target.value})} style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Heure depart</label>
+              <input type="time" value={form.heureDepart} onChange={e=>setForm({...form,heureDepart:e.target.value})} style={inputStyle}/>
+            </div>
+          </div>
+        )}
+
+        {/* Mode paiement */}
+        <div style={{ marginBottom:'16px' }}>
+          <label style={labelStyle}>Mode de paiement</label>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+            {[{val:'Espèces',icon:'💵'},{val:'Orange Money',icon:'🟠'},{val:'MTN Mobile Money',icon:'🟡'},{val:'Carte bancaire',icon:'💳'}].map(m=>(
+              <button key={m.val} onClick={()=>setForm({...form,modePaiement:m.val})} style={{
+                padding:'10px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer',
+                border:form.modePaiement===m.val?'2px solid #C9A84C':'2px solid #E0E0E0',
+                background:form.modePaiement===m.val?'#FFFBF0':'white',
+                color:form.modePaiement===m.val?'#C9A84C':'#666',
+              }}>{m.icon} {m.val}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Montant calculé */}
+        {form.chambre && (
+          <div style={{ background:'#F0F7F0', borderRadius:'12px', padding:'14px', marginBottom:'16px', border:'1px solid #2ECC71' }}>
+            <div style={{ fontSize:'12px', color:'#666', marginBottom:'4px' }}>Montant total calculé</div>
+            <div style={{ fontSize:'26px', fontWeight:'800', color:'#1B3A6B' }}>{montantTotal().toLocaleString('fr-FR')} FCFA</div>
+            <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Ch. {form.chambre} · {form.categorie} · {dureeCalculee().label}</div>
+          </div>
+        )}
+
+        <button onClick={handleValider} disabled={!peutValider} style={{
+          width:'100%', padding:'16px', borderRadius:'12px', border:'none',
+          cursor:peutValider?'pointer':'not-allowed',
+          background:peutValider?'#1B3A6B':'#CCC',
+          color:'white', fontWeight:'800', fontSize:'15px',
+        }}>
+          ✅ Enregistrer le séjour
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Séjours initiaux ─────────────────────────────────────────────────────────
+const sejoursInitiaux = [
+  { id:1, client:'M. Kouassi Ama', telephone:'+225 07 11 22 33', chambre:'205', categorie:'Confort', dateArrivee:'18/08/2026', heureArrivee:'14:00', dateDepart:'21/08/2026', heureDepart:'12:00', duree:'3 nuits', type:'nuit', statut:'en_cours', montant:'105 000', modePaiement:'Orange Money' },
+  { id:2, client:'Mme Diallo Fatou', telephone:'+225 05 44 55 66', chambre:'101', categorie:'Standard', dateArrivee:'17/08/2026', heureArrivee:'10:00', dateDepart:'19/08/2026', heureDepart:'12:00', duree:'2 nuits', type:'nuit', statut:'en_cours', montant:'50 000', modePaiement:'Espèces' },
+  { id:3, client:'M. Bamba Seydou', telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite', dateArrivee:'21/08/2026', heureArrivee:'09:30', dateDepart:'21/08/2026', heureDepart:'12:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500', modePaiement:'MTN Mobile Money' },
+]
+
+const statuts = {
+  en_cours: { label:'En cours', couleur:'#2ECC71' },
+  a_venir:  { label:'À venir',  couleur:'#C9A84C' },
+  termine:  { label:'Terminé',  couleur:'#999'    },
+}
+
+// ─── Composant principal ──────────────────────────────────────────────────────
+export default function Sejours({ sejours:sejoursProps, onAjouter, onTerminer, onProlonger, ouvrirFormulaire, onFormulaireOuvert }) {
+  // sejours viennent de App.jsx (état global)
+  const sejours = sejoursProps || []
+  const [recherche, setRecherche] = useState('')
+  const [filtre, setFiltre] = useState('tous')
+  const [typeFiltre, setTypeFiltre] = useState('tous')
+  const [showFormulaire, setShowFormulaire] = useState(false)
+  const [showConfetti,   setShowConfetti]   = useState(false)
+
+  // Ouvrir le formulaire depuis la NavBar (bouton +)
+  useEffect(() => {
+    if (ouvrirFormulaire) {
+      setShowFormulaire(true)
+      if (onFormulaireOuvert) onFormulaireOuvert()
+    }
+  }, [ouvrirFormulaire])
+  const [sejourAProlonger, setSejourAProlonger] = useState(null)
+  const [recuVisible, setRecuVisible] = useState(null)   // { texte, titre }
+
+  const filtresSejours = sejours.filter(s => {
+    const matchR = s.client.toLowerCase().includes(recherche.toLowerCase()) || s.chambre.includes(recherche)
+    const matchF = filtre==='tous' || s.statut===filtre
+    const matchT = typeFiltre==='tous' || s.type===typeFiltre
+    return matchR && matchF && matchT
+  })
+
+  const enCours = sejours.filter(s=>s.statut==='en_cours').length
+  const parHeure = sejours.filter(s=>s.type==='heure'&&s.statut==='en_cours').length
+  const parNuit  = sejours.filter(s=>s.type==='nuit' &&s.statut==='en_cours').length
+
+  const handleAjouter = (nouveau) => {
+    setSejours(prev=>[{ ...nouveau, id:Date.now() }, ...prev])
+    if (onNouveauSejour) onNouveauSejour(nouveau)
+  }
+
+  const handleProlonger = (id, ajout, supplement) => {
+    if (onProlonger) onProlonger(id, supplement)
+  }
+
+  const handleCheckout = (s) => {
+    const tr = tempsRestant(s)
+    let supplement = 0
+    let depassage = ''
+    if (tr.depasse && tr.depasseMinutes > CONFIG.toleranceDepassementMinutes) {
+      const tarif = s.type==='nuit' ? tarifsNuit[s.categorie] : tarifsHeure[s.categorie]
+      const unites = s.type==='nuit'
+        ? Math.ceil(tr.depasseMinutes / (24*60))
+        : Math.ceil(tr.depasseMinutes / 60)
+      supplement = tarif * unites
+      depassage = `${Math.floor(tr.depasseMinutes/60)}h${String(tr.depasseMinutes%60).padStart(2,'0')}`
+    }
+    const texte = genererRecuSortie(s, supplement, depassage)
+    if (onTerminer) onTerminer(s.id)
+    setRecuVisible({ texte, titre:"🧾 REÇU DE SORTIE" })
+  }
+
+  return (
+    <div style={{ paddingBottom:'80px' }}>
+      {/* Header */}
+      <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
+        <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Séjours</h1>
+        <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>
+          {enCours} en cours · {parHeure} à l'heure · {parNuit} à la nuit
+        </p>
+      </div>
+
+      <div style={{ padding:'16px 20px' }}>
+        {/* Stats */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
+          <div style={{ background:'#2ECC71', borderRadius:'12px', padding:'14px', color:'white', textAlign:'center' }}>
+            <LogIn size={20} style={{ marginBottom:'4px' }} />
+            <div style={{ fontSize:'22px', fontWeight:'700' }}>{parNuit}</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>À la nuit</div>
+          </div>
+          <div style={{ background:'#E8634A', borderRadius:'12px', padding:'14px', color:'white', textAlign:'center' }}>
+            <Clock size={20} style={{ marginBottom:'4px' }} />
+            <div style={{ fontSize:'22px', fontWeight:'700' }}>{parHeure}</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>A l'heure</div>
+          </div>
+        </div>
+
+        {/* Filtres type */}
+        <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
+          {['tous','nuit','heure'].map(t=>(
+            <button key={t} onClick={()=>setTypeFiltre(t)} style={{
+              padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', border:'none', cursor:'pointer',
+              background:typeFiltre===t?'#E8634A':'#F0F0F0',
+              color:typeFiltre===t?'white':'#666',
+            }}>{t==='tous'?'Tous types':t==='nuit'?'🌙 Nuit':'⏱️ Heure'}</button>
+          ))}
+        </div>
+
+        {/* Recherche */}
+        <div style={{ position:'relative', marginBottom:'12px' }}>
+          <Search size={18} style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#999' }} />
+          <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="Rechercher un client ou chambre..."
+            style={{ ...inputStyle, paddingLeft:'42px' }} />
+        </div>
+
+        {/* Filtres statut */}
+        <div style={{ display:'flex', gap:'8px', overflowX:'auto', marginBottom:'16px', paddingBottom:'4px' }}>
+          {[{id:'tous',label:'Tous'},{id:'en_cours',label:'En cours'},{id:'a_venir',label:'À venir'},{id:'termine',label:'Terminés'}].map(f=>(
+            <button key={f.id} onClick={()=>setFiltre(f.id)} style={{
+              padding:'6px 14px', borderRadius:'20px', fontSize:'13px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer',
+              background:filtre===f.id?'#1B3A6B':'#F0F0F0',
+              color:filtre===f.id?'white':'#666',
+            }}>{f.label}</button>
+          ))}
+        </div>
+
+        {/* Liste séjours */}
+        {filtresSejours.length===0 && (
+          <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
+            <div style={{ fontSize:'32px', marginBottom:'8px' }}>🏨</div>
+            <p>Aucun séjour trouvé</p>
+          </div>
+        )}
+
+        {filtresSejours.map(s=>{
+          const st = statuts[s.statut]||statuts.en_cours
+          const tr = s.statut==='en_cours' ? tempsRestant(s) : null
+          return (
+            <div key={s.id} style={{
+              background:'white', borderRadius:'12px', padding:'16px', marginBottom:'10px',
+              boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
+              borderLeft:`4px solid ${tr?.depasse?'#E74C3C':s.type==='heure'?'#E8634A':st.couleur}`
+            }}>
+              {/* Nom + statut */}
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                <span style={{ fontWeight:'700', fontSize:'15px', color:'#1B3A6B' }}>{s.client}</span>
+                <span style={{ background:tr?.depasse?'#E74C3C':st.couleur, color:'white', fontSize:'10px', fontWeight:'600', padding:'3px 8px', borderRadius:'10px' }}>
+                  {tr?.depasse?'⚠️ Dépassé':st.label}
+                </span>
+              </div>
+
+              {/* Téléphone */}
+              <div style={{ fontSize:'12px', color:'#888', marginBottom:'6px' }}>📞 {s.telephone}</div>
+
+              {/* Infos chambre */}
+              <div style={{ display:'flex', gap:'10px', fontSize:'12px', color:'#666', marginBottom:'6px', flexWrap:'wrap' }}>
+                <span>🏨 Ch. {s.chambre}</span>
+                <span>📋 {s.categorie}</span>
+                <span>{s.type==='heure'?'⏱️':'🌙'} {s.duree}</span>
+                <span>💰 {s.modePaiement}</span>
+              </div>
+
+              {/* Temps */}
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'10px' }}>
+                <span style={{ color:'#999' }}>
+                  {s.type==='nuit' ? `${s.dateArrivee} → ${s.dateDepart}` : `${s.heureArrivee} → ${s.heureDepart}`}
+                </span>
+                {tr && (
+                  <span style={{ color:tr.depasse?'#E74C3C':'#888', fontWeight:'600', fontSize:'11px' }}>
+                    {tr.depasse?'🔴 Dépassé':`⏳ ${tr.label}`}
+                  </span>
+                )}
+              </div>
+
+              {/* Montant + boutons */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'nowrap', gap:'6px' }}>
+                <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px', whiteSpace:'nowrap' }}>{s.montant} FCFA</span>
+                <div style={{ display:'flex', gap:'6px' }}>
+                  {/* Reçu entrée */}
+                  <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
+                    style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                    <Printer size={11}/> Entrée
+                  </button>
+                  {/* Prolonger ou Check-out */}
+                  {s.statut==='en_cours' && (
+                    <>
+                      <button onClick={()=>setSejourAProlonger(s)}
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        <RefreshCw size={11}/> Prolonger
+                      </button>
+                      <button onClick={()=>handleCheckout(s)}
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        <LogOut size={11}/> Sortie
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Bouton + géré par la NavBar */}
+
+      {showConfetti && <Confetti onFin={() => setShowConfetti(false)}/>}
+      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter}/>}
+      {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
+      {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
+    </div>
+  )
+}
