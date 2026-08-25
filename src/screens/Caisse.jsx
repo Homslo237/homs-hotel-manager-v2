@@ -216,4 +216,142 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
   return (
     <div style={{ paddingBottom:'80px' }}>
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
-        <div style={{ display:'flex', justifyContent:'space
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Caisse</h1>
+            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>Encaissements du jour - {aujourdhui()}</p>
+          </div>
+          <div style={{ display:'flex', gap:'8px' }}>
+            <button onClick={handlePartager} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'8px 10px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#25D366', color:'white', fontWeight:'700', fontSize:'11px' }}>
+              <Share2 size={13}/> Rapport
+            </button>
+            <button onClick={()=>setShowPassation(true)} style={{ display:'flex', alignItems:'center', gap:'4px', padding:'8px 10px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#C9A84C', color:'white', fontWeight:'700', fontSize:'11px' }}>
+              <FileText size={13}/> Passation
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding:'16px 20px' }}>
+
+        {/* Carte solde */}
+        <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', borderRadius:'16px', padding:'20px', marginBottom:'12px', color:'white' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+            <TrendingUp size={18} color="#C9A84C"/>
+            <span style={{ fontSize:'13px', opacity:0.8 }}>Solde net du jour</span>
+          </div>
+          <div style={{ fontSize:'32px', fontWeight:'700', color:'#C9A84C' }}>{fmt(totalGeneral)} FCFA</div>
+          <div style={{ display:'flex', gap:'16px', marginTop:'10px', fontSize:'12px', flexWrap:'wrap' }}>
+            <span>🏨 {fmt(totalSejours)}</span>
+            <span>📥 +{fmt(totalEntrees)}</span>
+            <span style={{ color:'#FF8A80' }}>📤 -{fmt(totalSorties)}</span>
+          </div>
+        </div>
+
+        {/* Cartes Total */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
+          <div style={{ background:'#2ECC71', borderRadius:'12px', padding:'14px', color:'white' }}>
+            <TrendingUp size={16} style={{ marginBottom:'4px' }}/>
+            <div style={{ fontSize:'18px', fontWeight:'800' }}>{fmt(totalSejours+totalEntrees)}</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>Total entrees FCFA</div>
+          </div>
+          <div style={{ background:'#E74C3C', borderRadius:'12px', padding:'14px', color:'white' }}>
+            <TrendingDown size={16} style={{ marginBottom:'4px' }}/>
+            <div style={{ fontSize:'18px', fontWeight:'800' }}>{fmt(totalSorties)}</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>Total sorties FCFA</div>
+          </div>
+        </div>
+
+        {/* 4 cases modes */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px' }}>
+          {[
+            { icon:'💵', label:'Especes',  montant:tEspeces, couleur:'#2ECC71' },
+            { icon:'🟠', label:'OM',       montant:tOM,      couleur:'#FF6600' },
+            { icon:'🟡', label:'MOMO',     montant:tMOMO,    couleur:'#C9A84C' },
+            { icon:'💳', label:'Carte',    montant:tCarte,   couleur:'#1B3A6B' },
+          ].map(m=>(
+            <div key={m.label} style={{ background:'white', borderRadius:'10px', padding:'10px 12px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`3px solid ${m.couleur}`, display:'flex', alignItems:'center', gap:'10px' }}>
+              <span style={{ fontSize:'20px' }}>{m.icon}</span>
+              <div>
+                <div style={{ fontSize:'13px', fontWeight:'800', color:'#1B3A6B' }}>{fmt(m.montant)}</div>
+                <div style={{ fontSize:'10px', color:'#888', fontWeight:'600' }}>{m.label} FCFA</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Onglets */}
+        <div style={{ display:'flex', borderRadius:'12px', overflow:'hidden', border:'2px solid #E0E0E0', marginBottom:'16px' }}>
+          {[{id:'sejours',label:'Sejours'},{id:'entrees',label:'Entrees'},{id:'sorties',label:'Sorties'}].map(o=>(
+            <button key={o.id} onClick={()=>setOnglet(o.id)} style={{ flex:1, padding:'11px 4px', fontWeight:'700', fontSize:'12px', border:'none', cursor:'pointer', background:onglet===o.id?'#1B3A6B':'white', color:onglet===o.id?'white':'#666' }}>
+              {o.id==='sejours'?'🏨 ':o.id==='entrees'?'📥 ':'📤 '}{o.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Sejours */}
+        {onglet==='sejours' && (
+          <>
+            <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
+              <span style={{ background:'#EEF2FF', color:'#1B3A6B', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>🌙 {fmt(totalNuits)} FCFA</span>
+              <span style={{ background:'#FFF3E0', color:'#E8634A', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>⏱️ {fmt(totalHeures)} FCFA</span>
+            </div>
+            <p style={{ fontSize:'11px', color:'#999', marginBottom:'12px', fontStyle:'italic' }}>Alimente automatiquement depuis les sejours</p>
+            {sejours.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#999' }}><div style={{ fontSize:'28px' }}>🏨</div><p>Aucun sejour</p></div>}
+            {sejours.map(p=>(
+              <div key={p.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${p.type==='nuit'?'#2ECC71':'#E8634A'}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                  <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{p.client}</span>
+                  <span style={{ fontWeight:'800', color:'#C9A84C', fontSize:'14px' }}>{fmt(p.montantNum)} FCFA</span>
+                </div>
+                <div style={{ fontSize:'12px', color:'#999' }}>Ch. {p.chambre} · {p.duree} · {p.modePaiement}</div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Entrees */}
+        {onglet==='entrees' && (
+          <>
+            <button onClick={()=>setShowEntree(true)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'16px' }}>
+              <Plus size={18}/> Nouvelle entree diverse
+            </button>
+            {entreesDiverses.length===0 ? <div style={{ textAlign:'center', padding:'30px', color:'#999' }}><div style={{ fontSize:'28px' }}>📥</div><p>Aucune entree diverse</p></div>
+            : entreesDiverses.map(e=>(
+              <div key={e.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #2ECC71' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                  <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{e.libelle}</span>
+                  <span style={{ fontWeight:'800', color:'#2ECC71', fontSize:'14px' }}>+{fmt(e.montant)} FCFA</span>
+                </div>
+                <div style={{ fontSize:'12px', color:'#999' }}>{e.emetteurNom&&`${e.emetteurNom} · `}{e.mode} · {e.heure}</div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Sorties */}
+        {onglet==='sorties' && (
+          <>
+            <button onClick={()=>setShowSortie(true)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#E74C3C', color:'white', fontWeight:'800', fontSize:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'16px' }}>
+              <Plus size={18}/> Nouvelle sortie diverse
+            </button>
+            {sortiesDiverses.length===0 ? <div style={{ textAlign:'center', padding:'30px', color:'#999' }}><div style={{ fontSize:'28px' }}>📤</div><p>Aucune sortie diverse</p></div>
+            : sortiesDiverses.map(s=>(
+              <div key={s.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #E74C3C' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                  <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.libelle}</span>
+                  <span style={{ fontWeight:'800', color:'#E74C3C', fontSize:'14px' }}>-{fmt(s.montant)} FCFA</span>
+                </div>
+                <div style={{ fontSize:'12px', color:'#999' }}>{s.beneficiaireNom&&`${s.beneficiaireNom} · `}{s.mode} · {s.heure}</div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {showEntree    && <FormulaireEntree  onClose={()=>setShowEntree(false)}    onAjouter={onAjouterEntree}/>}
+      {showSortie    && <FormulaireSortie  onClose={()=>setShowSortie(false)}    onAjouter={onAjouterSortie}/>}
+      {showPassation && <ModalPassation    sejours={sejours} entrees={entreesDiverses} sorties={sortiesDiverses} caisse={caisse} onClose={()=>setShowPassation(false)}/>}
+    </div>
+  )
+}
