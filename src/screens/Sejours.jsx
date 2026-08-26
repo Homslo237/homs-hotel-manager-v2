@@ -304,6 +304,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
   const now = maintenant()
   const [form, setForm] = useState({
     client:'', telephone:'', categorie:'Standard', chambre:'',
+    statut:'en_cours',
     typeSejour:'nuit',
     dateArrivee: now.date, heureArrivee: now.heure,
     dateDepart: (() => { const d=new Date(); d.setDate(d.getDate()+1); return d.toLocaleDateString('fr-FR') })(),
@@ -336,6 +337,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
   const handleValider = () => {
     if (!peutValider) return
     const d = dureeCalculee()
+    const mt = montantTotal()
     const nouveau = {
       client: form.client.trim(),
       telephone: form.telephone.trim(),
@@ -347,8 +349,9 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
       heureDepart: form.heureDepart,
       duree: d.label,
       type: form.typeSejour,
-      statut: 'en_cours',
-      montant: montantTotal().toLocaleString('fr-FR'),
+      statut: form.statut || 'en_cours',
+      montant: mt.toLocaleString('fr-FR'),
+      montantNum: mt,
       modePaiement: form.modePaiement,
     }
     onAjouter(nouveau)
@@ -385,6 +388,28 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
         <div style={{ marginBottom:'14px' }}>
           <label style={labelStyle}>Téléphone <span style={{color:'red'}}>*</span></label>
           <input value={form.telephone} onChange={e=>setForm({...form,telephone:e.target.value})} placeholder="+225 07 00 00 00 00" type="tel" style={inputStyle} />
+        </div>
+
+        {/* Toggle Entree maintenant / Reservation future */}
+        <div style={{ marginBottom:'14px' }}>
+          <label style={labelStyle}>Type de dossier</label>
+          <div style={{ display:'flex', borderRadius:'10px', overflow:'hidden', border:'2px solid #E0E0E0' }}>
+            {[
+              {val:'en_cours', label:'Entree maintenant'},
+              {val:'reserve',  label:'Reservation future'},
+            ].map(t=>(
+              <button key={t.val} onClick={()=>setForm({...form, statut:t.val})} style={{
+                flex:1, padding:'11px 4px', fontWeight:'700', fontSize:'12px', border:'none', cursor:'pointer',
+                background: form.statut===t.val ? '#1B3A6B' : 'white',
+                color: form.statut===t.val ? 'white' : '#666',
+              }}>{t.val==='en_cours' ? '🏨 ' : '📅 '}{t.label}</button>
+            ))}
+          </div>
+          {form.statut==='reserve' && (
+            <div style={{ background:'#FFF8F0', borderRadius:'10px', padding:'10px 12px', marginTop:'8px', border:'1px solid #C9A84C', fontSize:'12px', color:'#C9A84C', fontWeight:'600' }}>
+              La chambre sera marquee Reservee et bloquee pour cette periode
+            </div>
+          )}
         </div>
 
         {/* Type chambre */}
@@ -516,9 +541,10 @@ const sejoursInitiaux = [
 ]
 
 const statuts = {
-  en_cours: { label:'En cours', couleur:'#2ECC71' },
-  a_venir:  { label:'À venir',  couleur:'#C9A84C' },
-  termine:  { label:'Terminé',  couleur:'#999'    },
+  en_cours: { label:'En cours',   couleur:'#2ECC71' },
+  reserve:  { label:'Reserve',    couleur:'#8B5CF6' },
+  a_venir:  { label:'A venir',    couleur:'#C9A84C' },
+  termine:  { label:'Termine',    couleur:'#999'    },
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
@@ -553,8 +579,7 @@ export default function Sejours({ sejours:sejoursProps, onAjouter, onTerminer, o
   const parNuit  = sejours.filter(s=>s.type==='nuit' &&s.statut==='en_cours').length
 
   const handleAjouter = (nouveau) => {
-    setSejours(prev=>[{ ...nouveau, id:Date.now() }, ...prev])
-    if (onNouveauSejour) onNouveauSejour(nouveau)
+    if (onAjouter) onAjouter(nouveau)
   }
 
   const handleProlonger = (id, ajout, supplement) => {
