@@ -49,7 +49,7 @@ export default function App() {
   const [chambresStats, setChambresStats] = useState(CHAMBRES_STATS_INITIALES)
 
   // ─── Calculs automatiques partagés ───────────────────────────────────────────
-  const totalSejours   = sejours.filter(s=>s.statut==='en_cours').reduce((sum,s)=>sum+s.montantNum,0)
+  const totalSejours   = sejours.filter(s=>s.statut==='en_cours').reduce((sum,s)=>sum+(s.montantNum||0),0)
   const totalNuits     = sejours.filter(s=>s.statut==='en_cours'&&s.type==='nuit').reduce((sum,s)=>sum+s.montantNum,0)
   const totalHeures    = sejours.filter(s=>s.statut==='en_cours'&&s.type==='heure').reduce((sum,s)=>sum+s.montantNum,0)
   const totalEntrees   = entreesDiverses.reduce((sum,e)=>sum+e.montant,0)
@@ -70,19 +70,39 @@ export default function App() {
 
   // ─── Actions globales ─────────────────────────────────────────────────────────
   const ajouterSejour = (nouveau) => {
+    // Vérifier doublon : chambre déjà occupée ou réservée
+    const chambreOccupee = sejours.find(s =>
+      s.chambre === nouveau.chambre &&
+      (s.statut === 'en_cours' || s.statut === 'reserve')
+    )
+    if (chambreOccupee) {
+      alert('Chambre ' + nouveau.chambre + ' deja occupee ou reservee !')
+      return
+    }
+
+    const statut = nouveau.statut || 'en_cours'
     const ns = {
       ...nouveau,
       id: Date.now(),
       montantNum: parseInt((nouveau.montant||'0').replace(/\s/g,''), 10) || 0,
-      statut: 'en_cours',
+      statut,
     }
     setSejours(prev => [ns, ...prev])
-    // Mettre à jour chambres stats
-    setChambresStats(prev => ({
-      ...prev,
-      occupees:    prev.occupees + 1,
-      disponibles: prev.disponibles - 1,
-    }))
+
+    // Mettre a jour chambres stats seulement si entree immediate
+    if (statut === 'en_cours') {
+      setChambresStats(prev => ({
+        ...prev,
+        occupees:    prev.occupees + 1,
+        disponibles: Math.max(0, prev.disponibles - 1),
+      }))
+    } else {
+      // Reservation : juste reduire disponibles
+      setChambresStats(prev => ({
+        ...prev,
+        disponibles: Math.max(0, prev.disponibles - 1),
+      }))
+    }
   }
 
   const terminerSejour = (id) => {
@@ -191,4 +211,5 @@ export default function App() {
       />
     </div>
   )
-}
+                              }
+      
