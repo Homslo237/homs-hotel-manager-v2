@@ -300,7 +300,7 @@ const inputStyle = { width:'100%', padding:'12px 14px', border:'2px solid #E0E0E
 const btnQtyStyle = { width:'40px', height:'40px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'800', fontSize:'20px', color:'#1B3A6B', border:'none', cursor:'pointer' }
 
 // ─── Formulaire nouveau séjour ────────────────────────────────────────────────
-function FormulaireNouveauSejour({ onClose, onAjouter }) {
+function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
   const now = maintenant()
   const [form, setForm] = useState({
     client:'', telephone:'', categorie:'Standard', chambre:'',
@@ -313,8 +313,9 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
   })
   const [recuEntree, setRecuEntree] = useState(null)
 
-  const chambres = chambresParCategorie[form.categorie] || []
-  const chambresLibres = chambres.filter(c => c.statut==='libre')
+  // Chambres filtrées par catégorie depuis App.jsx (données réelles)
+  const chambres = chambresGenerees.filter(c => c.cat === form.categorie)
+  const chambresLibres = chambres.filter(c => c.statut === 'libre')
 
   const dureeCalculee = () => {
     if (form.typeSejour==='nuit') {
@@ -354,7 +355,11 @@ function FormulaireNouveauSejour({ onClose, onAjouter }) {
       montantNum: mt,
       modePaiement: form.modePaiement,
     }
-    onAjouter(nouveau)
+    const succes = onAjouter(nouveau)
+    if (succes === false) {
+      alert('Cette chambre est deja occupee ou reservee !')
+      return
+    }
     setRecuEntree(genererRecuEntree(nouveau))
   }
 
@@ -548,7 +553,7 @@ const statuts = {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Sejours({ sejours:sejoursProps, onAjouter, onTerminer, onProlonger, ouvrirFormulaire, onFormulaireOuvert }) {
+export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, ouvrirFormulaire, onFormulaireOuvert }) {
   // sejours viennent de App.jsx (état global)
   const sejours = sejoursProps || []
   const [recherche, setRecherche] = useState('')
@@ -579,7 +584,9 @@ export default function Sejours({ sejours:sejoursProps, onAjouter, onTerminer, o
   const parNuit  = sejours.filter(s=>s.type==='nuit' &&s.statut==='en_cours').length
 
   const handleAjouter = (nouveau) => {
-    if (onAjouter) onAjouter(nouveau)
+    if (!onAjouter) return
+    const succes = onAjouter(nouveau)
+    return succes // true=succes, false=chambre bloquee
   }
 
   const handleProlonger = (id, ajout, supplement) => {
@@ -737,7 +744,7 @@ export default function Sejours({ sejours:sejoursProps, onAjouter, onTerminer, o
       {/* Bouton + géré par la NavBar */}
 
       {showConfetti && <Confetti onFin={() => setShowConfetti(false)}/>}
-      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter}/>}
+      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees}/>}
       {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
       {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
     </div>
