@@ -311,4 +311,5 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
       )}
     </div>
   )
-}
+              }
+            
