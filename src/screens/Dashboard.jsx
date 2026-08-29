@@ -226,30 +226,30 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
           </div>
         </div>
 
-        {/* 4 cases chambres */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
+        {/* 5 cases chambres - hauteur reduite, incluant les reservations a venir */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px', marginBottom:'16px' }}>
           {[
             { label:'Disponibles', valeur:chambresStats.disponibles, couleur:'#2ECC71', icone:Home,          bg:'#F0FFF4', delay:0   },
             { label:'Occupées',    valeur:chambresStats.occupees,    couleur:'#1B3A6B', icone:Briefcase,     bg:'#EEF2FF', delay:0.1 },
+            { label:'A venir',     valeur:chambresStats.aVenir||0,   couleur:'#8B5CF6', icone:Clock,         bg:'#F5F3FF', delay:0.15},
             { label:'A nettoyer',  valeur:chambresStats.nettoyer,    couleur:'#C9A84C', icone:Sparkles,      bg:'#FFFBF0', delay:0.2 },
             { label:'Problemes',   valeur:chambresStats.problemes,   couleur:'#E74C3C', icone:AlertTriangle, bg:'#FFF5F5', delay:0.3 },
           ].map((s,i) => {
             const Icone = s.icone
             const pct = Math.round(((s.valeur||0) / (chambresStats.total||50)) * 100)
             return (
-              <div key={i} className="card-anim" style={{ background:'white', borderRadius:'16px', padding:'16px', boxShadow:'0 2px 12px rgba(0,0,0,0.07)', animationDelay: s.delay+'s', borderBottom:`3px solid ${s.couleur}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'10px' }}>
-                  <div style={{ width:'38px', height:'38px', borderRadius:'12px', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <Icone size={20} color={s.couleur}/>
+              <div key={i} className="card-anim" style={{ background:'white', borderRadius:'12px', padding:'8px', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: s.delay+'s', borderBottom:`3px solid ${s.couleur}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+                  <div style={{ width:'22px', height:'22px', borderRadius:'7px', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <Icone size={12} color={s.couleur}/>
                   </div>
-                  <span style={{ fontSize:'11px', color:'#888', background:'#F5F5F5', padding:'2px 8px', borderRadius:'10px' }}>/{chambresStats.total}</span>
+                  <span style={{ fontSize:'9px', color:'#999' }}>/{chambresStats.total}</span>
                 </div>
-                <div style={{ fontSize:'30px', fontWeight:'900', color:s.couleur, lineHeight:1 }}>{s.valeur||0}</div>
-                <div style={{ fontSize:'12px', color:'#888', margin:'4px 0 10px' }}>{s.label}</div>
-                <div style={{ height:'5px', background:'#F0F0F0', borderRadius:'3px', overflow:'hidden' }}>
-                  <div style={{ height:'5px', borderRadius:'3px', background:`linear-gradient(90deg, ${s.couleur}99, ${s.couleur})`, width: visible ? `${pct}%` : '0%', transition:`width 1s ${s.delay}s cubic-bezier(0.34, 1.56, 0.64, 1)` }}/>
+                <div style={{ fontSize:'20px', fontWeight:'900', color:s.couleur, lineHeight:1 }}>{s.valeur||0}</div>
+                <div style={{ fontSize:'9px', color:'#888', margin:'2px 0 4px', whiteSpace:'nowrap' }}>{s.label}</div>
+                <div style={{ height:'3px', background:'#F0F0F0', borderRadius:'2px', overflow:'hidden' }}>
+                  <div style={{ height:'3px', borderRadius:'2px', background:s.couleur, width: visible ? `${pct}%` : '0%', transition:`width 1s ${s.delay}s ease` }}/>
                 </div>
-                <div style={{ fontSize:'10px', color:s.couleur, fontWeight:'700', marginTop:'4px', textAlign:'right' }}>{pct}%</div>
               </div>
             )
           })}
