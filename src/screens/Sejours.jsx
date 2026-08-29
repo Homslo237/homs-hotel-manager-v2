@@ -401,7 +401,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
           <div style={{ display:'flex', borderRadius:'10px', overflow:'hidden', border:'2px solid #E0E0E0' }}>
             {[
               {val:'en_cours', label:'Entree maintenant'},
-              {val:'reserve',  label:'Reservation future'},
+              {val:'a_venir',  label:'Reservation future'},
             ].map(t=>(
               <button key={t.val} onClick={()=>setForm({...form, statut:t.val})} style={{
                 flex:1, padding:'11px 4px', fontWeight:'700', fontSize:'12px', border:'none', cursor:'pointer',
@@ -410,7 +410,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
               }}>{t.val==='en_cours' ? '🏨 ' : '📅 '}{t.label}</button>
             ))}
           </div>
-          {form.statut==='reserve' && (
+          {form.statut==='a_venir' && (
             <div style={{ background:'#FFF8F0', borderRadius:'10px', padding:'10px 12px', marginTop:'8px', border:'1px solid #C9A84C', fontSize:'12px', color:'#C9A84C', fontWeight:'600' }}>
               La chambre sera marquee Reservee et bloquee pour cette periode
             </div>
@@ -440,7 +440,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
           </label>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
             {chambres.map(c=>(
-              <button key={c.num} disabled={c.statut==='occupee' || c.statut==='reserve'}
+              <button key={c.num} disabled={c.statut==='occupee' || c.statut==='a_venir'}
                 onClick={()=>c.statut==='libre'&&setForm({...form,chambre:c.num})}
                 style={{
                   padding:'14px 8px', borderRadius:'10px', fontWeight:'700', fontSize:'16px',
@@ -547,13 +547,12 @@ const sejoursInitiaux = [
 
 const statuts = {
   en_cours: { label:'En cours',   couleur:'#2ECC71' },
-  reserve:  { label:'Reserve',    couleur:'#8B5CF6' },
-  a_venir:  { label:'A venir',    couleur:'#C9A84C' },
+  a_venir:  { label:'A venir',    couleur:'#8B5CF6' },
   termine:  { label:'Termine',    couleur:'#999'    },
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, ouvrirFormulaire, onFormulaireOuvert }) {
+export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert }) {
   // sejours viennent de App.jsx (état global)
   const sejours = sejoursProps || []
   const [recherche, setRecherche] = useState('')
@@ -733,6 +732,13 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
                         <LogOut size={11}/> Sortie
                       </button>
                     </>
+                  )}
+                  {/* Activer une reservation a venir : le client vient d'arriver */}
+                  {s.statut==='a_venir' && (
+                    <button onClick={()=>{ if(onActiverReservation) onActiverReservation(s.id) }}
+                      style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#F5F3FF', color:'#8B5CF6', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                      <LogIn size={11}/> Client arrive
+                    </button>
                   )}
                 </div>
               </div>
