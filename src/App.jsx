@@ -166,6 +166,8 @@ export default function App() {
   useEffect(() => {
     const verifier = () => {
       const now = new Date()
+      const idsALiberer = []
+
       sejours.filter(s => s.statut === 'en_cours').forEach(s => {
         const [, fin] = periodeDuSejour(s)
         if (!fin) return
@@ -183,7 +185,22 @@ export default function App() {
           jouerSonnerie('urgent')
           setAlertesSonnees(prev => ({ ...prev, [`urgent_${s.id}`]: true }))
         }
+
+        // Liberation automatique de la chambre au-dela de 3h de depassement.
+        // Le sejour passe "termine" avec une note pour facturation a posteriori ;
+        // rien n'est efface, seule la chambre redevient disponible a la vente.
+        if (diffMin <= -180) {
+          idsALiberer.push(s.id)
+        }
       })
+
+      if (idsALiberer.length > 0) {
+        setSejours(prev => prev.map(s =>
+          idsALiberer.includes(s.id)
+            ? { ...s, statut: 'termine', depassementNonRegle: true }
+            : s
+        ))
+      }
     }
 
     intervalRef.current = setInterval(verifier, 60000)
@@ -197,6 +214,7 @@ export default function App() {
     disponibles: chambresGenerees.filter(c => c.statut === 'libre').length,
     nettoyer:    chambresGenerees.filter(c => c.statut === 'nettoyage').length,
     problemes:   chambresGenerees.filter(c => c.statut === 'probleme').length,
+    aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
   const sejoursEnCours = sejours.filter(s => s.statut === 'en_cours')
