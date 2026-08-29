@@ -5,14 +5,14 @@ import { Search, X, AlertTriangle, Sparkles, CheckCircle, User, Phone, Moon } fr
 const statuts = {
   libre:     { label:'Libre',     couleur:'#2ECC71', bg:'#F0FFF4' },
   occupee:   { label:'Occupee',   couleur:'#1B3A6B', bg:'#EEF2FF' },
-  reserve:   { label:'Reserve',   couleur:'#8B5CF6', bg:'#F5F3FF' },
+  a_venir:   { label:'A venir',    couleur:'#8B5CF6', bg:'#F5F3FF' },
   nettoyage: { label:'Nettoyage', couleur:'#C9A84C', bg:'#FFFBF0' },
   probleme:  { label:'Probleme',  couleur:'#E74C3C', bg:'#FFF5F5' },
 }
 const iconeStatut = {
   libre:     CheckCircle,
   occupee:   User,
-  reserve:   User,
+  a_venir:   User,
   nettoyage: Sparkles,
   probleme:  AlertTriangle,
 }
@@ -48,10 +48,10 @@ function ModalChambre({ chambre, onClose, onChangerStatut }) {
         </div>
 
         {/* Infos client */}
-        {(chambre.statut==='occupee'||chambre.statut==='reserve') && chambre.client && (
+        {(chambre.statut==='occupee'||chambre.statut==='a_venir') && chambre.client && (
           <div style={{ background:'#F8F9FA', borderRadius:'12px', padding:'14px 16px', marginBottom:'16px' }}>
             <div style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B', marginBottom:'10px' }}>
-              {chambre.statut==='reserve' ? '📅 Reservation' : '👤 Client en cours'}
+              {chambre.statut==='a_venir' ? '📅 Reservation' : '👤 Client en cours'}
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', fontSize:'13px' }}>
               <User size={14} color="#666"/>
@@ -95,11 +95,11 @@ function ModalChambre({ chambre, onClose, onChangerStatut }) {
         </div>
 
         {/* Changer statut — seulement pour nettoyage et problème manuellement */}
-        {(chambre.statut !== 'occupee' && chambre.statut !== 'reserve') && (
+        {(chambre.statut !== 'occupee' && chambre.statut !== 'a_venir') && (
           <div style={{ marginBottom:'16px' }}>
             <label style={labelStyle}>Changer le statut</label>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
-              {Object.entries(statuts).filter(([k])=>k!=='occupee'&&k!=='reserve').map(([key, val]) => (
+              {Object.entries(statuts).filter(([k])=>k!=='occupee'&&k!=='a_venir').map(([key, val]) => (
                 <button key={key} onClick={() => setNouveauStatut(key)} style={{
                   padding:'10px', borderRadius:'10px', fontWeight:'700', fontSize:'13px', cursor:'pointer',
                   border: nouveauStatut===key ? `2px solid ${val.couleur}` : '2px solid #E0E0E0',
@@ -148,7 +148,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
   const stats = {
     libre:     chambres.filter(c=>c.statut==='libre').length,
     occupee:   chambres.filter(c=>c.statut==='occupee').length,
-    reserve:   chambres.filter(c=>c.statut==='reserve').length,
+    a_venir:   chambres.filter(c=>c.statut==='a_venir').length,
     nettoyage: chambres.filter(c=>c.statut==='nettoyage').length,
     probleme:  chambres.filter(c=>c.statut==='probleme').length,
   }
@@ -169,7 +169,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
       c.num===num ? {
         ...c, statut:nouveauStatut,
         probleme: nouveauStatut==='probleme' ? note : null,
-        client: nouveauStatut!=='occupee'&&nouveauStatut!=='reserve' ? null : c.client,
+        client: nouveauStatut!=='occupee'&&nouveauStatut!=='a_venir' ? null : c.client,
       } : c
     ))
     if (onMajChambre) onMajChambre(num, nouveauStatut, note)
@@ -197,7 +197,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
         <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Chambres</h1>
         <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>
-          {total} chambres · {stats.occupee} occupees · {stats.libre} libres · {stats.reserve} reservees
+          {total} chambres · {stats.occupee} occupees · {stats.libre} libres · {stats.a_venir} reservees
         </p>
       </div>
 
@@ -311,5 +311,4 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
       )}
     </div>
   )
-              }
-            
+}
