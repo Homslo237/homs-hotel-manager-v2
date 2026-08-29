@@ -1,4 +1,21 @@
 import { useState, useEffect } from 'react'
+
+// ─── Helpers date/heure (identiques a App.jsx pour coherence) ────────────────
+function versDateJS(dateFR, heure) {
+  if (!dateFR) return null
+  const [j, m, a] = dateFR.split('/').map(Number)
+  const [h, min]  = (heure || '00:00').split(':').map(Number)
+  return new Date(a, m - 1, j, h || 0, min || 0)
+}
+function periodeDuSejourJS(s) {
+  const debut = versDateJS(s.dateArrivee, s.heureArrivee)
+  const fin   = versDateJS(s.dateDepart || s.dateArrivee, s.heureDepart)
+  return [debut, fin]
+}
+function periodesSeChevauchentJS(debutA, finA, debutB, finB) {
+  if (!debutA || !finA || !debutB || !finB) return false
+  return debutA < finB && debutB < finA
+}
 // ─── Styles Confetti ──────────────────────────────────────────────────────────
 const CONFETTI_STYLES = `
   @keyframes confettiFall {
@@ -300,7 +317,7 @@ const inputStyle = { width:'100%', padding:'12px 14px', border:'2px solid #E0E0E
 const btnQtyStyle = { width:'40px', height:'40px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'800', fontSize:'20px', color:'#1B3A6B', border:'none', cursor:'pointer' }
 
 // ─── Formulaire nouveau séjour ────────────────────────────────────────────────
-function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
+function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tousLesSejours=[] }) {
   const now = maintenant()
   const [form, setForm] = useState({
     client:'', telephone:'', categorie:'Standard', chambre:'',
@@ -313,8 +330,39 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
   })
   const [recuEntree, setRecuEntree] = useState(null)
 
-  // Chambres filtrées par catégorie depuis App.jsx (données réelles)
-  const chambres = chambresGenerees.filter(c => c.cat === form.categorie)
+  // L'heure d'arrivee reste alignee sur l'horloge tant que c'est une entree
+  // immediate : la reception ne peut pas antidater ou postdater une entree.
+  useEffect(() => {
+    if (form.statut !== 'en_cours') return
+    const t = setInterval(() => {
+      setForm(f => f.statut==='en_cours' ? { ...f, heureArrivee: maintenant().heure } : f)
+    }, 30000)
+    return () => clearInterval(t)
+  }, [form.statut])
+
+  // Chambres de la categorie choisie
+  const chambresCategorie = chambresGenerees.filter(c => c.cat === form.categorie)
+
+  // Periode que l'utilisateur est en train de saisir dans le formulaire
+  const dateDepartCalculee = form.typeSejour==='nuit' ? form.dateDepart : form.dateArrivee
+  const [debutSaisi, finSaisi] = periodeDuSejourJS({
+    dateArrivee: form.dateArrivee, heureArrivee: form.heureArrivee,
+    dateDepart: dateDepartCalculee, heureDepart: form.heureDepart,
+  })
+
+  // Une chambre est disponible pour CETTE periode si aucun sejour actif ou a
+  // venir sur cette meme chambre ne chevauche les dates/heures demandees.
+  // C'est la vraie logique hoteliere : la meme chambre peut etre reservee
+  // plusieurs fois par jour tant que les creneaux ne se recoupent pas.
+  const chambres = chambresCategorie.map(c => {
+    const conflit = tousLesSejours.find(s => {
+      if (s.chambre !== c.num) return false
+      if (s.statut !== 'en_cours' && s.statut !== 'a_venir') return false
+      const [debutExistant, finExistant] = periodeDuSejourJS(s)
+      return periodesSeChevauchentJS(debutSaisi, finSaisi, debutExistant, finExistant)
+    })
+    return { ...c, statut: conflit ? 'occupee' : 'libre' }
+  })
   const chambresLibres = chambres.filter(c => c.statut === 'libre')
 
   const dureeCalculee = () => {
@@ -403,7 +451,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
               {val:'en_cours', label:'Entree maintenant'},
               {val:'a_venir',  label:'Reservation future'},
             ].map(t=>(
-              <button key={t.val} onClick={()=>setForm({...form, statut:t.val})} style={{
+              <button key={t.val} onClick={()=>setForm({...form, statut:t.val, heureArrivee: t.val==='en_cours' ? maintenant().heure : form.heureArrivee})} style={{
                 flex:1, padding:'11px 4px', fontWeight:'700', fontSize:'12px', border:'none', cursor:'pointer',
                 background: form.statut===t.val ? '#1B3A6B' : 'white',
                 color: form.statut===t.val ? 'white' : '#666',
@@ -491,8 +539,11 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[] }) {
         ):(
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' }}>
             <div>
-              <label style={labelStyle}>Heure arrivee</label>
-              <input type="time" value={form.heureArrivee} onChange={e=>setForm({...form,heureArrivee:e.target.value})} style={inputStyle}/>
+              <label style={labelStyle}>Heure arrivee {form.statut==='en_cours' && <span style={{color:'#2ECC71',fontWeight:'600'}}>(heure actuelle)</span>}</label>
+              <input type="time" value={form.heureArrivee}
+                disabled={form.statut==='en_cours'}
+                onChange={e=>setForm({...form,heureArrivee:e.target.value})}
+                style={{...inputStyle, background: form.statut==='en_cours' ? '#F5F5F5' : 'white', color: form.statut==='en_cours' ? '#888' : '#000'}}/>
             </div>
             <div>
               <label style={labelStyle}>Heure depart</label>
@@ -750,7 +801,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       {/* Bouton + géré par la NavBar */}
 
       {showConfetti && <Confetti onFin={() => setShowConfetti(false)}/>}
-      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees}/>}
+      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours}/>}
       {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
       {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
     </div>
