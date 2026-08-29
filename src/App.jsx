@@ -28,19 +28,49 @@ export const CONFIG_CHAMBRES = {
   ]
 }
 
-// ─── Génération des 50 chambres ───────────────────────────────────────────────
-export function genererChambres(sejours=[]) {
+// ─── Helpers date/heure ────────────────────────────────────────────────────────
+function versDate(dateFR, heure) {
+  if (!dateFR) return null
+  const [j, m, a] = dateFR.split('/').map(Number)
+  const [h, min]  = (heure || '00:00').split(':').map(Number)
+  return new Date(a, m - 1, j, h || 0, min || 0)
+}
+
+function periodeDuSejour(s) {
+  const debut = versDate(s.dateArrivee, s.heureArrivee)
+  const fin   = versDate(s.dateDepart || s.dateArrivee, s.heureDepart)
+  return [debut, fin]
+}
+
+function periodesSeChevauchent(debutA, finA, debutB, finB) {
+  if (!debutA || !finA || !debutB || !finB) return false
+  return debutA < finB && debutB < finA
+}
+
+// ─── Génération des 50 chambres — SOURCE UNIQUE DE VÉRITÉ ─────────────────────
+export function genererChambres(sejours = []) {
   const chambres = []
+  const maintenant = new Date()
+
   CONFIG_CHAMBRES.categories.forEach(cat => {
     for (let i = 1; i <= cat.nombre; i++) {
       const num = String(cat.debut + i)
-      const sejour = sejours.find(s =>
-        s.chambre === num && (s.statut === 'en_cours' || s.statut === 'reserve')
-      )
+
+      const enCours = sejours.find(s => s.chambre === num && s.statut === 'en_cours')
+
+      const aVenir = sejours.find(s => {
+        if (s.chambre !== num || s.statut !== 'a_venir') return false
+        const [debut] = periodeDuSejour(s)
+        if (!debut) return false
+        const minutesAvant = (debut - maintenant) / 60000
+        return minutesAvant <= 120 && minutesAvant > -1440
+      })
+
+      const sejour = enCours || aVenir
       chambres.push({
         num,
         cat: cat.nom,
-        statut: sejour ? (sejour.statut === 'reserve' ? 'reserve' : 'occupee') : 'libre',
+        statut: sejour ? (sejour.statut === 'a_venir' ? 'a_venir' : 'occupee') : 'libre',
         tarifNuit: cat.tarifNuit,
         tarifHeure: cat.tarifHeure,
         client: sejour?.client || null,
@@ -58,14 +88,14 @@ export function genererChambres(sejours=[]) {
 const STORAGE_KEY = 'homs_data_v1'
 
 function sauvegarder(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch(e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
 }
 
 function charger() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
-  } catch(e) { return null }
+  } catch (e) { return null }
 }
 
 // ─── Séjours initiaux (démo) ──────────────────────────────────────────────────
@@ -75,9 +105,7 @@ const SEJOURS_DEMO = [
   { id:3, client:'M. Bamba Seydou',  telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite',    dateArrivee:'25/08/2026', heureArrivee:'09:30', dateDepart:'25/08/2026', heureDepart:'22:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500',  montantNum:19500,  modePaiement:'MTN Mobile Money' },
 ]
 
-const CHAMBRES_STATS_INITIALES = { total:50, disponibles:37, occupees:8, nettoyer:3, problemes:2 }
-
-// ─── Sons d'alerte ────────────────────────────────────────────────────────────
+// ─── Sons d'alerte ─────────────────────────────────────────────────────────────
 function jouerSonnerie(type = 'alerte') {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
@@ -96,7 +124,7 @@ function jouerSonnerie(type = 'alerte') {
       osc.stop(temps + 0.4)
       temps += 0.45
     })
-  } catch(e) {}
+  } catch (e) {}
 }
 
 export default function App() {
@@ -106,15 +134,12 @@ export default function App() {
   const [cle,              setCle]              = useState(0)
   const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
 
-  // ─── ÉTAT GLOBAL — chargé depuis localStorage ─────────────────────────────
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
   const [sortiesDiverses, setSortiesDiverses] = useState([])
-  const [chambresStats,   setChambresStats]   = useState(CHAMBRES_STATS_INITIALES)
   const [alertesSonnees,  setAlertesSonnees]  = useState({})
   const intervalRef = useRef(null)
 
-  // ─── Chargement initial depuis localStorage ────────────────────────────────
   useEffect(() => {
     const el = document.createElement('style')
     el.textContent = styleTransition
@@ -125,7 +150,6 @@ export default function App() {
       setSejours(sauvegarde.sejours || SEJOURS_DEMO)
       setEntreesDiverses(sauvegarde.entreesDiverses || [])
       setSortiesDiverses(sauvegarde.sortiesDiverses || [])
-      setChambresStats(sauvegarde.chambresStats || CHAMBRES_STATS_INITIALES)
     } else {
       setSejours(SEJOURS_DEMO)
     }
@@ -133,43 +157,31 @@ export default function App() {
     return () => document.head.removeChild(el)
   }, [])
 
-  // ─── Sauvegarde automatique à chaque changement ───────────────────────────
   useEffect(() => {
     if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0) {
-      sauvegarder({ sejours, entreesDiverses, sortiesDiverses, chambresStats })
+      sauvegarder({ sejours, entreesDiverses, sortiesDiverses })
     }
-  }, [sejours, entreesDiverses, sortiesDiverses, chambresStats])
+  }, [sejours, entreesDiverses, sortiesDiverses])
 
-  // ─── Vérification dépassement + sonnerie toutes les minutes ───────────────
   useEffect(() => {
     const verifier = () => {
       const now = new Date()
       sejours.filter(s => s.statut === 'en_cours').forEach(s => {
-        let fin
-        if (s.type === 'nuit') {
-          const [j,m,a] = (s.dateDepart||'01/01/2099').split('/').map(Number)
-          fin = new Date(a, m-1, j, 12, 0)
-        } else {
-          const today = new Date()
-          const [h,min] = (s.heureDepart||'23:59').split(':').map(Number)
-          fin = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, min)
-        }
+        const [, fin] = periodeDuSejour(s)
+        if (!fin) return
         const diffMin = (fin - now) / 60000
 
-        // 5 min avant → sonnerie rappel
         if (diffMin > 0 && diffMin <= 5 && !alertesSonnees[`rappel_${s.id}`]) {
           jouerSonnerie('rappel')
-          setAlertesSonnees(prev => ({...prev, [`rappel_${s.id}`]: true}))
+          setAlertesSonnees(prev => ({ ...prev, [`rappel_${s.id}`]: true }))
         }
-        // Heure exacte → sonnerie alerte
         if (diffMin <= 0 && diffMin > -1 && !alertesSonnees[`alerte_${s.id}`]) {
           jouerSonnerie('alerte')
-          setAlertesSonnees(prev => ({...prev, [`alerte_${s.id}`]: true}))
+          setAlertesSonnees(prev => ({ ...prev, [`alerte_${s.id}`]: true }))
         }
-        // Après tolérance → sonnerie urgente (défaut 20 min)
         if (diffMin <= -20 && !alertesSonnees[`urgent_${s.id}`]) {
           jouerSonnerie('urgent')
-          setAlertesSonnees(prev => ({...prev, [`urgent_${s.id}`]: true}))
+          setAlertesSonnees(prev => ({ ...prev, [`urgent_${s.id}`]: true }))
         }
       })
     }
@@ -178,83 +190,79 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [sejours, alertesSonnees])
 
-  // ─── Calculs partagés ─────────────────────────────────────────────────────
+  const chambresGenerees = genererChambres(sejours)
+  const chambresStats = {
+    total:       chambresGenerees.length,
+    occupees:    chambresGenerees.filter(c => c.statut === 'occupee').length,
+    disponibles: chambresGenerees.filter(c => c.statut === 'libre').length,
+    nettoyer:    chambresGenerees.filter(c => c.statut === 'nettoyage').length,
+    problemes:   chambresGenerees.filter(c => c.statut === 'probleme').length,
+  }
+
   const sejoursEnCours = sejours.filter(s => s.statut === 'en_cours')
-  const totalSejours   = sejoursEnCours.reduce((sum,s)=>sum+(s.montantNum||0),0)
-  const totalNuits     = sejoursEnCours.filter(s=>s.type==='nuit').reduce((sum,s)=>sum+(s.montantNum||0),0)
-  const totalHeures    = sejoursEnCours.filter(s=>s.type==='heure').reduce((sum,s)=>sum+(s.montantNum||0),0)
-  const totalEntrees   = entreesDiverses.reduce((sum,e)=>sum+(e.montant||0),0)
-  const totalSorties   = sortiesDiverses.reduce((sum,s)=>sum+(s.montant||0),0)
+  const totalSejours   = sejoursEnCours.reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalNuits     = sejoursEnCours.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalHeures    = sejoursEnCours.filter(s => s.type === 'heure').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalEntrees   = entreesDiverses.reduce((sum, e) => sum + (e.montant || 0), 0)
+  const totalSorties   = sortiesDiverses.reduce((sum, s) => sum + (s.montant || 0), 0)
   const soldeNet       = totalSejours + totalEntrees - totalSorties
-  const tauxOccupation = Math.round((chambresStats.occupees / chambresStats.total) * 100)
+  const tauxOccupation = chambresStats.total > 0 ? Math.round((chambresStats.occupees / chambresStats.total) * 100) : 0
   const caisse = { totalSejours, totalNuits, totalHeures, totalEntrees, totalSorties, soldeNet }
 
-  // ─── Chambres générées dynamiquement depuis les séjours ───────────────────
-  const chambresGenerees = genererChambres(sejours)
-
-  // ─── Actions globales ──────────────────────────────────────────────────────
   const ajouterSejour = (nouveau) => {
-    // Vérifier doublon STRICTEMENT
-    const chambreBloquee = sejours.find(s =>
-      s.chambre === nouveau.chambre &&
-      (s.statut === 'en_cours' || s.statut === 'reserve')
-    )
-    if (chambreBloquee) return false // Bloquer sans reçu
+    const [debutNouveau, finNouveau] = periodeDuSejour(nouveau)
+
+    const conflit = sejours.find(s => {
+      if (s.chambre !== nouveau.chambre) return false
+      if (s.statut !== 'en_cours' && s.statut !== 'a_venir') return false
+      const [debutExistant, finExistant] = periodeDuSejour(s)
+      return periodesSeChevauchent(debutNouveau, finNouveau, debutExistant, finExistant)
+    })
+    if (conflit) return false
 
     const statut = nouveau.statut || 'en_cours'
     const heureReelle = statut === 'en_cours'
-      ? new Date().toTimeString().slice(0,5) // Heure exacte de validation
+      ? new Date().toTimeString().slice(0, 5)
       : nouveau.heureArrivee
 
     const ns = {
       ...nouveau,
       id: Date.now(),
       heureArrivee: heureReelle,
-      montantNum: parseInt((nouveau.montant||'0').replace(/\s/g,''), 10) || 0,
+      montantNum: parseInt((nouveau.montant || '0').replace(/\s/g, ''), 10) || 0,
       statut,
     }
 
-    setSejours(prev => {
-      const updated = [ns, ...prev]
-      return updated
-    })
-
-    // Mettre à jour stats chambres
-    setChambresStats(prev => ({
-      ...prev,
-      occupees:    prev.occupees + (statut === 'en_cours' ? 1 : 0),
-      disponibles: Math.max(0, prev.disponibles - 1),
-    }))
-
-    return true // Succès → autoriser le reçu
+    setSejours(prev => [ns, ...prev])
+    return true
   }
 
   const terminerSejour = (id) => {
-    setSejours(prev => prev.map(s => s.id===id ? {...s, statut:'termine'} : s))
-    setChambresStats(prev => ({
-      ...prev,
-      occupees:    Math.max(0, prev.occupees - 1),
-      disponibles: prev.disponibles + 1,
-    }))
-    // Supprimer alertes de ce séjour
+    setSejours(prev => prev.map(s => (s.id === id ? { ...s, statut: 'termine' } : s)))
     setAlertesSonnees(prev => {
-      const updated = {...prev}
+      const updated = { ...prev }
       delete updated[`rappel_${id}`]
       delete updated[`alerte_${id}`]
       delete updated[`urgent_${id}`]
       return updated
     })
+  }
+
+  const activerReservation = (id) => {
+    setSejours(prev => prev.map(s => {
+      if (s.id !== id) return s
+      return { ...s, statut: 'en_cours', heureArrivee: new Date().toTimeString().slice(0, 5) }
+    }))
   }
 
   const prolongerSejour = (id, supplement) => {
     setSejours(prev => prev.map(s => {
       if (s.id !== id) return s
-      const nouveauMontant = (s.montantNum||0) + supplement
+      const nouveauMontant = (s.montantNum || 0) + supplement
       return { ...s, montantNum: nouveauMontant, montant: nouveauMontant.toLocaleString('fr-FR') }
     }))
-    // Réinitialiser les alertes pour ce séjour prolongé
     setAlertesSonnees(prev => {
-      const updated = {...prev}
+      const updated = { ...prev }
       delete updated[`rappel_${id}`]
       delete updated[`alerte_${id}`]
       delete updated[`urgent_${id}`]
@@ -262,7 +270,6 @@ export default function App() {
     })
   }
 
-  // ─── Navigation ───────────────────────────────────────────────────────────
   const changerOnglet = (nouvelOnglet) => {
     if (nouvelOnglet === onglet) return
     const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
@@ -289,7 +296,7 @@ export default function App() {
   const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
 
   return (
-    <div style={{ paddingBottom:'70px', background:'#F5F7FA', minHeight:'100vh' }}>
+    <div style={{ paddingBottom: '70px', background: '#F5F7FA', minHeight: '100vh' }}>
       <div key={cle} className="screen-in">
 
         {onglet === 'dashboard' && (
@@ -306,11 +313,6 @@ export default function App() {
           <Chambres
             chambres={chambresGenerees}
             chambresStats={chambresStats}
-            onMajStats={setChambresStats}
-            onMajChambre={(num, statut, note) => {
-              // Mettre à jour stats quand statut change manuellement
-              setChambresStats(prev => ({...prev}))
-            }}
           />
         )}
 
@@ -321,6 +323,7 @@ export default function App() {
             onAjouter={ajouterSejour}
             onTerminer={terminerSejour}
             onProlonger={prolongerSejour}
+            onActiverReservation={activerReservation}
             ouvrirFormulaire={ouvrirFormulaire}
             onFormulaireOuvert={() => setOuvrirFormulaire(false)}
           />
@@ -331,8 +334,8 @@ export default function App() {
             sejours={sejoursEnCours}
             entreesDiverses={entreesDiverses}
             sortiesDiverses={sortiesDiverses}
-            onAjouterEntree={e => setEntreesDiverses(prev=>[e,...prev])}
-            onAjouterSortie={s => setSortiesDiverses(prev=>[s,...prev])}
+            onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])}
+            onAjouterSortie={s => setSortiesDiverses(prev => [s, ...prev])}
             caisse={caisse}
           />
         )}
@@ -357,4 +360,3 @@ export default function App() {
     </div>
   )
 }
-
