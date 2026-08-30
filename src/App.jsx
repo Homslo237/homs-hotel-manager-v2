@@ -217,10 +217,19 @@ export default function App() {
     aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
+  // Occupation physique : uniquement les sejours reellement en cours
+  // (sert au Dashboard/Chambres pour le taux d'occupation)
   const sejoursEnCours = sejours.filter(s => s.statut === 'en_cours')
-  const totalSejours   = sejoursEnCours.reduce((sum, s) => sum + (s.montantNum || 0), 0)
-  const totalNuits     = sejoursEnCours.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
-  const totalHeures    = sejoursEnCours.filter(s => s.type === 'heure').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+
+  // Encaissement : un sejour "a_venir" avec paiement enregistre a la
+  // reservation represente de l'argent deja recu par l'hotel. On l'inclut
+  // donc dans les totaux de caisse au meme titre qu'une entree immediate.
+  // Logique retenue : en_cours + a_venir sont consideres "encaisses".
+  const sejoursEncaisses = sejours.filter(s => s.statut === 'en_cours' || s.statut === 'a_venir')
+
+  const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalNuits     = sejoursEncaisses.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalHeures    = sejoursEncaisses.filter(s => s.type === 'heure').reduce((sum, s) => sum + (s.montantNum || 0), 0)
   const totalEntrees   = entreesDiverses.reduce((sum, e) => sum + (e.montant || 0), 0)
   const totalSorties   = sortiesDiverses.reduce((sum, s) => sum + (s.montant || 0), 0)
   const soldeNet       = totalSejours + totalEntrees - totalSorties
@@ -349,7 +358,7 @@ export default function App() {
 
         {onglet === 'caisse' && accesRole.includes('caisse') && (
           <Caisse
-            sejours={sejoursEnCours}
+            sejours={sejoursEncaisses}
             entreesDiverses={entreesDiverses}
             sortiesDiverses={sortiesDiverses}
             onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])}
