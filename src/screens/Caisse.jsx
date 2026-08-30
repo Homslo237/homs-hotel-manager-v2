@@ -299,10 +299,15 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
             <p style={{ fontSize:'11px', color:'#999', marginBottom:'12px', fontStyle:'italic' }}>Alimente automatiquement depuis les sejours</p>
             {sejours.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#999' }}><div style={{ fontSize:'28px' }}>🏨</div><p>Aucun sejour</p></div>}
             {sejours.map(p=>(
-              <div key={p.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${p.type==='nuit'?'#2ECC71':'#E8634A'}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+              <div key={p.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${p.statut==='a_venir'?'#8B5CF6':p.type==='nuit'?'#2ECC71':'#E8634A'}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{p.client}</span>
-                  <span style={{ fontWeight:'800', color:'#C9A84C', fontSize:'14px' }}>{fmt(p.montantNum)} FCFA</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                    {p.statut==='a_venir' && (
+                      <span style={{ background:'#F5F3FF', color:'#8B5CF6', fontSize:'9px', fontWeight:'700', padding:'2px 6px', borderRadius:'8px' }}>RESERVE</span>
+                    )}
+                    <span style={{ fontWeight:'800', color:'#C9A84C', fontSize:'14px' }}>{fmt(p.montantNum)} FCFA</span>
+                  </div>
                 </div>
                 <div style={{ fontSize:'12px', color:'#999' }}>Ch. {p.chambre} · {p.duree} · {p.modePaiement}</div>
               </div>
