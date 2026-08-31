@@ -333,4 +333,38 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
                   {d.statut==='fait' ? 'Parti' : 'En attente'}
                 </div>
               </div>
-  </
+            </div>
+          ))}
+        </div>
+
+        {/* Séjours en cours */}
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
+            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Moon size={16} color="#1B3A6B"/>
+            </div>
+            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
+            <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
+              {sejoursEnCours.length}
+            </span>
+          </div>
+          {sejoursEnCours.map((s,i) => (
+            <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: (i*0.08)+'s' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
+                <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
+                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montantNum)} F</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#888' }}>
+                <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
+                <span style={{ color:s.type==='heure'?'#E8634A':'#1B3A6B', fontWeight:'600' }}>
+                  Depart : {s.type==='nuit' ? s.dateDepart : s.heureDepart}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </div>
+  )
+}
