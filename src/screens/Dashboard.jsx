@@ -24,16 +24,12 @@ const caJours = [
   { jour:'Auj', montant:0 }, // sera remplacé par soldeNet
 ]
 
-const arriveesDuJour = [
-  { nom:'M. Dupont Jean',    chambre:'104', heure:'14h00', categorie:'Standard' },
-  { nom:'Mme Traoré Aïcha', chambre:'208', heure:'15h30', categorie:'Confort'  },
-  { nom:'M. Nguessan Paul',  chambre:'306', heure:'18h00', categorie:'Suite'    },
-]
-
-const departsDuJour = [
-  { nom:'Mme Diallo Fatou', chambre:'103', heure:'11h00', statut:'fait'      },
-  { nom:'M. Bamba Seydou',  chambre:'214', heure:'12h00', statut:'en_attente' },
-]
+// Renvoie la date du jour au format JJ/MM/AAAA, identique au format
+// utilisé partout ailleurs dans l'app pour dateArrivee/dateDepart.
+function dateDuJourFR() {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+}
 
 function GraphiqueCA({ data, visible }) {
   const max = Math.max(...data.map(d => d.montant), 1)
@@ -147,6 +143,17 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
 
   const prenom = utilisateur?.email?.split('@')[0] || 'vous'
   const sejoursEnCours = sejours.filter(s => s.statut === 'en_cours')
+
+  // Arrivees du jour : reservations a venir dont l'arrivee est prevue aujourd'hui
+  const aujourdhuiFR = dateDuJourFR()
+  const arriveesDuJour = sejours
+    .filter(s => s.statut === 'a_venir' && s.dateArrivee === aujourdhuiFR)
+    .map(s => ({ nom: s.client, chambre: s.chambre, heure: s.heureArrivee, categorie: s.categorie }))
+
+  // Departs du jour : sejours en cours dont le depart est prevu aujourd'hui
+  const departsDuJour = sejoursEnCours
+    .filter(s => s.dateDepart === aujourdhuiFR)
+    .map(s => ({ nom: s.client, chambre: s.chambre, heure: s.heureDepart, statut: 'en_attente' }))
 
   return (
     <div style={{ paddingBottom:'90px', background:'#F5F7FA', minHeight:'100vh' }}>
@@ -326,38 +333,4 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
                   {d.statut==='fait' ? 'Parti' : 'En attente'}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Séjours en cours */}
-        <div>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Moon size={16} color="#1B3A6B"/>
-            </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
-            <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
-              {sejoursEnCours.length}
-            </span>
-          </div>
-          {sejoursEnCours.map((s,i) => (
-            <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: (i*0.08)+'s' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
-                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montantNum)} F</span>
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#888' }}>
-                <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
-                <span style={{ color:s.type==='heure'?'#E8634A':'#1B3A6B', fontWeight:'600' }}>
-                  Depart : {s.type==='nuit' ? s.dateDepart : s.heureDepart}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-      </div>
-    </div>
-  )
-}
+  </
