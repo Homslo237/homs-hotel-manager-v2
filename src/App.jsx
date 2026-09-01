@@ -203,6 +203,9 @@ export default function App() {
       }
     }
 
+    // Verification immediate au montage : rattrape les depassements
+    // accumules pendant que l'app etait fermee, sans attendre la 1ere minute.
+    verifier()
     intervalRef.current = setInterval(verifier, 60000)
     return () => clearInterval(intervalRef.current)
   }, [sejours, alertesSonnees])
