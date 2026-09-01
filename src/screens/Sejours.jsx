@@ -762,10 +762,10 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
                 )}
               </div>
 
-              {/* Montant + boutons */}
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'nowrap', gap:'6px' }}>
+              {/* Montant + boutons - autorise le retour a la ligne si 3 boutons */}
+              <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
                 <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px', whiteSpace:'nowrap' }}>{s.montant} FCFA</span>
-                <div style={{ display:'flex', gap:'6px' }}>
+                <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
                   {/* Reçu entrée */}
                   <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
                     style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
