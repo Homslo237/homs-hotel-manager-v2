@@ -723,7 +723,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
         )}
 
         {filtresSejours.map(s=>{
-          const st = statuts[s.statut]||statuts.en_cours
+          const st = statuts[s.statut] || { label: s.statut || 'Inconnu', couleur: '#999' }
           const tr = s.statut==='en_cours' ? tempsRestant(s) : null
           return (
             <div key={s.id} style={{
