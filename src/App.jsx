@@ -320,6 +320,16 @@ export default function App() {
     setEcran('connexion')
   }
 
+  // Outil de test : efface toutes les donnees et repart sur la demo propre.
+  // A retirer (ou proteger derriere le role directeur) avant la commercialisation.
+  const handleReinitialiser = () => {
+    try { localStorage.removeItem(STORAGE_KEY) } catch (e) {}
+    setSejours(SEJOURS_DEMO)
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+    setAlertesSonnees({})
+  }
+
   if (ecran === 'splash')    return <Splash onFin={() => setEcran('connexion')} />
   if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion} />
 
@@ -374,6 +384,7 @@ export default function App() {
           <Menu
             utilisateur={utilisateur}
             onDeconnexion={handleDeconnexion}
+            onReinitialiser={handleReinitialiser}
           />
         )}
       </div>
