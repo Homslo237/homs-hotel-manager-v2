@@ -288,7 +288,7 @@ const menuItems = [
   },
 ]
 
-export default function Menu({ onDeconnexion }) {
+export default function Menu({ onDeconnexion, onReinitialiser }) {
   const [ecranActif, setEcranActif] = useState(null)
 
   return (
@@ -345,6 +345,25 @@ export default function Menu({ onDeconnexion }) {
             </div>
           ))}
 
+          {/* Reinitialiser les donnees - outil de test, a retirer avant commercialisation */}
+          <div
+            onClick={() => {
+              if (window.confirm('Effacer toutes les donnees de test (sejours, caisse) et repartir sur les donnees de demonstration ? Cette action est irreversible.')) {
+                if (onReinitialiser) onReinitialiser()
+              }
+            }}
+            style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}
+          >
+            <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF3C7', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Trash2 size={20} color="#C9A84C"/>
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:'600', fontSize:'14px', color:'#C9A84C' }}>Reinitialiser les donnees</div>
+              <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Outil de test - efface sejours et caisse</div>
+            </div>
+            <ChevronRight size={16} color="#D1D5DB"/>
+          </div>
+
           {/* Déconnexion */}
           <div onClick={onDeconnexion} style={{ background:'white', borderRadius:'16px', padding:'14px 16px', marginBottom:'24px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -374,4 +393,6 @@ export default function Menu({ onDeconnexion }) {
   )
 }
 // Note : La section "Configuration des chambres" est déjà dans EcranDirecteur ci-dessus.
-// Les paramètres suivants ont été ajoutés dans paramsDefa
+// Les paramètres suivants ont été ajoutés dans paramsDefaut :
+// totalChambres: 50
+// categories: Standard (20, 101-120), Confort (20, 201-220), Suite (10, 301-310)
