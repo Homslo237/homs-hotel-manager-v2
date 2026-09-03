@@ -228,7 +228,19 @@ export default function App() {
   // reservation represente de l'argent deja recu par l'hotel. On l'inclut
   // donc dans les totaux de caisse au meme titre qu'une entree immediate.
   // Logique retenue : en_cours + a_venir sont consideres "encaisses".
-  const sejoursEncaisses = sejours.filter(s => s.statut === 'en_cours' || s.statut === 'a_venir')
+  // Un sejour reste compte dans le solde du jour meme apres son depart
+  // (statut "termine"), tant que ce depart a eu lieu aujourd'hui : l'argent
+  // encaisse ne disparait pas du solde du jour simplement parce que le
+  // client est parti. Seuls les sejours d'un jour anterieur sortent du calcul.
+  const aujourdhuiPourCaisse = (() => {
+    const d = new Date()
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+  })()
+  const sejoursEncaisses = sejours.filter(s =>
+    s.statut === 'en_cours' ||
+    s.statut === 'a_venir' ||
+    (s.statut === 'termine' && s.dateArrivee === aujourdhuiPourCaisse)
+  )
 
   const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
   const totalNuits     = sejoursEncaisses.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
