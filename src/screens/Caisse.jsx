@@ -6,13 +6,13 @@ const maintenant = () => new Date().toTimeString().slice(0, 5)
 const aujourdhui = () => new Date().toLocaleDateString('fr-FR')
 
 const modesEntree = [
-  { val:'Especes',          icon:'💵' },
+  { val:'Espèces',          icon:'💵' },
   { val:'Orange Money',     icon:'🟠' },
   { val:'MTN Mobile Money', icon:'🟡' },
   { val:'Carte bancaire',   icon:'💳' },
 ]
 const modesSortie = [
-  { val:'Especes',          icon:'💵' },
+  { val:'Espèces',          icon:'💵' },
   { val:'Orange Money',     icon:'🟠' },
   { val:'MTN Mobile Money', icon:'🟡' },
   { val:'Carte bancaire',   icon:'💳' },
@@ -22,7 +22,7 @@ const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
 
 function FormulaireEntree({ onClose, onAjouter }) {
-  const [form, setForm] = useState({ libelle:'', emetteurNom:'', emetteurContact:'', montant:'', mode:'Especes' })
+  const [form, setForm] = useState({ libelle:'', emetteurNom:'', emetteurContact:'', montant:'', mode:'Espèces' })
   const ok = form.libelle.trim() && form.montant && Number(form.montant) > 0
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}>
@@ -66,7 +66,7 @@ function FormulaireEntree({ onClose, onAjouter }) {
 }
 
 function FormulaireSortie({ onClose, onAjouter }) {
-  const [form, setForm] = useState({ libelle:'', beneficiaireNom:'', beneficiaireContact:'', montant:'', mode:'Especes' })
+  const [form, setForm] = useState({ libelle:'', beneficiaireNom:'', beneficiaireContact:'', montant:'', mode:'Espèces' })
   const ok = form.libelle.trim() && form.montant && Number(form.montant) > 0
   return (
     <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}>
@@ -112,7 +112,7 @@ function FormulaireSortie({ onClose, onAjouter }) {
 function ModalPassation({ sejours, entrees, sorties, caisse, onClose }) {
   const [form, setForm] = useState({ numeroPassation:'001', vacation:'Matin (06h00 - 14h00)', recSortantNom:'', recEntrantNom:'', clePortesRemises:'', clePortesTotal:'', cleCaisseRemises:'', cleCaisseTotal:'', incidents:'', observations:'' })
 
-  const totalEspeces = [...sejours,...entrees].filter(p=>p.mode==='Especes'||p.modePaiement==='Especes').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
+  const totalEspeces = [...sejours,...entrees].filter(p=>p.mode==='Espèces'||p.modePaiement==='Espèces').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
   const totalOM      = [...sejours,...entrees].filter(p=>p.mode==='Orange Money'||p.modePaiement==='Orange Money').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
   const totalMOMO    = [...sejours,...entrees].filter(p=>p.mode==='MTN Mobile Money'||p.modePaiement==='MTN Mobile Money').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
   const totalCarte   = [...sejours,...entrees].filter(p=>p.mode==='Carte bancaire'||p.modePaiement==='Carte bancaire').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
@@ -202,7 +202,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
     ...sejours.map(s => ({ mode: s.modePaiement, montant: s.montantNum||0 })),
     ...entreesDiverses.map(e => ({ mode: e.mode, montant: e.montant||0 }))
   ]
-  const tEspeces = allIn.filter(p=>p.mode==='Especes').reduce((s,p)=>s+p.montant,0)
+  const tEspeces = allIn.filter(p=>p.mode==='Espèces').reduce((s,p)=>s+p.montant,0)
   const tOM      = allIn.filter(p=>p.mode==='Orange Money').reduce((s,p)=>s+p.montant,0)
   const tMOMO    = allIn.filter(p=>p.mode==='MTN Mobile Money').reduce((s,p)=>s+p.montant,0)
   const tCarte   = allIn.filter(p=>p.mode==='Carte bancaire').reduce((s,p)=>s+p.montant,0)
@@ -265,7 +265,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
         {/* 4 cases modes */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px' }}>
           {[
-            { icon:'💵', label:'Especes',  montant:tEspeces, couleur:'#2ECC71' },
+            { icon:'💵', label:'Espèces',  montant:tEspeces, couleur:'#2ECC71' },
             { icon:'🟠', label:'OM',       montant:tOM,      couleur:'#FF6600' },
             { icon:'🟡', label:'MOMO',     montant:tMOMO,    couleur:'#C9A84C' },
             { icon:'💳', label:'Carte',    montant:tCarte,   couleur:'#1B3A6B' },
