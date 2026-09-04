@@ -297,11 +297,26 @@ export default function App() {
     }))
   }
 
-  const prolongerSejour = (id, supplement) => {
+  const prolongerSejour = (id, ajout, supplement) => {
     setSejours(prev => prev.map(s => {
       if (s.id !== id) return s
       const nouveauMontant = (s.montantNum || 0) + supplement
-      return { ...s, montantNum: nouveauMontant, montant: nouveauMontant.toLocaleString('fr-FR') }
+
+      // La prolongation doit repousser reellement l'heure/date de depart,
+      // sinon le reçu de sortie continue de calculer un dépassement par
+      // rapport a l'ancienne heure de fin, jamais mise a jour.
+      if (s.type === 'nuit') {
+        const [j, m, a] = s.dateDepart.split('/').map(Number)
+        const d = new Date(a, m - 1, j)
+        d.setDate(d.getDate() + (ajout || 0))
+        const nouvelleDateDepart = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+        return { ...s, montantNum: nouveauMontant, montant: nouveauMontant.toLocaleString('fr-FR'), dateDepart: nouvelleDateDepart }
+      } else {
+        const [h, min] = s.heureDepart.split(':').map(Number)
+        const totalMin = h * 60 + min + (ajout || 0) * 60
+        const nouvelleHeureDepart = `${String(Math.floor(totalMin/60) % 24).padStart(2,'0')}:${String(totalMin % 60).padStart(2,'0')}`
+        return { ...s, montantNum: nouveauMontant, montant: nouveauMontant.toLocaleString('fr-FR'), heureDepart: nouvelleHeureDepart }
+      }
     }))
     setAlertesSonnees(prev => {
       const updated = { ...prev }
