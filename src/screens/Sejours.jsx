@@ -622,6 +622,20 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
   const [sejourAProlonger, setSejourAProlonger] = useState(null)
   const [recuVisible, setRecuVisible] = useState(null)   // { texte, titre }
 
+  // Verrouille le scroll de la page de fond tant qu'une modale est ouverte,
+  // et remet la fenetre en haut a l'ouverture pour que le formulaire ou le
+  // reçu soit immediatement visible, sans avoir a scroller pour le trouver.
+  useEffect(() => {
+    const modaleOuverte = showFormulaire || !!sejourAProlonger || !!recuVisible
+    if (modaleOuverte) {
+      window.scrollTo(0, 0)
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showFormulaire, sejourAProlonger, recuVisible])
+
   const filtresSejours = sejours.filter(s => {
     const matchR = s.client.toLowerCase().includes(recherche.toLowerCase()) || s.chambre.includes(recherche)
     const matchF = filtre==='tous' || s.statut===filtre
@@ -640,7 +654,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
   }
 
   const handleProlonger = (id, ajout, supplement) => {
-    if (onProlonger) onProlonger(id, supplement)
+    if (onProlonger) onProlonger(id, ajout, supplement)
   }
 
   const handleCheckout = (s) => {
