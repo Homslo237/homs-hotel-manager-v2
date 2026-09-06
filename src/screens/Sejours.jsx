@@ -199,18 +199,42 @@ Merci de votre confiance !
 function genererRecuSortie(s, supplement, depassage) {
   const now = maintenant()
   const aSuppl = supplement > 0
+  const historique = s.historiqueProlongations || []
+
+  // Reconstituer l'heure/date de fin PREVUE au tout debut du sejour,
+  // avant toute prolongation : c'est le "avant" de la toute premiere
+  // prolongation, ou l'heure actuelle si le sejour n'a jamais ete prolonge.
+  const finInitiale = historique.length > 0 ? historique[0].avant : (s.type==='nuit' ? s.dateDepart : s.heureDepart)
+  const uniteLabel = s.type==='nuit' ? '' : ''
+
+  let sectionHistorique = `--------------------------------
+HISTORIQUE DU SEJOUR
+--------------------------------
+Entree initiale : ${s.type==='nuit' ? s.dateArrivee : s.heureArrivee} -> ${finInitiale}`
+
+  historique.forEach((h, i) => {
+    sectionHistorique += `
+Prolongation ${i+1}   : ${h.avant} -> ${h.apres} (+${h.montant.toLocaleString('fr-FR')} FCFA)`
+  })
+
+  sectionHistorique += `
+--------------------------------`
+
   return `================================
   ${CONFIG.nomHotel} / REÇU DE SORTIE
 ================================
 Client  : ${s.client}
 Chambre : ${s.chambre}
-Sortie  : ${now.date} à ${now.heure}${aSuppl ? `
-Dépassement: ${depassage}
-Supplément: ${supplement.toLocaleString('fr-FR')} FCFA
-TOTAL DÛ : ${supplement.toLocaleString('fr-FR')} FCFA` : `
-Aucun dépassement`}
+${sectionHistorique}
+Sortie reelle : ${now.date} à ${now.heure}${aSuppl ? `
+Dépassement   : ${depassage}
+Supplément    : ${supplement.toLocaleString('fr-FR')} FCFA` : `
+Dépassement   : Aucun`}
+--------------------------------
+Montant total encaisse : ${s.montant} FCFA${aSuppl ? ` + ${supplement.toLocaleString('fr-FR')} FCFA` : ''}
 ================================
-       À très bientôt !
+   Merci de votre confiance,
+       à très bientôt !
 ================================`
 }
 
