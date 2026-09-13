@@ -137,6 +137,9 @@ export default function App() {
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
   const [sortiesDiverses, setSortiesDiverses] = useState([])
+  // Historique permanent : jamais vide, meme apres une cloture de caisse.
+  // Sert aux statistiques du Directeur (CA jour/semaine/mois/annee).
+  const [historique,      setHistorique]       = useState([])
   const [alertesSonnees,  setAlertesSonnees]  = useState({})
   const intervalRef = useRef(null)
 
@@ -150,6 +153,7 @@ export default function App() {
       setSejours(sauvegarde.sejours || SEJOURS_DEMO)
       setEntreesDiverses(sauvegarde.entreesDiverses || [])
       setSortiesDiverses(sauvegarde.sortiesDiverses || [])
+      setHistorique(sauvegarde.historique || [])
     } else {
       setSejours(SEJOURS_DEMO)
     }
@@ -158,10 +162,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0) {
-      sauvegarder({ sejours, entreesDiverses, sortiesDiverses })
+    if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0 || historique.length > 0) {
+      sauvegarder({ sejours, entreesDiverses, sortiesDiverses, historique })
     }
-  }, [sejours, entreesDiverses, sortiesDiverses])
+  }, [sejours, entreesDiverses, sortiesDiverses, historique])
 
   useEffect(() => {
     const verifier = () => {
@@ -227,19 +231,14 @@ export default function App() {
   // Encaissement : un sejour "a_venir" avec paiement enregistre a la
   // reservation represente de l'argent deja recu par l'hotel. On l'inclut
   // donc dans les totaux de caisse au meme titre qu'une entree immediate.
-  // Logique retenue : en_cours + a_venir sont consideres "encaisses".
-  // Un sejour reste compte dans le solde du jour meme apres son depart
-  // (statut "termine"), tant que ce depart a eu lieu aujourd'hui : l'argent
-  // encaisse ne disparait pas du solde du jour simplement parce que le
-  // client est parti. Seuls les sejours d'un jour anterieur sortent du calcul.
-  const aujourdhuiPourCaisse = (() => {
-    const d = new Date()
-    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
-  })()
+  // La caisse active reste stable durant toute la journee (et au-dela) :
+  // elle ne se vide JAMAIS toute seule au changement de date. Seule une
+  // cloture manuelle du Directeur (passation de service) la remet a zero,
+  // en archivant tout dans l'historique permanent au passage.
   const sejoursEncaisses = sejours.filter(s =>
     s.statut === 'en_cours' ||
     s.statut === 'a_venir' ||
-    (s.statut === 'termine' && s.dateArrivee === aujourdhuiPourCaisse)
+    s.statut === 'termine'
   )
 
   const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
@@ -357,6 +356,41 @@ export default function App() {
     setEcran('connexion')
   }
 
+  // Cloture de caisse (passation de service) : archive dans l'historique
+  // permanent tout ce qui etait dans la caisse active (sejours en_cours/
+  // termine/a_venir payes + entrees/sorties diverses), puis vide la caisse
+  // active pour repartir de zero sur la vacation suivante. L'historique,
+  // lui, n'est jamais vide : c'est la source des statistiques du Directeur.
+  const cloturerCaisse = () => {
+    const maintenant = new Date()
+    const horodatage = `${String(maintenant.getDate()).padStart(2,'0')}/${String(maintenant.getMonth()+1).padStart(2,'0')}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2,'0')}:${String(maintenant.getMinutes()).padStart(2,'0')}`
+
+    const entreesSejours = sejours
+      .filter(s => s.statut === 'en_cours' || s.statut === 'a_venir' || s.statut === 'termine')
+      .map(s => ({
+        type: 'sejour', client: s.client, chambre: s.chambre, montant: s.montantNum || 0,
+        mode: s.modePaiement, date: s.dateArrivee, cloture: horodatage,
+      }))
+
+    const entreesArchivees = entreesDiverses.map(e => ({
+      type: 'entree', libelle: e.libelle, montant: e.montant || 0, mode: e.mode,
+      date: e.heure, cloture: horodatage,
+    }))
+
+    const sortiesArchivees = sortiesDiverses.map(s => ({
+      type: 'sortie', libelle: s.libelle, montant: s.montant || 0, mode: s.mode,
+      date: s.heure, cloture: horodatage,
+    }))
+
+    setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
+
+    // Vider la caisse active : les sejours en_cours redeviennent visibles
+    // uniquement dans l'historique, plus dans le calcul du solde courant.
+    setSejours(prev => prev.filter(s => s.statut !== 'termine'))
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+  }
+
   // Outil de test : efface toutes les donnees et repart sur la demo propre.
   // A retirer (ou proteger derriere le role directeur) avant la commercialisation.
   const handleReinitialiser = () => {
@@ -414,6 +448,7 @@ export default function App() {
             onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])}
             onAjouterSortie={s => setSortiesDiverses(prev => [s, ...prev])}
             caisse={caisse}
+            onCloturerCaisse={cloturerCaisse}
           />
         )}
 
@@ -422,6 +457,7 @@ export default function App() {
             utilisateur={utilisateur}
             onDeconnexion={handleDeconnexion}
             onReinitialiser={handleReinitialiser}
+            historique={historique}
           />
         )}
       </div>
