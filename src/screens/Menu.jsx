@@ -25,6 +25,156 @@ const paramsDefaut = {
   ]
 }
 
+// ─── Helpers date pour les statistiques ───────────────────────────────────────
+// Convertit "JJ/MM/AAAA" en objet Date pour pouvoir comparer des periodes.
+function parseDateFR(dateFR) {
+  if (!dateFR) return null
+  const [j, m, a] = dateFR.split('/').map(Number)
+  if (!j || !m || !a) return null
+  return new Date(a, m - 1, j)
+}
+
+function estDansLaPeriode(dateFR, periode) {
+  const d = parseDateFR(dateFR)
+  if (!d) return false
+  const now = new Date()
+
+  if (periode === 'jour') {
+    return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+  }
+  if (periode === 'semaine') {
+    const debutSemaine = new Date(now)
+    const jourSemaine = now.getDay() === 0 ? 7 : now.getDay() // lundi = 1 ... dimanche = 7
+    debutSemaine.setDate(now.getDate() - jourSemaine + 1)
+    debutSemaine.setHours(0,0,0,0)
+    return d >= debutSemaine && d <= now
+  }
+  if (periode === 'mois') {
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+  }
+  if (periode === 'annee') {
+    return d.getFullYear() === now.getFullYear()
+  }
+  return true
+}
+
+// ─── Sous-écran : Statistiques du Directeur ───────────────────────────────────
+function EcranStatistiques({ onClose, historique = [] }) {
+  const [periode, setPeriode] = useState('jour')
+
+  const items = historique.filter(h => estDansLaPeriode(h.date, periode))
+
+  const totalEntrees = items.filter(h => h.type === 'sejour' || h.type === 'entree').reduce((s, h) => s + (h.montant||0), 0)
+  const totalSorties = items.filter(h => h.type === 'sortie').reduce((s, h) => s + (h.montant||0), 0)
+  const soldeNet = totalEntrees - totalSorties
+
+  const parMode = (mode) => items
+    .filter(h => (h.type === 'sejour' || h.type === 'entree') && h.mode === mode)
+    .reduce((s, h) => s + (h.montant||0), 0)
+
+  const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
+
+  const periodes = [
+    { id:'jour',    label:'Jour'    },
+    { id:'semaine', label:'Semaine' },
+    { id:'mois',    label:'Mois'    },
+    { id:'annee',   label:'Annee'   },
+  ]
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
+      <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <h1 style={{ color:'#C9A84C', fontSize:'20px', fontWeight:'800' }}>Statistiques</h1>
+            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>Chiffre d'affaires par periode</p>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'10px', padding:'8px', cursor:'pointer' }}>
+            <X size={20} color="white"/>
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding:'16px 20px' }}>
+
+        {/* Selecteur de periode */}
+        <div style={{ display:'flex', borderRadius:'12px', overflow:'hidden', border:'2px solid #E0E0E0', marginBottom:'16px' }}>
+          {periodes.map(p => (
+            <button key={p.id} onClick={() => setPeriode(p.id)} style={{
+              flex:1, padding:'11px 4px', fontWeight:'700', fontSize:'13px', border:'none', cursor:'pointer',
+              background: periode===p.id ? '#1B3A6B' : 'white',
+              color: periode===p.id ? 'white' : '#666',
+            }}>{p.label}</button>
+          ))}
+        </div>
+
+        {historique.length === 0 && (
+          <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
+            <div style={{ fontSize:'32px', marginBottom:'8px' }}>📊</div>
+            <p>Aucune donnee dans l'historique</p>
+            <p style={{ fontSize:'12px', marginTop:'4px' }}>Les chiffres apparaitront apres une premiere cloture de caisse</p>
+          </div>
+        )}
+
+        {historique.length > 0 && (
+          <>
+            {/* Carte solde net */}
+            <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', borderRadius:'16px', padding:'20px', marginBottom:'16px', color:'white' }}>
+              <div style={{ fontSize:'13px', opacity:0.8, marginBottom:'8px' }}>Solde net - {periodes.find(p=>p.id===periode)?.label}</div>
+              <div style={{ fontSize:'32px', fontWeight:'700', color:'#C9A84C' }}>{fmt(soldeNet)} FCFA</div>
+              <div style={{ display:'flex', gap:'16px', marginTop:'10px', fontSize:'12px' }}>
+                <span>📥 +{fmt(totalEntrees)}</span>
+                <span style={{ color:'#FF8A80' }}>📤 -{fmt(totalSorties)}</span>
+              </div>
+            </div>
+
+            {/* Repartition par mode */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px' }}>
+              {[
+                { icon:'💵', label:'Especes',  montant:parMode('Espèces'),          couleur:'#2ECC71' },
+                { icon:'🟠', label:'OM',       montant:parMode('Orange Money'),     couleur:'#FF6600' },
+                { icon:'🟡', label:'MOMO',     montant:parMode('MTN Mobile Money'), couleur:'#C9A84C' },
+                { icon:'💳', label:'Carte',    montant:parMode('Carte bancaire'),   couleur:'#1B3A6B' },
+              ].map(m => (
+                <div key={m.label} style={{ background:'white', borderRadius:'10px', padding:'10px 12px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`3px solid ${m.couleur}`, display:'flex', alignItems:'center', gap:'10px' }}>
+                  <span style={{ fontSize:'20px' }}>{m.icon}</span>
+                  <div>
+                    <div style={{ fontSize:'13px', fontWeight:'800', color:'#1B3A6B' }}>{fmt(m.montant)}</div>
+                    <div style={{ fontSize:'10px', color:'#888', fontWeight:'600' }}>{m.label} FCFA</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Detail des mouvements */}
+            <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
+              Detail ({items.length} mouvement{items.length>1?'s':''})
+            </div>
+            {items.length === 0 && (
+              <p style={{ fontSize:'13px', color:'#999', textAlign:'center', padding:'20px' }}>Aucun mouvement sur cette periode</p>
+            )}
+            {items.map((h, i) => (
+              <div key={i} style={{ background:'white', borderRadius:'12px', padding:'12px 16px', marginBottom:'8px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', borderLeft:`4px solid ${h.type==='sortie'?'#E74C3C':'#2ECC71'}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                  <span style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>
+                    {h.type==='sejour' ? h.client : h.libelle}
+                  </span>
+                  <span style={{ fontWeight:'800', fontSize:'13px', color:h.type==='sortie'?'#E74C3C':'#2ECC71' }}>
+                    {h.type==='sortie'?'-':'+'}{fmt(h.montant)} FCFA
+                  </span>
+                </div>
+                <div style={{ fontSize:'11px', color:'#999' }}>
+                  {h.type==='sejour' ? `Ch. ${h.chambre} · ` : ''}{h.mode} · {h.date}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Sous-écran : Paramètres Directeur ───────────────────────────────────────
 function EcranDirecteur({ onClose }) {
   const [params, setParams] = useState(paramsDefaut)
@@ -263,7 +413,7 @@ const menuItems = [
     items: [
       { icone: Settings, label: 'Paramètres directeur', sous: 'Vacations, tolérance, établissement', couleur: '#C9A84C', action: 'directeur' },
       { icone: Users,    label: 'Utilisateurs & rôles',  sous: 'Gérer le personnel et les accès',    couleur: '#1B3A6B', action: null },
-      { icone: BarChart2,label: 'Rapports & statistiques',sous: 'Chiffres d\'affaires, exports',     couleur: '#2ECC71', action: null },
+      { icone: BarChart2,label: 'Rapports & statistiques',sous: 'Chiffres d\'affaires par periode',     couleur: '#2ECC71', action: 'statistiques' },
     ]
   },
   {
@@ -288,7 +438,7 @@ const menuItems = [
   },
 ]
 
-export default function Menu({ onDeconnexion, onReinitialiser }) {
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) {
   const [ecranActif, setEcranActif] = useState(null)
 
   return (
@@ -388,6 +538,11 @@ export default function Menu({ onDeconnexion, onReinitialiser }) {
       {/* Écran Directeur */}
       {ecranActif === 'directeur' && (
         <EcranDirecteur onClose={() => setEcranActif(null)}/>
+      )}
+
+      {/* Écran Statistiques */}
+      {ecranActif === 'statistiques' && (
+        <EcranStatistiques onClose={() => setEcranActif(null)} historique={historique}/>
       )}
     </>
   )
