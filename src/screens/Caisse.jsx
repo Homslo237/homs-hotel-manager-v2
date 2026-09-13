@@ -109,7 +109,7 @@ function FormulaireSortie({ onClose, onAjouter }) {
   )
 }
 
-function ModalPassation({ sejours, entrees, sorties, caisse, onClose }) {
+function ModalPassation({ sejours, entrees, sorties, caisse, onClose, onCloturerCaisse }) {
   const [form, setForm] = useState({ numeroPassation:'001', vacation:'Matin (06h00 - 14h00)', recSortantNom:'', recEntrantNom:'', clePortesRemises:'', clePortesTotal:'', cleCaisseRemises:'', cleCaisseTotal:'', incidents:'', observations:'' })
 
   const totalEspeces = [...sejours,...entrees].filter(p=>p.mode==='Espèces'||p.modePaiement==='Espèces').reduce((s,p)=>s+(p.montantNum||p.montant||0),0)
@@ -175,15 +175,26 @@ function ModalPassation({ sejours, entrees, sorties, caisse, onClose }) {
           <div><label style={labelStyle}>Incidents</label><textarea value={form.incidents} onChange={e=>setForm({...form,incidents:e.target.value})} placeholder="Aucun incident..." rows={3} style={{ ...inputStyle, resize:'none' }}/></div>
           <div><label style={labelStyle}>Observations</label><textarea value={form.observations} onChange={e=>setForm({...form,observations:e.target.value})} placeholder="RAS..." rows={3} style={{ ...inputStyle, resize:'none' }}/></div>
         </div>
-        <button onClick={handleImprimer} style={{ width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+        <button onClick={handleImprimer} style={{ width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'10px' }}>
           <FileText size={18}/> Generer et imprimer le PDF
+        </button>
+        <button
+          onClick={() => {
+            if (window.confirm('Confirmer la cloture de caisse ? Le solde actuel sera archive dans l\'historique et la caisse repartira a zero pour la prochaine vacation. Cette action est irreversible.')) {
+              if (onCloturerCaisse) onCloturerCaisse()
+              onClose()
+            }
+          }}
+          style={{ width:'100%', padding:'16px', borderRadius:'12px', border:'2px solid #E74C3C', cursor:'pointer', background:'white', color:'#E74C3C', fontWeight:'800', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}
+        >
+          Confirmer la cloture de caisse
         </button>
       </div>
     </div>
   )
 }
 
-export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses=[], onAjouterEntree, onAjouterSortie, caisse={} }) {
+export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses=[], onAjouterEntree, onAjouterSortie, caisse={}, onCloturerCaisse }) {
   const [onglet,        setOnglet]        = useState('sejours')
   const [showEntree,    setShowEntree]    = useState(false)
   const [showSortie,    setShowSortie]    = useState(false)
@@ -356,7 +367,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
 
       {showEntree    && <FormulaireEntree  onClose={()=>setShowEntree(false)}    onAjouter={onAjouterEntree}/>}
       {showSortie    && <FormulaireSortie  onClose={()=>setShowSortie(false)}    onAjouter={onAjouterSortie}/>}
-      {showPassation && <ModalPassation    sejours={sejours} entrees={entreesDiverses} sorties={sortiesDiverses} caisse={caisse} onClose={()=>setShowPassation(false)}/>}
+      {showPassation && <ModalPassation    sejours={sejours} entrees={entreesDiverses} sorties={sortiesDiverses} caisse={caisse} onClose={()=>setShowPassation(false)} onCloturerCaisse={onCloturerCaisse}/>}
     </div>
   )
 }
