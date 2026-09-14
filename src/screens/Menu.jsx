@@ -2,14 +2,12 @@ import { useState } from 'react'
 import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings, Clock,
-  AlertTriangle, Plus, Trash2, Save
+  AlertTriangle, Plus, Trash2, Save, Building2, Upload
 } from 'lucide-react'
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
 
-// ─── Paramètres par défaut du Directeur ──────────────────────────────────────
 const paramsDefaut = {
   nomHotel: 'HOMS-HÔTEL',
   toleranceMinutes: 20,
@@ -25,8 +23,6 @@ const paramsDefaut = {
   ]
 }
 
-// ─── Helpers date pour les statistiques ───────────────────────────────────────
-// Convertit "JJ/MM/AAAA" en objet Date pour pouvoir comparer des periodes.
 function parseDateFR(dateFR) {
   if (!dateFR) return null
   const [j, m, a] = dateFR.split('/').map(Number)
@@ -38,13 +34,12 @@ function estDansLaPeriode(dateFR, periode) {
   const d = parseDateFR(dateFR)
   if (!d) return false
   const now = new Date()
-
   if (periode === 'jour') {
     return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }
   if (periode === 'semaine') {
     const debutSemaine = new Date(now)
-    const jourSemaine = now.getDay() === 0 ? 7 : now.getDay() // lundi = 1 ... dimanche = 7
+    const jourSemaine = now.getDay() === 0 ? 7 : now.getDay()
     debutSemaine.setDate(now.getDate() - jourSemaine + 1)
     debutSemaine.setHours(0,0,0,0)
     return d >= debutSemaine && d <= now
@@ -58,29 +53,20 @@ function estDansLaPeriode(dateFR, periode) {
   return true
 }
 
-// ─── Sous-écran : Statistiques du Directeur ───────────────────────────────────
 function EcranStatistiques({ onClose, historique = [] }) {
   const [periode, setPeriode] = useState('jour')
-
   const items = historique.filter(h => estDansLaPeriode(h.date, periode))
-
   const totalEntrees = items.filter(h => h.type === 'sejour' || h.type === 'entree').reduce((s, h) => s + (h.montant||0), 0)
   const totalSorties = items.filter(h => h.type === 'sortie').reduce((s, h) => s + (h.montant||0), 0)
   const soldeNet = totalEntrees - totalSorties
-
-  const parMode = (mode) => items
-    .filter(h => (h.type === 'sejour' || h.type === 'entree') && h.mode === mode)
-    .reduce((s, h) => s + (h.montant||0), 0)
-
+  const parMode = (mode) => items.filter(h => (h.type === 'sejour' || h.type === 'entree') && h.mode === mode).reduce((s, h) => s + (h.montant||0), 0)
   const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
-
   const periodes = [
     { id:'jour',    label:'Jour'    },
     { id:'semaine', label:'Semaine' },
     { id:'mois',    label:'Mois'    },
     { id:'annee',   label:'Annee'   },
   ]
-
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
@@ -94,10 +80,7 @@ function EcranStatistiques({ onClose, historique = [] }) {
           </button>
         </div>
       </div>
-
       <div style={{ padding:'16px 20px' }}>
-
-        {/* Selecteur de periode */}
         <div style={{ display:'flex', borderRadius:'12px', overflow:'hidden', border:'2px solid #E0E0E0', marginBottom:'16px' }}>
           {periodes.map(p => (
             <button key={p.id} onClick={() => setPeriode(p.id)} style={{
@@ -107,7 +90,6 @@ function EcranStatistiques({ onClose, historique = [] }) {
             }}>{p.label}</button>
           ))}
         </div>
-
         {historique.length === 0 && (
           <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
             <div style={{ fontSize:'32px', marginBottom:'8px' }}>📊</div>
@@ -115,10 +97,8 @@ function EcranStatistiques({ onClose, historique = [] }) {
             <p style={{ fontSize:'12px', marginTop:'4px' }}>Les chiffres apparaitront apres une premiere cloture de caisse</p>
           </div>
         )}
-
         {historique.length > 0 && (
           <>
-            {/* Carte solde net */}
             <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', borderRadius:'16px', padding:'20px', marginBottom:'16px', color:'white' }}>
               <div style={{ fontSize:'13px', opacity:0.8, marginBottom:'8px' }}>Solde net - {periodes.find(p=>p.id===periode)?.label}</div>
               <div style={{ fontSize:'32px', fontWeight:'700', color:'#C9A84C' }}>{fmt(soldeNet)} FCFA</div>
@@ -127,8 +107,6 @@ function EcranStatistiques({ onClose, historique = [] }) {
                 <span style={{ color:'#FF8A80' }}>📤 -{fmt(totalSorties)}</span>
               </div>
             </div>
-
-            {/* Repartition par mode */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px' }}>
               {[
                 { icon:'💵', label:'Especes',  montant:parMode('Espèces'),          couleur:'#2ECC71' },
@@ -145,8 +123,6 @@ function EcranStatistiques({ onClose, historique = [] }) {
                 </div>
               ))}
             </div>
-
-            {/* Detail des mouvements */}
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
               Detail ({items.length} mouvement{items.length>1?'s':''})
             </div>
@@ -175,23 +151,159 @@ function EcranStatistiques({ onClose, historique = [] }) {
   )
 }
 
-// ─── Sous-écran : Paramètres Directeur ───────────────────────────────────────
+function EcranIdentite({ onClose }) {
+  const [identite, setIdentite] = useState({
+    nom: '', slogan: '', adresse: '',
+    telephone1: '', telephone2: '', email: '',
+    rccm: '', contribuable: '', mentionLegale: '',
+    logoUrl: null,
+  })
+  const [sauvegarde, setSauvegarde] = useState(false)
+
+  const handleLogo = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { alert('Maximum 2 Mo.'); return }
+    setIdentite({ ...identite, logoUrl: URL.createObjectURL(file) })
+  }
+
+  const handleSauvegarder = () => {
+    setSauvegarde(true)
+    setTimeout(() => setSauvegarde(false), 2000)
+  }
+
+  const champ = (label, cle, placeholder, type = 'text') => (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <input type={type} value={identite[cle]} placeholder={placeholder}
+        onChange={e => setIdentite({ ...identite, [cle]: e.target.value })}
+        style={inputStyle}/>
+    </div>
+  )
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
+      <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <h1 style={{ color:'#C9A84C', fontSize:'20px', fontWeight:'800' }}>Identité de l'établissement</h1>
+            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>Logo, en-tête, contacts, infos légales</p>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'10px', padding:'8px', cursor:'pointer' }}>
+            <X size={20} color="white"/>
+          </button>
+        </div>
+      </div>
+      <div style={{ padding:'16px 20px' }}>
+
+        {/* Logo */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🖼️ LOGO DE L'ÉTABLISSEMENT</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
+            {identite.logoUrl ? (
+              <div style={{ textAlign:'center' }}>
+                <img src={identite.logoUrl} alt="Logo" style={{ maxHeight:'100px', maxWidth:'100%', borderRadius:'8px', marginBottom:'10px' }}/>
+                <br/>
+                <label style={{ cursor:'pointer', color:'#1B3A6B', fontWeight:'700', fontSize:'13px', textDecoration:'underline' }}>
+                  Changer le logo
+                  <input type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }}/>
+                </label>
+              </div>
+            ) : (
+              <label style={{ cursor:'pointer', display:'block' }}>
+                <div style={{ border:'2px dashed #C9A84C', borderRadius:'10px', padding:'24px', textAlign:'center', background:'#FFFDF5' }}>
+                  <Upload size={28} color="#C9A84C"/>
+                  <div style={{ fontSize:'13px', color:'#888', marginTop:'8px', fontWeight:'600' }}>Appuyer pour choisir un logo</div>
+                  <div style={{ fontSize:'11px', color:'#BBB', marginTop:'4px' }}>PNG ou JPG · max 2 Mo</div>
+                </div>
+                <input type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }}/>
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* En-tête */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🏨 EN-TÊTE DES REÇUS</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
+            {champ("Nom de l'établissement", 'nom', 'Ex. HOMS-HÔTEL')}
+            {champ('Slogan / devise', 'slogan', 'Ex. Votre confort, notre priorité')}
+            {champ('Adresse complète', 'adresse', 'Rue, quartier, ville...')}
+          </div>
+        </div>
+
+        {/* Contacts */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>📞 CONTACTS</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
+              <div>
+                <label style={labelStyle}>Téléphone 1</label>
+                <input type="tel" value={identite.telephone1} placeholder="+237 6XX XXX XX"
+                  onChange={e => setIdentite({ ...identite, telephone1: e.target.value })} style={inputStyle}/>
+              </div>
+              <div>
+                <label style={labelStyle}>Téléphone 2</label>
+                <input type="tel" value={identite.telephone2} placeholder="Optionnel"
+                  onChange={e => setIdentite({ ...identite, telephone2: e.target.value })} style={inputStyle}/>
+              </div>
+            </div>
+            {champ('Email', 'email', 'hotel@exemple.com', 'email')}
+          </div>
+        </div>
+
+        {/* Infos légales */}
+        <div style={{ marginBottom:'24px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>📄 INFOS LÉGALES (reçus)</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
+              <div>
+                <label style={labelStyle}>N° RCCM</label>
+                <input value={identite.rccm} placeholder="Optionnel"
+                  onChange={e => setIdentite({ ...identite, rccm: e.target.value })} style={inputStyle}/>
+              </div>
+              <div>
+                <label style={labelStyle}>N° Contribuable</label>
+                <input value={identite.contribuable} placeholder="Optionnel"
+                  onChange={e => setIdentite({ ...identite, contribuable: e.target.value })} style={inputStyle}/>
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Mention sur les reçus</label>
+              <textarea value={identite.mentionLegale}
+                placeholder="Ex. Merci de votre confiance. Toute chambre louée ne peut être remboursée."
+                onChange={e => setIdentite({ ...identite, mentionLegale: e.target.value })}
+                rows={3} style={{ ...inputStyle, resize:'vertical', fontFamily:'inherit' }}/>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleSauvegarder} style={{
+          width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
+          background: sauvegarde ? '#2ECC71' : '#1B3A6B',
+          color:'white', fontWeight:'800', fontSize:'15px',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+          transition:'background 0.3s'
+        }}>
+          <Save size={18}/>
+          {sauvegarde ? '✅ Informations enregistrées !' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function EcranDirecteur({ onClose }) {
   const [params, setParams] = useState(paramsDefaut)
   const [sauvegarde, setSauvegarde] = useState(false)
 
   const handleSauvegarder = () => {
-    // En Phase 2 : sauvegarder dans Firebase
     setSauvegarde(true)
     setTimeout(() => setSauvegarde(false), 2000)
   }
 
   const ajouterVacation = () => {
-    const newId = Date.now()
-    setParams({
-      ...params,
-      vacations: [...params.vacations, { id:newId, nom:'Nouvelle vacation', debut:'00:00', fin:'08:00' }]
-    })
+    setParams({ ...params, vacations: [...params.vacations, { id:Date.now(), nom:'Nouvelle vacation', debut:'00:00', fin:'08:00' }] })
   }
 
   const supprimerVacation = (id) => {
@@ -199,15 +311,11 @@ function EcranDirecteur({ onClose }) {
   }
 
   const modifierVacation = (id, champ, valeur) => {
-    setParams({
-      ...params,
-      vacations: params.vacations.map(v => v.id === id ? { ...v, [champ]: valeur } : v)
-    })
+    setParams({ ...params, vacations: params.vacations.map(v => v.id === id ? { ...v, [champ]: valeur } : v) })
   }
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
-      {/* Header */}
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
@@ -219,42 +327,27 @@ function EcranDirecteur({ onClose }) {
           </button>
         </div>
       </div>
-
       <div style={{ padding:'16px 20px' }}>
 
-        {/* ── Section : Établissement ── */}
         <div style={{ marginBottom:'20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
-            🏨 ÉTABLISSEMENT
-          </div>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🏨 ÉTABLISSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
             <div style={{ marginBottom:'14px' }}>
               <label style={labelStyle}>Nom de l'hôtel</label>
-              <input value={params.nomHotel}
-                onChange={e => setParams({...params, nomHotel:e.target.value})}
-                style={inputStyle}/>
+              <input value={params.nomHotel} onChange={e => setParams({...params, nomHotel:e.target.value})} style={inputStyle}/>
             </div>
             <div>
               <label style={labelStyle}>Nombre total de chambres</label>
-              <input value={params.totalChambres} type="number"
-                onChange={e => setParams({...params, totalChambres:Number(e.target.value)})}
-                style={inputStyle}/>
+              <input value={params.totalChambres} type="number" onChange={e => setParams({...params, totalChambres:Number(e.target.value)})} style={inputStyle}/>
             </div>
           </div>
         </div>
 
-        {/* ── Section : Tolérance dépassement ── */}
         <div style={{ marginBottom:'20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
-            ⏱️ TOLÉRANCE DÉPASSEMENT
-          </div>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>⏱️ TOLÉRANCE DÉPASSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
-            <label style={labelStyle}>
-              Durée de grâce après l'heure de départ prévue
-            </label>
-            <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>
-              En dessous de ce seuil → pas de supplément. Au-dessus → supplément calculé automatiquement sur le reçu de sortie.
-            </p>
+            <label style={labelStyle}>Durée de grâce après l'heure de départ prévue</label>
+            <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>En dessous de ce seuil → pas de supplément. Au-dessus → supplément calculé automatiquement.</p>
             <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
               <input value={params.toleranceMinutes} type="number" min="0" max="120"
                 onChange={e => setParams({...params, toleranceMinutes:Number(e.target.value)})}
@@ -264,116 +357,81 @@ function EcranDirecteur({ onClose }) {
             <div style={{ marginTop:'10px', background:'#FFF8E1', borderRadius:'8px', padding:'10px 12px', display:'flex', gap:'8px', alignItems:'flex-start' }}>
               <AlertTriangle size={14} color="#C9A84C" style={{ marginTop:'1px', flexShrink:0 }}/>
               <span style={{ fontSize:'12px', color:'#666' }}>
-                Actuellement : <strong>{params.toleranceMinutes} minutes</strong> de grâce accordées à chaque client avant facturation du dépassement.
+                Actuellement : <strong>{params.toleranceMinutes} minutes</strong> de grâce accordées à chaque client.
               </span>
             </div>
           </div>
         </div>
 
-        {/* ── Section : Vacations ── */}
         <div style={{ marginBottom:'20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
-            🔄 VACATIONS (ÉQUIPES)
-          </div>
-          <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>
-            Définissez les tranches horaires de vos équipes. Elles apparaîtront dans la passation de service.
-          </p>
-
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🔄 VACATIONS (ÉQUIPES)</div>
+          <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>Définissez les tranches horaires de vos équipes.</p>
           {params.vacations.map((v, i) => (
             <div key={v.id} style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #1B3A6B' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
                 <span style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>Vacation {i+1}</span>
                 {params.vacations.length > 1 && (
-                  <button onClick={() => supprimerVacation(v.id)}
-                    style={{ background:'#FFF0F0', border:'none', borderRadius:'8px', padding:'6px', cursor:'pointer' }}>
+                  <button onClick={() => supprimerVacation(v.id)} style={{ background:'#FFF0F0', border:'none', borderRadius:'8px', padding:'6px', cursor:'pointer' }}>
                     <Trash2 size={14} color="#E74C3C"/>
                   </button>
                 )}
               </div>
               <div style={{ marginBottom:'10px' }}>
                 <label style={labelStyle}>Nom de la vacation</label>
-                <input value={v.nom}
-                  onChange={e => modifierVacation(v.id, 'nom', e.target.value)}
-                  placeholder="Ex. Matin, Soir, Équipe A..."
-                  style={inputStyle}/>
+                <input value={v.nom} onChange={e => modifierVacation(v.id, 'nom', e.target.value)} placeholder="Ex. Matin, Soir..." style={inputStyle}/>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
                 <div>
                   <label style={labelStyle}>Heure de début</label>
-                  <input type="time" value={v.debut}
-                    onChange={e => modifierVacation(v.id, 'debut', e.target.value)}
-                    style={inputStyle}/>
+                  <input type="time" value={v.debut} onChange={e => modifierVacation(v.id, 'debut', e.target.value)} style={inputStyle}/>
                 </div>
                 <div>
                   <label style={labelStyle}>Heure de fin</label>
-                  <input type="time" value={v.fin}
-                    onChange={e => modifierVacation(v.id, 'fin', e.target.value)}
-                    style={inputStyle}/>
+                  <input type="time" value={v.fin} onChange={e => modifierVacation(v.id, 'fin', e.target.value)} style={inputStyle}/>
                 </div>
               </div>
             </div>
           ))}
-
-          <button onClick={ajouterVacation} style={{
-            width:'100%', padding:'12px', borderRadius:'12px', border:'2px dashed #1B3A6B',
-            background:'transparent', color:'#1B3A6B', fontWeight:'700', fontSize:'14px',
-            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-          }}>
+          <button onClick={ajouterVacation} style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'2px dashed #1B3A6B', background:'transparent', color:'#1B3A6B', fontWeight:'700', fontSize:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
             <Plus size={16}/> Ajouter une vacation
           </button>
         </div>
 
-        {/* ── Section : Configuration des chambres ── */}
         <div style={{ marginBottom:'20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
-            🛏️ CONFIGURATION DES CHAMBRES
-          </div>
-          <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>
-            Définissez vos catégories de chambres, leur numérotation et leurs tarifs.
-          </p>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🛏️ CONFIGURATION DES CHAMBRES</div>
+          <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>Définissez vos catégories, numérotation et tarifs.</p>
           {params.categories.map((cat, i) => (
             <div key={cat.id} style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #C9A84C' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
                 <span style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>Catégorie {i+1}</span>
                 {params.categories.length > 1 && (
-                  <button onClick={() => setParams({...params, categories: params.categories.filter(c=>c.id!==cat.id)})}
-                    style={{ background:'#FFF0F0', border:'none', borderRadius:'8px', padding:'6px', cursor:'pointer' }}>
+                  <button onClick={() => setParams({...params, categories: params.categories.filter(c=>c.id!==cat.id)})} style={{ background:'#FFF0F0', border:'none', borderRadius:'8px', padding:'6px', cursor:'pointer' }}>
                     <Trash2 size={14} color="#E74C3C"/>
                   </button>
                 )}
               </div>
               <div style={{ marginBottom:'10px' }}>
                 <label style={labelStyle}>Nom de la catégorie</label>
-                <input value={cat.nom}
-                  onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,nom:e.target.value}:c)})}
-                  placeholder="Ex. Standard, Confort, Suite..." style={inputStyle}/>
+                <input value={cat.nom} onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,nom:e.target.value}:c)})} placeholder="Ex. Standard, Confort, Suite..." style={inputStyle}/>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'10px' }}>
                 <div>
                   <label style={labelStyle}>N° de début</label>
-                  <input type="number" value={cat.debut}
-                    onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,debut:Number(e.target.value)}:c)})}
-                    style={inputStyle}/>
+                  <input type="number" value={cat.debut} onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,debut:Number(e.target.value)}:c)})} style={inputStyle}/>
                 </div>
                 <div>
                   <label style={labelStyle}>Nb de chambres</label>
-                  <input type="number" value={cat.nombre}
-                    onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,nombre:Number(e.target.value)}:c)})}
-                    style={inputStyle}/>
+                  <input type="number" value={cat.nombre} onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,nombre:Number(e.target.value)}:c)})} style={inputStyle}/>
                 </div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
                 <div>
                   <label style={labelStyle}>Tarif / nuit (FCFA)</label>
-                  <input type="number" value={cat.tarifNuit}
-                    onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,tarifNuit:Number(e.target.value)}:c)})}
-                    style={inputStyle}/>
+                  <input type="number" value={cat.tarifNuit} onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,tarifNuit:Number(e.target.value)}:c)})} style={inputStyle}/>
                 </div>
                 <div>
                   <label style={labelStyle}>Tarif / heure (FCFA)</label>
-                  <input type="number" value={cat.tarifHeure}
-                    onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,tarifHeure:Number(e.target.value)}:c)})}
-                    style={inputStyle}/>
+                  <input type="number" value={cat.tarifHeure} onChange={e => setParams({...params, categories: params.categories.map(c=>c.id===cat.id?{...c,tarifHeure:Number(e.target.value)}:c)})} style={inputStyle}/>
                 </div>
               </div>
               <div style={{ marginTop:'8px', background:'#F0F4FF', borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'#1B3A6B', fontWeight:'600' }}>
@@ -390,7 +448,6 @@ function EcranDirecteur({ onClose }) {
           </div>
         </div>
 
-        {/* Bouton sauvegarder */}
         <button onClick={handleSauvegarder} style={{
           width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
           background: sauvegarde ? '#2ECC71' : '#1B3A6B',
@@ -406,28 +463,28 @@ function EcranDirecteur({ onClose }) {
   )
 }
 
-// ─── Menu principal ───────────────────────────────────────────────────────────
 const menuItems = [
   {
     section: 'Directeur / Gérant',
     items: [
-      { icone: Settings, label: 'Paramètres directeur', sous: 'Vacations, tolérance, établissement', couleur: '#C9A84C', action: 'directeur' },
-      { icone: Users,    label: 'Utilisateurs & rôles',  sous: 'Gérer le personnel et les accès',    couleur: '#1B3A6B', action: null },
-      { icone: BarChart2,label: 'Rapports & statistiques',sous: 'Chiffres d\'affaires par periode',     couleur: '#2ECC71', action: 'statistiques' },
+      { icone: Settings,  label: 'Paramètres directeur',         sous: 'Vacations, tolérance, établissement', couleur: '#C9A84C', action: 'directeur' },
+      { icone: Building2, label: "Identité de l'établissement",  sous: 'Logo, en-tête, contacts, infos légales', couleur: '#2C5282', action: 'identite' },
+      { icone: Users,     label: 'Utilisateurs & rôles',         sous: 'Gérer le personnel et les accès',    couleur: '#1B3A6B', action: null },
+      { icone: BarChart2, label: 'Rapports & statistiques',      sous: "Chiffres d'affaires par periode",    couleur: '#2ECC71', action: 'statistiques' },
     ]
   },
   {
     section: 'Mon compte',
     items: [
-      { icone: User,  label: 'Mon profil',        sous: 'Informations personnelles',     couleur: '#1B3A6B', action: null },
-      { icone: Hotel, label: 'Mon établissement', sous: 'Nom, adresse, contacts',        couleur: '#2C5282', action: null },
+      { icone: User,  label: 'Mon profil',        sous: 'Informations personnelles', couleur: '#1B3A6B', action: null },
+      { icone: Hotel, label: 'Mon établissement', sous: 'Nom, adresse, contacts',    couleur: '#2C5282', action: null },
     ]
   },
   {
     section: 'Opérations',
     items: [
-      { icone: Wrench,   label: 'Maintenance',           sous: 'Signalements et réparations',  couleur: '#E74C3C', action: null },
-      { icone: BookOpen, label: 'Journal des opérations', sous: 'Historique des activités',     couleur: '#1B3A6B', action: null },
+      { icone: Wrench,   label: 'Maintenance',            sous: 'Signalements et réparations', couleur: '#E74C3C', action: null },
+      { icone: BookOpen, label: 'Journal des opérations', sous: 'Historique des activités',    couleur: '#1B3A6B', action: null },
     ]
   },
   {
@@ -444,8 +501,6 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
   return (
     <>
       <div style={{ background:'#F5F7FA', minHeight:'100vh', paddingBottom:'80px' }}>
-
-        {/* Profil header */}
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'32px 20px 24px', display:'flex', flexDirection:'column', alignItems:'center' }}>
           <div style={{ width:'72px', height:'72px', borderRadius:'36px', background:'#C9A84C', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', fontSize:'28px', fontWeight:'700', color:'white' }}>
             A
@@ -458,7 +513,6 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
         </div>
 
         <div style={{ padding:'16px 20px' }}>
-
           {menuItems.map((section, si) => (
             <div key={si} style={{ marginBottom:'20px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
@@ -468,8 +522,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
                 {section.items.map((item, ii) => {
                   const Icone = item.icone
                   return (
-                    <div key={ii}
-                      onClick={() => item.action && setEcranActif(item.action)}
+                    <div key={ii} onClick={() => item.action && setEcranActif(item.action)}
                       style={{
                         display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px',
                         borderBottom: ii < section.items.length-1 ? '1px solid #F0F0F0' : 'none',
@@ -480,9 +533,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
                         <Icone size={20} color={item.couleur}/>
                       </div>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:'600', fontSize:'14px', color: item.action ? '#1F2937' : '#AAA' }}>
-                          {item.label}
-                        </div>
+                        <div style={{ fontWeight:'600', fontSize:'14px', color: item.action ? '#1F2937' : '#AAA' }}>{item.label}</div>
                         <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>
                           {item.action ? item.sous : item.sous + ' — bientôt disponible'}
                         </div>
@@ -495,15 +546,12 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             </div>
           ))}
 
-          {/* Reinitialiser les donnees - outil de test, a retirer avant commercialisation */}
-          <div
-            onClick={() => {
-              if (window.confirm('Effacer toutes les donnees de test (sejours, caisse) et repartir sur les donnees de demonstration ? Cette action est irreversible.')) {
-                if (onReinitialiser) onReinitialiser()
-              }
-            }}
-            style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}
-          >
+          {/* Bouton Réinitialiser - outil de test */}
+          <div onClick={() => {
+            if (window.confirm('Effacer toutes les donnees de test ? Cette action est irreversible.')) {
+              if (onReinitialiser) onReinitialiser()
+            }
+          }} style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}>
             <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF3C7', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <Trash2 size={20} color="#C9A84C"/>
             </div>
@@ -526,7 +574,6 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             <ChevronRight size={16} color="#D1D5DB"/>
           </div>
 
-          {/* Logo bas */}
           <div style={{ textAlign:'center', paddingTop:'8px' }}>
             <img src="/logo-homslovision-blanc.png" alt="Homslovision"
               style={{ height:'32px', opacity:0.7 }}
@@ -535,19 +582,9 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
         </div>
       </div>
 
-      {/* Écran Directeur */}
-      {ecranActif === 'directeur' && (
-        <EcranDirecteur onClose={() => setEcranActif(null)}/>
-      )}
-
-      {/* Écran Statistiques */}
-      {ecranActif === 'statistiques' && (
-        <EcranStatistiques onClose={() => setEcranActif(null)} historique={historique}/>
-      )}
+      {ecranActif === 'directeur' && <EcranDirecteur onClose={() => setEcranActif(null)}/>}
+      {ecranActif === 'identite' && <EcranIdentite onClose={() => setEcranActif(null)}/>}
+      {ecranActif === 'statistiques' && <EcranStatistiques onClose={() => setEcranActif(null)} historique={historique}/>}
     </>
   )
 }
-// Note : La section "Configuration des chambres" est déjà dans EcranDirecteur ci-dessus.
-// Les paramètres suivants ont été ajoutés dans paramsDefaut :
-// totalChambres: 50
-// categories: Standard (20, 101-120), Confort (20, 201-220), Suite (10, 301-310)
