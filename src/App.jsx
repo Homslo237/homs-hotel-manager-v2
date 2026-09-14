@@ -337,7 +337,7 @@ export default function App() {
   }
 
   const sejoursEncaisses = sejours.filter(s =>
-    s.statut === 'en_cours' || s.statut === 'a_venir' || s.statut === 'termine'
+    s.statut === 'en_cours' || s.statut === 'a_venir' || s.statut === 'termine'|| s.statut === 'no_show'
   )
 
   const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
