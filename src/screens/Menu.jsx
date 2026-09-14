@@ -69,10 +69,8 @@ function EcranStatistiques({ onClose, historique = [] }) {
   const parMode = (mode) => items.filter(h => (h.type === 'sejour' || h.type === 'entree') && h.mode === mode).reduce((s, h) => s + (h.montant||0), 0)
   const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
   const periodes = [
-    { id:'jour',    label:'Jour'    },
-    { id:'semaine', label:'Semaine' },
-    { id:'mois',    label:'Mois'    },
-    { id:'annee',   label:'Annee'   },
+    { id:'jour', label:'Jour' }, { id:'semaine', label:'Semaine' },
+    { id:'mois', label:'Mois' }, { id:'annee', label:'Annee' },
   ]
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
@@ -133,15 +131,11 @@ function EcranStatistiques({ onClose, historique = [] }) {
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>
               Detail ({items.length} mouvement{items.length>1?'s':''})
             </div>
-            {items.length === 0 && (
-              <p style={{ fontSize:'13px', color:'#999', textAlign:'center', padding:'20px' }}>Aucun mouvement sur cette periode</p>
-            )}
+            {items.length === 0 && <p style={{ fontSize:'13px', color:'#999', textAlign:'center', padding:'20px' }}>Aucun mouvement sur cette periode</p>}
             {items.map((h, i) => (
               <div key={i} style={{ background:'white', borderRadius:'12px', padding:'12px 16px', marginBottom:'8px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', borderLeft:`4px solid ${h.type==='sortie'?'#E74C3C':'#2ECC71'}` }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
-                  <span style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>
-                    {h.type==='sejour' ? h.client : h.libelle}
-                  </span>
+                  <span style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>{h.type==='sejour' ? h.client : h.libelle}</span>
                   <span style={{ fontWeight:'800', fontSize:'13px', color:h.type==='sortie'?'#E74C3C':'#2ECC71' }}>
                     {h.type==='sortie'?'-':'+'}{fmt(h.montant)} FCFA
                   </span>
@@ -158,14 +152,12 @@ function EcranStatistiques({ onClose, historique = [] }) {
   )
 }
 
-function EcranIdentite({ onClose }) {
+function EcranIdentite({ onClose, onIdentiteChange }) {
   const [identite, setIdentite] = useState(() => {
     try {
       const sauvegarde = localStorage.getItem('homs_identite')
       return sauvegarde ? JSON.parse(sauvegarde) : identiteDefaut
-    } catch {
-      return identiteDefaut
-    }
+    } catch { return identiteDefaut }
   })
   const [sauvegarde, setSauvegarde] = useState(false)
 
@@ -174,9 +166,7 @@ function EcranIdentite({ onClose }) {
     if (!file) return
     if (file.size > 2 * 1024 * 1024) { alert('Maximum 2 Mo.'); return }
     const reader = new FileReader()
-    reader.onload = (ev) => {
-      setIdentite(prev => ({ ...prev, logoUrl: ev.target.result }))
-    }
+    reader.onload = (ev) => setIdentite(prev => ({ ...prev, logoUrl: ev.target.result }))
     reader.readAsDataURL(file)
   }
 
@@ -185,9 +175,8 @@ function EcranIdentite({ onClose }) {
       localStorage.setItem('homs_identite', JSON.stringify(identite))
       setSauvegarde(true)
       setTimeout(() => setSauvegarde(false), 2000)
-    } catch {
-      alert('Erreur lors de la sauvegarde.')
-    }
+      if (onIdentiteChange) onIdentiteChange(identite)
+    } catch { alert('Erreur lors de la sauvegarde.') }
   }
 
   const champ = (label, cle, placeholder, type = 'text') => (
@@ -214,7 +203,6 @@ function EcranIdentite({ onClose }) {
       </div>
       <div style={{ padding:'16px 20px' }}>
 
-        {/* Logo */}
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🖼️ LOGO DE L'ÉTABLISSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
@@ -240,7 +228,6 @@ function EcranIdentite({ onClose }) {
           </div>
         </div>
 
-        {/* En-tête */}
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🏨 EN-TÊTE DES REÇUS</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
@@ -250,7 +237,6 @@ function EcranIdentite({ onClose }) {
           </div>
         </div>
 
-        {/* Contacts */}
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>📞 CONTACTS</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
@@ -270,7 +256,6 @@ function EcranIdentite({ onClose }) {
           </div>
         </div>
 
-        {/* Infos légales */}
         <div style={{ marginBottom:'24px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>📄 INFOS LÉGALES (reçus)</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
@@ -323,11 +308,9 @@ function EcranDirecteur({ onClose }) {
   const ajouterVacation = () => {
     setParams({ ...params, vacations: [...params.vacations, { id:Date.now(), nom:'Nouvelle vacation', debut:'00:00', fin:'08:00' }] })
   }
-
   const supprimerVacation = (id) => {
     setParams({ ...params, vacations: params.vacations.filter(v => v.id !== id) })
   }
-
   const modifierVacation = (id, champ, valeur) => {
     setParams({ ...params, vacations: params.vacations.map(v => v.id === id ? { ...v, [champ]: valeur } : v) })
   }
@@ -515,16 +498,42 @@ const menuItems = [
 
 export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) {
   const [ecranActif, setEcranActif] = useState(null)
+  const [identite, setIdentite] = useState(() => {
+    try {
+      const s = localStorage.getItem('homs_identite')
+      return s ? JSON.parse(s) : identiteDefaut
+    } catch { return identiteDefaut }
+  })
+
+  const premiereLettre = identite.nom
+    ? identite.nom.charAt(0).toUpperCase()
+    : 'H'
 
   return (
     <>
       <div style={{ background:'#F5F7FA', minHeight:'100vh', paddingBottom:'80px' }}>
+
+        {/* ── Header dynamique ── */}
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'32px 20px 24px', display:'flex', flexDirection:'column', alignItems:'center' }}>
-          <div style={{ width:'72px', height:'72px', borderRadius:'36px', background:'#C9A84C', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', fontSize:'28px', fontWeight:'700', color:'white' }}>
-            A
+          {identite.logoUrl ? (
+            <img src={identite.logoUrl} alt="Logo"
+              style={{ width:'72px', height:'72px', borderRadius:'36px', objectFit:'cover', marginBottom:'12px', border:'3px solid #C9A84C' }}/>
+          ) : (
+            <div style={{ width:'72px', height:'72px', borderRadius:'36px', background:'#C9A84C', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', fontSize:'28px', fontWeight:'700', color:'white' }}>
+              {premiereLettre}
+            </div>
+          )}
+          <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>
+            {identite.nom || 'HOMS-HÔTEL'}
           </div>
-          <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>Administrateur</div>
-          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>Hôtel HOMS · Gérant</div>
+          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>
+            {identite.slogan || 'Gérant · Accès administrateur'}
+          </div>
+          {identite.adresse ? (
+            <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>
+              📍 {identite.adresse}
+            </div>
+          ) : null}
           <div style={{ marginTop:'12px', background:'rgba(201,168,76,0.2)', border:'1px solid #C9A84C', borderRadius:'20px', padding:'4px 16px', fontSize:'12px', color:'#C9A84C' }}>
             ✓ Accès administrateur
           </div>
@@ -599,7 +608,12 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
       </div>
 
       {ecranActif === 'directeur' && <EcranDirecteur onClose={() => setEcranActif(null)}/>}
-      {ecranActif === 'identite' && <EcranIdentite onClose={() => setEcranActif(null)}/>}
+      {ecranActif === 'identite' && (
+        <EcranIdentite
+          onClose={() => setEcranActif(null)}
+          onIdentiteChange={(nouvelleIdentite) => setIdentite(nouvelleIdentite)}
+        />
+      )}
       {ecranActif === 'statistiques' && <EcranStatistiques onClose={() => setEcranActif(null)} historique={historique}/>}
     </>
   )
