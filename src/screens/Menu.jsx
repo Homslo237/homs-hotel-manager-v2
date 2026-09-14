@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings, Clock,
@@ -21,6 +21,13 @@ const paramsDefaut = {
     { id:2, nom:'Confort',  debut:200, nombre:20, tarifNuit:35000, tarifHeure:3500 },
     { id:3, nom:'Suite',    debut:300, nombre:10, tarifNuit:65000, tarifHeure:6500 },
   ]
+}
+
+const identiteDefaut = {
+  nom: '', slogan: '', adresse: '',
+  telephone1: '', telephone2: '', email: '',
+  rccm: '', contribuable: '', mentionLegale: '',
+  logoUrl: null,
 }
 
 function parseDateFR(dateFR) {
@@ -152,11 +159,13 @@ function EcranStatistiques({ onClose, historique = [] }) {
 }
 
 function EcranIdentite({ onClose }) {
-  const [identite, setIdentite] = useState({
-    nom: '', slogan: '', adresse: '',
-    telephone1: '', telephone2: '', email: '',
-    rccm: '', contribuable: '', mentionLegale: '',
-    logoUrl: null,
+  const [identite, setIdentite] = useState(() => {
+    try {
+      const sauvegarde = localStorage.getItem('homs_identite')
+      return sauvegarde ? JSON.parse(sauvegarde) : identiteDefaut
+    } catch {
+      return identiteDefaut
+    }
   })
   const [sauvegarde, setSauvegarde] = useState(false)
 
@@ -164,12 +173,21 @@ function EcranIdentite({ onClose }) {
     const file = e.target.files[0]
     if (!file) return
     if (file.size > 2 * 1024 * 1024) { alert('Maximum 2 Mo.'); return }
-    setIdentite({ ...identite, logoUrl: URL.createObjectURL(file) })
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setIdentite(prev => ({ ...prev, logoUrl: ev.target.result }))
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleSauvegarder = () => {
-    setSauvegarde(true)
-    setTimeout(() => setSauvegarde(false), 2000)
+    try {
+      localStorage.setItem('homs_identite', JSON.stringify(identite))
+      setSauvegarde(true)
+      setTimeout(() => setSauvegarde(false), 2000)
+    } catch {
+      alert('Erreur lors de la sauvegarde.')
+    }
   }
 
   const champ = (label, cle, placeholder, type = 'text') => (
@@ -467,10 +485,10 @@ const menuItems = [
   {
     section: 'Directeur / Gérant',
     items: [
-      { icone: Settings,  label: 'Paramètres directeur',         sous: 'Vacations, tolérance, établissement', couleur: '#C9A84C', action: 'directeur' },
-      { icone: Building2, label: "Identité de l'établissement",  sous: 'Logo, en-tête, contacts, infos légales', couleur: '#2C5282', action: 'identite' },
-      { icone: Users,     label: 'Utilisateurs & rôles',         sous: 'Gérer le personnel et les accès',    couleur: '#1B3A6B', action: null },
-      { icone: BarChart2, label: 'Rapports & statistiques',      sous: "Chiffres d'affaires par periode",    couleur: '#2ECC71', action: 'statistiques' },
+      { icone: Settings,  label: 'Paramètres directeur',        sous: 'Vacations, tolérance, établissement',    couleur: '#C9A84C', action: 'directeur' },
+      { icone: Building2, label: "Identité de l'établissement", sous: 'Logo, en-tête, contacts, infos légales', couleur: '#2C5282', action: 'identite' },
+      { icone: Users,     label: 'Utilisateurs & rôles',        sous: 'Gérer le personnel et les accès',        couleur: '#1B3A6B', action: null },
+      { icone: BarChart2, label: 'Rapports & statistiques',     sous: "Chiffres d'affaires par periode",        couleur: '#2ECC71', action: 'statistiques' },
     ]
   },
   {
@@ -546,7 +564,6 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             </div>
           ))}
 
-          {/* Bouton Réinitialiser - outil de test */}
           <div onClick={() => {
             if (window.confirm('Effacer toutes les donnees de test ? Cette action est irreversible.')) {
               if (onReinitialiser) onReinitialiser()
@@ -562,7 +579,6 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             <ChevronRight size={16} color="#D1D5DB"/>
           </div>
 
-          {/* Déconnexion */}
           <div onClick={onDeconnexion} style={{ background:'white', borderRadius:'16px', padding:'14px 16px', marginBottom:'24px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogOut size={20} color="#E74C3C"/>
