@@ -3,7 +3,7 @@ import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings,
   AlertTriangle, Plus, Trash2, Save, Building2, Upload,
-  Eye, EyeOff, UserCheck, UserX, Clock, Lock
+  Eye, EyeOff, UserCheck, UserX, Clock, Lock, Phone, Camera
 } from 'lucide-react'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
@@ -55,6 +55,16 @@ function sauvegarderUtilisateurs(liste) {
   try { localStorage.setItem('homs_utilisateurs', JSON.stringify(liste)) } catch {}
 }
 
+function lireProfil(userId) {
+  try {
+    const s = localStorage.getItem(`homs_profil_${userId}`)
+    return s ? JSON.parse(s) : null
+  } catch { return null }
+}
+function sauvegarderProfil(userId, profil) {
+  try { localStorage.setItem(`homs_profil_${userId}`, JSON.stringify(profil)) } catch {}
+}
+
 function parseDateFR(dateFR) {
   if (!dateFR) return null
   const [j, m, a] = dateFR.split('/').map(Number)
@@ -92,6 +102,221 @@ function BanniereAccesReserve() {
       <div style={{ fontSize:'13px', color:'#888' }}>
         Ces options sont disponibles uniquement pour le compte Directeur.
         Contactez votre responsable si vous avez besoin d'y accéder.
+      </div>
+    </div>
+  )
+}
+
+// ─── Écran Mon Profil ─────────────────────────────────────────────────────────
+function EcranMonProfil({ onClose, utilisateur, onProfilChange }) {
+  const userId = utilisateur?.nom || 'directeur'
+  const profilSauvegarde = lireProfil(userId)
+
+  const [profil, setProfil] = useState({
+    nom: utilisateur?.nom || '',
+    telephone: profilSauvegarde?.telephone || '',
+    photoUrl: profilSauvegarde?.photoUrl || null,
+  })
+  const [ancienMdp, setAncienMdp] = useState('')
+  const [nouveauMdp, setNouveauMdp] = useState('')
+  const [confirmerMdp, setConfirmerMdp] = useState('')
+  const [voirMdp, setVoirMdp] = useState(false)
+  const [sauvegarde, setSauvegarde] = useState(false)
+  const [erreurMdp, setErreurMdp] = useState('')
+  const [successMdp, setSuccessMdp] = useState(false)
+
+  const roleInfo = ROLES_LABELS[utilisateur?.role] || ROLES_LABELS.receptionniste
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2*1024*1024) { alert('Maximum 2 Mo.'); return }
+    const reader = new FileReader()
+    reader.onload = (ev) => setProfil(prev => ({ ...prev, photoUrl: ev.target.result }))
+    reader.readAsDataURL(file)
+  }
+
+  const handleSauvegarder = () => {
+    const profilMaj = { ...profil }
+    sauvegarderProfil(userId, profilMaj)
+
+    // Mettre à jour aussi dans la liste des utilisateurs si ce n'est pas le directeur
+    if (utilisateur?.role !== 'directeur') {
+      const utilisateurs = lireUtilisateurs()
+      const maj = utilisateurs.map(u =>
+        u.nom === utilisateur?.nom ? { ...u, nom: profil.nom } : u
+      )
+      sauvegarderUtilisateurs(maj)
+    }
+
+    setSauvegarde(true)
+    setTimeout(() => setSauvegarde(false), 2000)
+    if (onProfilChange) onProfilChange(profilMaj)
+  }
+
+  const handleChangerMdp = () => {
+    setErreurMdp('')
+    if (!ancienMdp || !nouveauMdp || !confirmerMdp) {
+      setErreurMdp('Remplissez tous les champs.')
+      return
+    }
+    if (nouveauMdp !== confirmerMdp) {
+      setErreurMdp('Les mots de passe ne correspondent pas.')
+      return
+    }
+    if (nouveauMdp.length < 4) {
+      setErreurMdp('Minimum 4 caractères.')
+      return
+    }
+
+    // Vérifier l'ancien mot de passe
+    if (utilisateur?.role === 'directeur') {
+      if (ancienMdp !== 'admin1234') {
+        setErreurMdp('Ancien mot de passe incorrect.')
+        return
+      }
+      // Pour le directeur on ne peut pas changer encore (Phase 2 Firebase)
+      setSuccessMdp(true)
+      setTimeout(() => setSuccessMdp(false), 2000)
+    } else {
+      const utilisateurs = lireUtilisateurs()
+      const user = utilisateurs.find(u => u.nom === utilisateur?.nom)
+      if (!user || user.motDePasse !== ancienMdp) {
+        setErreurMdp('Ancien mot de passe incorrect.')
+        return
+      }
+      const maj = utilisateurs.map(u =>
+        u.nom === utilisateur?.nom ? { ...u, motDePasse: nouveauMdp } : u
+      )
+      sauvegarderUtilisateurs(maj)
+      setSuccessMdp(true)
+      setTimeout(() => setSuccessMdp(false), 2000)
+    }
+    setAncienMdp(''); setNouveauMdp(''); setConfirmerMdp('')
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
+      {/* Header */}
+      <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <h1 style={{ color:'#C9A84C', fontSize:'20px', fontWeight:'800' }}>Mon profil</h1>
+            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>Informations personnelles</p>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'10px', padding:'8px', cursor:'pointer' }}>
+            <X size={20} color="white"/>
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding:'16px 20px' }}>
+
+        {/* Photo de profil */}
+        <div style={{ marginBottom:'20px', textAlign:'center' }}>
+          <div style={{ position:'relative', display:'inline-block' }}>
+            {profil.photoUrl ? (
+              <img src={profil.photoUrl} alt="Photo" style={{ width:'90px', height:'90px', borderRadius:'45px', objectFit:'cover', border:'3px solid #C9A84C' }}/>
+            ) : (
+              <div style={{ width:'90px', height:'90px', borderRadius:'45px', background:'linear-gradient(135deg, #1B3A6B, #2C5282)', display:'flex', alignItems:'center', justifyContent:'center', border:'3px solid #C9A84C' }}>
+                <span style={{ fontSize:'32px', fontWeight:'800', color:'white' }}>
+                  {profil.nom ? profil.nom.charAt(0).toUpperCase() : roleInfo.emoji}
+                </span>
+              </div>
+            )}
+            <label style={{ position:'absolute', bottom:0, right:0, background:'#C9A84C', borderRadius:'50%', width:'28px', height:'28px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', border:'2px solid white' }}>
+              <Camera size={14} color="white"/>
+              <input type="file" accept="image/*" onChange={handlePhoto} style={{ display:'none' }}/>
+            </label>
+          </div>
+          <div style={{ marginTop:'10px', fontWeight:'700', fontSize:'16px', color:'#1B3A6B' }}>{profil.nom}</div>
+          <div style={{ fontSize:'12px', color:roleInfo.couleur, fontWeight:'600' }}>{roleInfo.emoji} {roleInfo.label}</div>
+          {utilisateur?.derniereConnexion && (
+            <div style={{ fontSize:'11px', color:'#999', marginTop:'4px' }}>
+              🕐 Dernière connexion : {utilisateur.derniereConnexion}
+            </div>
+          )}
+        </div>
+
+        {/* Infos personnelles */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>👤 INFORMATIONS PERSONNELLES</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
+            <div>
+              <label style={labelStyle}>Nom complet</label>
+              <input value={profil.nom} onChange={e=>setProfil({...profil,nom:e.target.value})} placeholder="Votre nom" style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Téléphone</label>
+              <input type="tel" value={profil.telephone} onChange={e=>setProfil({...profil,telephone:e.target.value})} placeholder="+237 6XX XXX XX" style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Rôle</label>
+              <div style={{ padding:'11px 14px', background:'#F5F5F5', borderRadius:'10px', fontSize:'14px', color:'#888', border:'2px solid #E0E0E0' }}>
+                {roleInfo.emoji} {roleInfo.label} — non modifiable
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bouton sauvegarder infos */}
+        <button onClick={handleSauvegarder} style={{
+          width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+          background:sauvegarde?'#2ECC71':'#1B3A6B', color:'white', fontWeight:'800', fontSize:'14px',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+          transition:'background 0.3s', marginBottom:'24px'
+        }}>
+          <Save size={16}/>
+          {sauvegarde ? '✅ Profil mis à jour !' : 'Enregistrer les informations'}
+        </button>
+
+        {/* Changer mot de passe */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🔑 CHANGER MON MOT DE PASSE</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
+            <div>
+              <label style={labelStyle}>Ancien mot de passe</label>
+              <div style={{ position:'relative' }}>
+                <input type={voirMdp?'text':'password'} value={ancienMdp}
+                  onChange={e=>setAncienMdp(e.target.value)}
+                  placeholder="••••••••" style={{ ...inputStyle, paddingRight:'44px' }}/>
+                <button onClick={()=>setVoirMdp(!voirMdp)} style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer' }}>
+                  {voirMdp ? <EyeOff size={16} color="#999"/> : <Eye size={16} color="#999"/>}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Nouveau mot de passe</label>
+              <input type={voirMdp?'text':'password'} value={nouveauMdp}
+                onChange={e=>setNouveauMdp(e.target.value)}
+                placeholder="Minimum 4 caractères" style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Confirmer le nouveau mot de passe</label>
+              <input type={voirMdp?'text':'password'} value={confirmerMdp}
+                onChange={e=>setConfirmerMdp(e.target.value)}
+                placeholder="Répétez le mot de passe" style={inputStyle}/>
+            </div>
+
+            {erreurMdp && (
+              <div style={{ background:'#FFF0F0', borderRadius:'8px', padding:'10px 12px', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
+                ⚠️ {erreurMdp}
+              </div>
+            )}
+            {successMdp && (
+              <div style={{ background:'#E8F5E9', borderRadius:'8px', padding:'10px 12px', fontSize:'12px', color:'#2ECC71', fontWeight:'600' }}>
+                ✅ Mot de passe mis à jour !
+              </div>
+            )}
+
+            <button onClick={handleChangerMdp} style={{
+              width:'100%', padding:'12px', borderRadius:'10px', border:'none', cursor:'pointer',
+              background:'#1B3A6B', color:'white', fontWeight:'700', fontSize:'14px'
+            }}>
+              🔑 Mettre à jour le mot de passe
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -334,27 +559,19 @@ function EcranUtilisateurs({ onClose }) {
   })
   const [sauvegarde, setSauvegarde] = useState(false)
 
-  const sauver = (liste) => {
-    setUtilisateurs(liste)
-    sauvegarderUtilisateurs(liste)
-  }
+  const sauver = (liste) => { setUtilisateurs(liste); sauvegarderUtilisateurs(liste) }
 
   const handleAjouter = () => {
     if (!form.nom.trim() || !form.motDePasse.trim() || !form.reponseSecrete.trim()) {
-      alert('Remplissez tous les champs obligatoires.')
-      return
+      alert('Remplissez tous les champs obligatoires.'); return
     }
     if (form.motDePasse.length < 4) { alert('Mot de passe : minimum 4 caractères.'); return }
     const nouveau = {
-      id: Date.now(),
-      nom: form.nom.trim(),
-      role: form.role,
-      motDePasse: form.motDePasse,
-      questionSecrete: form.questionSecrete,
-      reponseSecrete: form.reponseSecrete.trim(),
-      actif: true,
-      derniereConnexion: null,
-      dateCreation: new Date().toLocaleDateString('fr-FR'),
+      id: Date.now(), nom:form.nom.trim(), role:form.role,
+      motDePasse:form.motDePasse, questionSecrete:form.questionSecrete,
+      reponseSecrete:form.reponseSecrete.trim(),
+      actif:true, derniereConnexion:null,
+      dateCreation:new Date().toLocaleDateString('fr-FR'),
     }
     sauver([...utilisateurs, nouveau])
     setForm({ nom:'', role:'receptionniste', motDePasse:'', questionSecrete:QUESTIONS_SECRETES[0], reponseSecrete:'' })
@@ -363,12 +580,9 @@ function EcranUtilisateurs({ onClose }) {
     setTimeout(() => setSauvegarde(false), 2000)
   }
 
-  const toggleActif = (id) => sauver(utilisateurs.map(u => u.id===id ? {...u,actif:!u.actif} : u))
-  const supprimer = (id) => {
-    if (!window.confirm('Supprimer cet utilisateur ?')) return
-    sauver(utilisateurs.filter(u => u.id !== id))
-  }
-  const toggleVoirMdp = (id) => setShowMdp(prev => ({...prev,[id]:!prev[id]}))
+  const toggleActif = (id) => sauver(utilisateurs.map(u => u.id===id?{...u,actif:!u.actif}:u))
+  const supprimer = (id) => { if(!window.confirm('Supprimer cet utilisateur ?')) return; sauver(utilisateurs.filter(u=>u.id!==id)) }
+  const toggleVoirMdp = (id) => setShowMdp(prev=>({...prev,[id]:!prev[id]}))
   const roleInfo = (role) => ROLES_LABELS[role] || { label:role, couleur:'#999', emoji:'👤' }
 
   return (
@@ -395,7 +609,7 @@ function EcranUtilisateurs({ onClose }) {
           <div style={{ fontSize:'11px', color:'#C9A84C', marginTop:'4px', fontWeight:'600' }}>⚠️ Changez ce mot de passe avant la mise en production</div>
         </div>
 
-        {utilisateurs.length === 0 && !showForm && (
+        {utilisateurs.length===0 && !showForm && (
           <div style={{ textAlign:'center', padding:'30px 20px', color:'#999' }}>
             <div style={{ fontSize:'32px', marginBottom:'8px' }}>👥</div>
             <p style={{ fontSize:'13px' }}>Aucun compte créé</p>
@@ -405,19 +619,13 @@ function EcranUtilisateurs({ onClose }) {
         {utilisateurs.map(u => {
           const ri = roleInfo(u.role)
           return (
-            <div key={u.id} style={{
-              background:u.actif?'white':'#F9F9F9', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px',
-              boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${u.actif?ri.couleur:'#CCC'}`,
-              opacity:u.actif?1:0.7,
-            }}>
+            <div key={u.id} style={{ background:u.actif?'white':'#F9F9F9', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${u.actif?ri.couleur:'#CCC'}`, opacity:u.actif?1:0.7 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'6px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                   <span style={{ fontSize:'20px' }}>{ri.emoji}</span>
                   <div>
                     <div style={{ fontWeight:'800', fontSize:'14px', color:'#1B3A6B' }}>{u.nom}</div>
-                    <span style={{ background:ri.couleur+'22', color:ri.couleur, fontSize:'10px', fontWeight:'700', padding:'2px 8px', borderRadius:'8px' }}>
-                      {ri.label}
-                    </span>
+                    <span style={{ background:ri.couleur+'22', color:ri.couleur, fontSize:'10px', fontWeight:'700', padding:'2px 8px', borderRadius:'8px' }}>{ri.label}</span>
                   </div>
                 </div>
                 <span style={{ background:u.actif?'#E8F5E9':'#FFEBEE', color:u.actif?'#2ECC71':'#E74C3C', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px' }}>
@@ -435,11 +643,7 @@ function EcranUtilisateurs({ onClose }) {
                 {u.derniereConnexion?`Dernière connexion : ${u.derniereConnexion}`:'Jamais connecté'}
               </div>
               <div style={{ display:'flex', gap:'8px' }}>
-                <button onClick={()=>toggleActif(u.id)} style={{
-                  flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:'12px',
-                  background:u.actif?'#FFF0F0':'#E8F5E9', color:u.actif?'#E74C3C':'#2ECC71',
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'
-                }}>
+                <button onClick={()=>toggleActif(u.id)} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:'12px', background:u.actif?'#FFF0F0':'#E8F5E9', color:u.actif?'#E74C3C':'#2ECC71', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
                   {u.actif?<><UserX size={13}/> Désactiver</>:<><UserCheck size={13}/> Activer</>}
                 </button>
                 <button onClick={()=>supprimer(u.id)} style={{ padding:'8px 12px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -463,12 +667,9 @@ function EcranUtilisateurs({ onClose }) {
                 {['receptionniste','caissier'].map(r => {
                   const ri = roleInfo(r)
                   return (
-                    <button key={r} onClick={()=>setForm({...form,role:r})} style={{
-                      flex:1, padding:'10px 6px', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
-                      background:form.role===r?ri.couleur:'#F0F0F0',
-                      color:form.role===r?'white':'#555',
-                      border:form.role===r?`2px solid ${ri.couleur}`:'2px solid transparent',
-                    }}>{ri.emoji} {ri.label}</button>
+                    <button key={r} onClick={()=>setForm({...form,role:r})} style={{ flex:1, padding:'10px 6px', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', background:form.role===r?ri.couleur:'#F0F0F0', color:form.role===r?'white':'#555', border:form.role===r?`2px solid ${ri.couleur}`:'2px solid transparent' }}>
+                      {ri.emoji} {ri.label}
+                    </button>
                   )
                 })}
               </div>
@@ -551,7 +752,7 @@ function EcranDirecteur({ onClose }) {
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>⏱️ TOLÉRANCE DÉPASSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
             <label style={labelStyle}>Durée de grâce après l'heure de départ prévue</label>
-            <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>En dessous → pas de supplément. Au-dessus → supplément calculé automatiquement.</p>
+            <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>En dessous → pas de supplément. Au-dessus → supplément calculé.</p>
             <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
               <input value={params.toleranceMinutes} type="number" min="0" max="120"
                 onChange={e=>setParams({...params,toleranceMinutes:Number(e.target.value)})}
@@ -674,8 +875,8 @@ const menuItemsDirecteur = [
   {
     section: 'Mon compte',
     items: [
-      { icone:User,  label:'Mon profil',        sous:'Informations personnelles', couleur:'#1B3A6B', action:null },
-      { icone:Hotel, label:'Mon établissement', sous:'Nom, adresse, contacts',    couleur:'#2C5282', action:null },
+      { icone:User,  label:'Mon profil', sous:'Photo, nom, téléphone, mot de passe', couleur:'#1B3A6B', action:'profil' },
+      { icone:Hotel, label:'Mon établissement', sous:'Nom, adresse, contacts',       couleur:'#2C5282', action:null },
     ]
   },
   {
@@ -702,28 +903,36 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
     } catch { return identiteDefaut }
   })
 
+  // Profil de l'utilisateur connecté (photo, nom mis à jour)
+  const userId = utilisateur?.nom || 'directeur'
+  const [profilUtilisateur, setProfilUtilisateur] = useState(() => lireProfil(userId))
+
   const estDirecteur = utilisateur?.role === 'directeur'
   const roleInfo = ROLES_LABELS[utilisateur?.role] || ROLES_LABELS.receptionniste
-  const premiereLettre = identite.nom ? identite.nom.charAt(0).toUpperCase() : 'H'
+  const nomAffiche = profilUtilisateur?.nom || utilisateur?.nom || 'Utilisateur'
+  const photoAffichee = profilUtilisateur?.photoUrl || null
+  const premiereLettre = nomAffiche ? nomAffiche.charAt(0).toUpperCase() : 'H'
 
   return (
     <>
       <div style={{ background:'#F5F7FA', minHeight:'100vh', paddingBottom:'80px' }}>
 
-        {/* Header */}
+        {/* Header dynamique avec photo de l'agent */}
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'32px 20px 24px', display:'flex', flexDirection:'column', alignItems:'center' }}>
-          {identite.logoUrl ? (
+          {photoAffichee ? (
+            <img src={photoAffichee} alt="Photo profil" style={{ width:'72px', height:'72px', borderRadius:'36px', objectFit:'cover', marginBottom:'12px', border:'3px solid #C9A84C' }}/>
+          ) : identite.logoUrl && estDirecteur ? (
             <img src={identite.logoUrl} alt="Logo" style={{ width:'72px', height:'72px', borderRadius:'36px', objectFit:'cover', marginBottom:'12px', border:'3px solid #C9A84C' }}/>
           ) : (
-            <div style={{ width:'72px', height:'72px', borderRadius:'36px', background:'#C9A84C', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', fontSize:'28px', fontWeight:'700', color:'white' }}>
+            <div style={{ width:'72px', height:'72px', borderRadius:'36px', background:roleInfo.couleur, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px', fontSize:'28px', fontWeight:'700', color:'white' }}>
               {premiereLettre}
             </div>
           )}
-          <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>{identite.nom || 'HOMS-HÔTEL'}</div>
+          <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>{nomAffiche}</div>
           <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>
-            {utilisateur?.nom || 'Utilisateur'} · {roleInfo.label}
+            {estDirecteur ? (identite.nom || 'HOMS-HÔTEL') : roleInfo.label}
           </div>
-          {identite.adresse && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>📍 {identite.adresse}</div>}
+          {identite.adresse && estDirecteur && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>📍 {identite.adresse}</div>}
           <div style={{ marginTop:'12px', background:`${roleInfo.couleur}33`, border:`1px solid ${roleInfo.couleur}`, borderRadius:'20px', padding:'4px 16px', fontSize:'12px', color:roleInfo.couleur }}>
             {roleInfo.emoji} {roleInfo.label}
           </div>
@@ -731,7 +940,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
 
         <div style={{ padding:'16px 20px' }}>
 
-          {/* ── Menu Directeur complet ── */}
+          {/* Menu Directeur complet */}
           {estDirecteur && menuItemsDirecteur.map((section,si) => (
             <div key={si} style={{ marginBottom:'20px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
@@ -765,34 +974,23 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
             </div>
           ))}
 
-          {/* ── Menu Réceptionniste / Caissier : accès limité ── */}
+          {/* Menu Réceptionniste / Caissier */}
           {!estDirecteur && (
             <>
-              <BanniereAccesReserve />
-
-              {/* Juste Mon profil */}
+              <BanniereAccesReserve/>
               <div style={{ marginBottom:'20px' }}>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
-                  Mon compte
-                </div>
+                <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>Mon compte</div>
                 <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px' }}>
+                  <div onClick={()=>setEcranActif('profil')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
                     <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#1B3A6B15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <User size={20} color="#1B3A6B"/>
                     </div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>{utilisateur?.nom || 'Mon profil'}</div>
-                      <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>{roleInfo.label} · {utilisateur?.derniereConnexion ? `Connecté le ${utilisateur.derniereConnexion}` : 'Connecté'}</div>
+                      <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>Mon profil</div>
+                      <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Photo, nom, téléphone, mot de passe</div>
                     </div>
+                    <ChevronRight size={16} color="#D1D5DB"/>
                   </div>
-                </div>
-              </div>
-
-              <div style={{ marginBottom:'20px' }}>
-                <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
-                  À propos
-                </div>
-                <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
                   <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px' }}>
                     <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#E8634A15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                       <Info size={20} color="#E8634A"/>
@@ -850,6 +1048,13 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
       {ecranActif==='identite'     && <EcranIdentite onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite}/>}
       {ecranActif==='utilisateurs' && <EcranUtilisateurs onClose={()=>setEcranActif(null)}/>}
       {ecranActif==='statistiques' && <EcranStatistiques onClose={()=>setEcranActif(null)} historique={historique}/>}
+      {ecranActif==='profil'       && (
+        <EcranMonProfil
+          onClose={()=>setEcranActif(null)}
+          utilisateur={utilisateur}
+          onProfilChange={(p)=>setProfilUtilisateur(p)}
+        />
+      )}
     </>
   )
 }
