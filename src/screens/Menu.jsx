@@ -3,7 +3,7 @@ import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings,
   AlertTriangle, Plus, Trash2, Save, Building2, Upload,
-  Eye, EyeOff, UserCheck, UserX, Clock
+  Eye, EyeOff, UserCheck, UserX, Clock, Lock
 } from 'lucide-react'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
@@ -45,7 +45,6 @@ const QUESTIONS_SECRETES = [
   'Quel est le nom de votre école primaire ?',
 ]
 
-// ─── localStorage utilisateurs ────────────────────────────────────────────────
 function lireUtilisateurs() {
   try {
     const s = localStorage.getItem('homs_utilisateurs')
@@ -67,9 +66,7 @@ function estDansLaPeriode(dateFR, periode) {
   const d = parseDateFR(dateFR)
   if (!d) return false
   const now = new Date()
-  if (periode === 'jour') {
-    return d.getDate()===now.getDate() && d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
-  }
+  if (periode === 'jour') return d.getDate()===now.getDate() && d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
   if (periode === 'semaine') {
     const debutSemaine = new Date(now)
     const jourSemaine = now.getDay()===0?7:now.getDay()
@@ -80,6 +77,24 @@ function estDansLaPeriode(dateFR, periode) {
   if (periode === 'mois') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
   if (periode === 'annee') return d.getFullYear()===now.getFullYear()
   return true
+}
+
+// ─── Bannière accès réservé ───────────────────────────────────────────────────
+function BanniereAccesReserve() {
+  return (
+    <div style={{
+      background:'#FFF8E1', border:'1px solid #C9A84C', borderRadius:'14px',
+      padding:'20px', marginBottom:'20px',
+      display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', textAlign:'center'
+    }}>
+      <Lock size={32} color="#C9A84C"/>
+      <div style={{ fontWeight:'800', fontSize:'15px', color:'#1B3A6B' }}>Accès réservé au Directeur</div>
+      <div style={{ fontSize:'13px', color:'#888' }}>
+        Ces options sont disponibles uniquement pour le compte Directeur.
+        Contactez votre responsable si vous avez besoin d'y accéder.
+      </div>
+    </div>
+  )
 }
 
 // ─── Écran Statistiques ───────────────────────────────────────────────────────
@@ -348,19 +363,12 @@ function EcranUtilisateurs({ onClose }) {
     setTimeout(() => setSauvegarde(false), 2000)
   }
 
-  const toggleActif = (id) => {
-    sauver(utilisateurs.map(u => u.id===id ? { ...u, actif:!u.actif } : u))
-  }
-
+  const toggleActif = (id) => sauver(utilisateurs.map(u => u.id===id ? {...u,actif:!u.actif} : u))
   const supprimer = (id) => {
     if (!window.confirm('Supprimer cet utilisateur ?')) return
     sauver(utilisateurs.filter(u => u.id !== id))
   }
-
-  const toggleVoirMdp = (id) => {
-    setShowMdp(prev => ({ ...prev, [id]: !prev[id] }))
-  }
-
+  const toggleVoirMdp = (id) => setShowMdp(prev => ({...prev,[id]:!prev[id]}))
   const roleInfo = (role) => ROLES_LABELS[role] || { label:role, couleur:'#999', emoji:'👤' }
 
   return (
@@ -376,10 +384,7 @@ function EcranUtilisateurs({ onClose }) {
           </button>
         </div>
       </div>
-
       <div style={{ padding:'16px 20px' }}>
-
-        {/* Compte directeur par défaut */}
         <div style={{ background:'#FFFBF0', border:'1px solid #C9A84C', borderRadius:'14px', padding:'14px 16px', marginBottom:'16px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'4px' }}>
             <span style={{ fontSize:'20px' }}>👔</span>
@@ -390,12 +395,10 @@ function EcranUtilisateurs({ onClose }) {
           <div style={{ fontSize:'11px', color:'#C9A84C', marginTop:'4px', fontWeight:'600' }}>⚠️ Changez ce mot de passe avant la mise en production</div>
         </div>
 
-        {/* Liste des utilisateurs créés */}
         {utilisateurs.length === 0 && !showForm && (
           <div style={{ textAlign:'center', padding:'30px 20px', color:'#999' }}>
             <div style={{ fontSize:'32px', marginBottom:'8px' }}>👥</div>
             <p style={{ fontSize:'13px' }}>Aucun compte créé</p>
-            <p style={{ fontSize:'11px', marginTop:'4px' }}>Ajoutez votre premier agent ci-dessous</p>
           </div>
         )}
 
@@ -403,11 +406,9 @@ function EcranUtilisateurs({ onClose }) {
           const ri = roleInfo(u.role)
           return (
             <div key={u.id} style={{
-              background: u.actif ? 'white' : '#F9F9F9',
-              borderRadius:'14px', padding:'14px 16px', marginBottom:'10px',
-              boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
-              borderLeft:`4px solid ${u.actif ? ri.couleur : '#CCC'}`,
-              opacity: u.actif ? 1 : 0.7,
+              background:u.actif?'white':'#F9F9F9', borderRadius:'14px', padding:'14px 16px', marginBottom:'10px',
+              boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`4px solid ${u.actif?ri.couleur:'#CCC'}`,
+              opacity:u.actif?1:0.7,
             }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'6px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
@@ -419,46 +420,29 @@ function EcranUtilisateurs({ onClose }) {
                     </span>
                   </div>
                 </div>
-                <span style={{
-                  background: u.actif ? '#E8F5E9' : '#FFEBEE',
-                  color: u.actif ? '#2ECC71' : '#E74C3C',
-                  fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px'
-                }}>
-                  {u.actif ? '✅ Actif' : '🔴 Désactivé'}
+                <span style={{ background:u.actif?'#E8F5E9':'#FFEBEE', color:u.actif?'#2ECC71':'#E74C3C', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px' }}>
+                  {u.actif?'✅ Actif':'🔴 Désactivé'}
                 </span>
               </div>
-
-              {/* Mot de passe */}
               <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
-                <span style={{ fontSize:'12px', color:'#666' }}>
-                  🔑 {showMdp[u.id] ? u.motDePasse : '••••••••'}
-                </span>
-                <button onClick={() => toggleVoirMdp(u.id)} style={{ background:'none', border:'none', cursor:'pointer', padding:'2px' }}>
-                  {showMdp[u.id] ? <EyeOff size={14} color="#999"/> : <Eye size={14} color="#999"/>}
+                <span style={{ fontSize:'12px', color:'#666' }}>🔑 {showMdp[u.id]?u.motDePasse:'••••••••'}</span>
+                <button onClick={()=>toggleVoirMdp(u.id)} style={{ background:'none', border:'none', cursor:'pointer', padding:'2px' }}>
+                  {showMdp[u.id]?<EyeOff size={14} color="#999"/>:<Eye size={14} color="#999"/>}
                 </button>
               </div>
-
-              {/* Dernière connexion */}
               <div style={{ fontSize:'11px', color:'#999', marginBottom:'10px', display:'flex', alignItems:'center', gap:'4px' }}>
                 <Clock size={11}/>
-                {u.derniereConnexion ? `Dernière connexion : ${u.derniereConnexion}` : 'Jamais connecté'}
+                {u.derniereConnexion?`Dernière connexion : ${u.derniereConnexion}`:'Jamais connecté'}
               </div>
-
-              {/* Actions */}
               <div style={{ display:'flex', gap:'8px' }}>
-                <button onClick={() => toggleActif(u.id)} style={{
+                <button onClick={()=>toggleActif(u.id)} style={{
                   flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'700', fontSize:'12px',
-                  background: u.actif ? '#FFF0F0' : '#E8F5E9',
-                  color: u.actif ? '#E74C3C' : '#2ECC71',
+                  background:u.actif?'#FFF0F0':'#E8F5E9', color:u.actif?'#E74C3C':'#2ECC71',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'
                 }}>
-                  {u.actif ? <><UserX size={13}/> Désactiver</> : <><UserCheck size={13}/> Activer</>}
+                  {u.actif?<><UserX size={13}/> Désactiver</>:<><UserCheck size={13}/> Activer</>}
                 </button>
-                <button onClick={() => supprimer(u.id)} style={{
-                  padding:'8px 12px', borderRadius:'8px', border:'none', cursor:'pointer',
-                  background:'#FFF0F0', color:'#E74C3C',
-                  display:'flex', alignItems:'center', justifyContent:'center'
-                }}>
+                <button onClick={()=>supprimer(u.id)} style={{ padding:'8px 12px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <Trash2 size={14}/>
                 </button>
               </div>
@@ -466,16 +450,13 @@ function EcranUtilisateurs({ onClose }) {
           )
         })}
 
-        {/* Formulaire ajout */}
         {showForm && (
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', marginBottom:'16px', boxShadow:'0 2px 8px rgba(0,0,0,0.1)', border:'2px solid #1B3A6B' }}>
             <div style={{ fontWeight:'800', fontSize:'15px', color:'#1B3A6B', marginBottom:'14px' }}>➕ Nouveau compte</div>
-
             <div style={{ marginBottom:'12px' }}>
               <label style={labelStyle}>Nom complet <span style={{color:'red'}}>*</span></label>
               <input value={form.nom} onChange={e=>setForm({...form,nom:e.target.value})} placeholder="Ex. Jean Dupont" style={inputStyle}/>
             </div>
-
             <div style={{ marginBottom:'12px' }}>
               <label style={labelStyle}>Rôle <span style={{color:'red'}}>*</span></label>
               <div style={{ display:'flex', gap:'8px' }}>
@@ -492,43 +473,29 @@ function EcranUtilisateurs({ onClose }) {
                 })}
               </div>
             </div>
-
             <div style={{ marginBottom:'12px' }}>
               <label style={labelStyle}>Mot de passe <span style={{color:'red'}}>*</span></label>
               <input type="password" value={form.motDePasse} onChange={e=>setForm({...form,motDePasse:e.target.value})} placeholder="Minimum 4 caractères" style={inputStyle}/>
             </div>
-
             <div style={{ marginBottom:'12px' }}>
               <label style={labelStyle}>Question secrète <span style={{color:'red'}}>*</span></label>
-              <select value={form.questionSecrete} onChange={e=>setForm({...form,questionSecrete:e.target.value})}
-                style={{ ...inputStyle, background:'white' }}>
+              <select value={form.questionSecrete} onChange={e=>setForm({...form,questionSecrete:e.target.value})} style={{ ...inputStyle, background:'white' }}>
                 {QUESTIONS_SECRETES.map(q => <option key={q} value={q}>{q}</option>)}
               </select>
             </div>
-
             <div style={{ marginBottom:'16px' }}>
               <label style={labelStyle}>Réponse secrète <span style={{color:'red'}}>*</span></label>
               <input value={form.reponseSecrete} onChange={e=>setForm({...form,reponseSecrete:e.target.value})} placeholder="Réponse à la question secrète" style={inputStyle}/>
             </div>
-
             <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={()=>setShowForm(false)} style={{ flex:1, padding:'12px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'700', color:'#666', border:'none', cursor:'pointer' }}>
-                Annuler
-              </button>
-              <button onClick={handleAjouter} style={{ flex:2, padding:'12px', borderRadius:'10px', background:'#1B3A6B', fontWeight:'700', color:'white', border:'none', cursor:'pointer' }}>
-                ✅ Créer le compte
-              </button>
+              <button onClick={()=>setShowForm(false)} style={{ flex:1, padding:'12px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'700', color:'#666', border:'none', cursor:'pointer' }}>Annuler</button>
+              <button onClick={handleAjouter} style={{ flex:2, padding:'12px', borderRadius:'10px', background:'#1B3A6B', fontWeight:'700', color:'white', border:'none', cursor:'pointer' }}>✅ Créer le compte</button>
             </div>
           </div>
         )}
 
-        {/* Bouton ajouter */}
         {!showForm && (
-          <button onClick={()=>setShowForm(true)} style={{
-            width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed #1B3A6B',
-            background:'transparent', color:'#1B3A6B', fontWeight:'700', fontSize:'14px',
-            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-          }}>
+          <button onClick={()=>setShowForm(true)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed #1B3A6B', background:'transparent', color:'#1B3A6B', fontWeight:'700', fontSize:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
             <Plus size={16}/> Ajouter un agent
           </button>
         )}
@@ -548,14 +515,8 @@ function EcranDirecteur({ onClose }) {
   const [params, setParams] = useState(paramsDefaut)
   const [sauvegarde, setSauvegarde] = useState(false)
 
-  const handleSauvegarder = () => {
-    setSauvegarde(true)
-    setTimeout(() => setSauvegarde(false), 2000)
-  }
-
-  const ajouterVacation = () => {
-    setParams({ ...params, vacations:[...params.vacations, {id:Date.now(),nom:'Nouvelle vacation',debut:'00:00',fin:'08:00'}] })
-  }
+  const handleSauvegarder = () => { setSauvegarde(true); setTimeout(()=>setSauvegarde(false),2000) }
+  const ajouterVacation = () => setParams({...params,vacations:[...params.vacations,{id:Date.now(),nom:'Nouvelle vacation',debut:'00:00',fin:'08:00'}]})
   const supprimerVacation = (id) => setParams({...params,vacations:params.vacations.filter(v=>v.id!==id)})
   const modifierVacation = (id,champ,valeur) => setParams({...params,vacations:params.vacations.map(v=>v.id===id?{...v,[champ]:valeur}:v)})
 
@@ -586,7 +547,6 @@ function EcranDirecteur({ onClose }) {
             </div>
           </div>
         </div>
-
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>⏱️ TOLÉRANCE DÉPASSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
@@ -604,7 +564,6 @@ function EcranDirecteur({ onClose }) {
             </div>
           </div>
         </div>
-
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🔄 VACATIONS (ÉQUIPES)</div>
           <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>Définissez les tranches horaires de vos équipes.</p>
@@ -638,7 +597,6 @@ function EcranDirecteur({ onClose }) {
             <Plus size={16}/> Ajouter une vacation
           </button>
         </div>
-
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🛏️ CONFIGURATION DES CHAMBRES</div>
           <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>Définissez vos catégories, numérotation et tarifs.</p>
@@ -689,22 +647,21 @@ function EcranDirecteur({ onClose }) {
             🏨 Total : {params.categories.reduce((s,c)=>s+c.nombre,0)} chambres configurées
           </div>
         </div>
-
         <button onClick={handleSauvegarder} style={{
           width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
           background:sauvegarde?'#2ECC71':'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px',
           display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'background 0.3s'
         }}>
           <Save size={18}/>
-          {sauvegarde ? '✅ Paramètres sauvegardés !' : 'Sauvegarder les paramètres'}
+          {sauvegarde?'✅ Paramètres sauvegardés !':'Sauvegarder les paramètres'}
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Menu items ───────────────────────────────────────────────────────────────
-const menuItems = [
+// ─── Menu items Directeur ─────────────────────────────────────────────────────
+const menuItemsDirecteur = [
   {
     section: 'Directeur / Gérant',
     items: [
@@ -736,7 +693,7 @@ const menuItems = [
   },
 ]
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) {
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[], utilisateur }) {
   const [ecranActif, setEcranActif] = useState(null)
   const [identite, setIdentite] = useState(() => {
     try {
@@ -745,11 +702,15 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
     } catch { return identiteDefaut }
   })
 
+  const estDirecteur = utilisateur?.role === 'directeur'
+  const roleInfo = ROLES_LABELS[utilisateur?.role] || ROLES_LABELS.receptionniste
   const premiereLettre = identite.nom ? identite.nom.charAt(0).toUpperCase() : 'H'
 
   return (
     <>
       <div style={{ background:'#F5F7FA', minHeight:'100vh', paddingBottom:'80px' }}>
+
+        {/* Header */}
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'32px 20px 24px', display:'flex', flexDirection:'column', alignItems:'center' }}>
           {identite.logoUrl ? (
             <img src={identite.logoUrl} alt="Logo" style={{ width:'72px', height:'72px', borderRadius:'36px', objectFit:'cover', marginBottom:'12px', border:'3px solid #C9A84C' }}/>
@@ -759,15 +720,19 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             </div>
           )}
           <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>{identite.nom || 'HOMS-HÔTEL'}</div>
-          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>{identite.slogan || 'Gérant · Accès administrateur'}</div>
+          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>
+            {utilisateur?.nom || 'Utilisateur'} · {roleInfo.label}
+          </div>
           {identite.adresse && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>📍 {identite.adresse}</div>}
-          <div style={{ marginTop:'12px', background:'rgba(201,168,76,0.2)', border:'1px solid #C9A84C', borderRadius:'20px', padding:'4px 16px', fontSize:'12px', color:'#C9A84C' }}>
-            ✓ Accès administrateur
+          <div style={{ marginTop:'12px', background:`${roleInfo.couleur}33`, border:`1px solid ${roleInfo.couleur}`, borderRadius:'20px', padding:'4px 16px', fontSize:'12px', color:roleInfo.couleur }}>
+            {roleInfo.emoji} {roleInfo.label}
           </div>
         </div>
 
         <div style={{ padding:'16px 20px' }}>
-          {menuItems.map((section,si) => (
+
+          {/* ── Menu Directeur complet ── */}
+          {estDirecteur && menuItemsDirecteur.map((section,si) => (
             <div key={si} style={{ marginBottom:'20px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
                 {section.section}
@@ -789,7 +754,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
                       <div style={{ flex:1 }}>
                         <div style={{ fontWeight:'600', fontSize:'14px', color:item.action?'#1F2937':'#AAA' }}>{item.label}</div>
                         <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>
-                          {item.action ? item.sous : item.sous+' — bientôt disponible'}
+                          {item.action?item.sous:item.sous+' — bientôt disponible'}
                         </div>
                       </div>
                       <ChevronRight size={16} color={item.action?'#D1D5DB':'#E0E0E0'}/>
@@ -800,21 +765,68 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[] }) 
             </div>
           ))}
 
-          <div onClick={()=>{
-            if(window.confirm('Effacer toutes les donnees de test ? Cette action est irreversible.')) {
-              if(onReinitialiser) onReinitialiser()
-            }
-          }} style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}>
-            <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF3C7', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Trash2 size={20} color="#C9A84C"/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontWeight:'600', fontSize:'14px', color:'#C9A84C' }}>Reinitialiser les donnees</div>
-              <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Outil de test - efface sejours et caisse</div>
-            </div>
-            <ChevronRight size={16} color="#D1D5DB"/>
-          </div>
+          {/* ── Menu Réceptionniste / Caissier : accès limité ── */}
+          {!estDirecteur && (
+            <>
+              <BanniereAccesReserve />
 
+              {/* Juste Mon profil */}
+              <div style={{ marginBottom:'20px' }}>
+                <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
+                  Mon compte
+                </div>
+                <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px' }}>
+                    <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#1B3A6B15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <User size={20} color="#1B3A6B"/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>{utilisateur?.nom || 'Mon profil'}</div>
+                      <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>{roleInfo.label} · {utilisateur?.derniereConnexion ? `Connecté le ${utilisateur.derniereConnexion}` : 'Connecté'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom:'20px' }}>
+                <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
+                  À propos
+                </div>
+                <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px' }}>
+                    <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#E8634A15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Info size={20} color="#E8634A"/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>À propos de HOMS</div>
+                      <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Version 1.0 — Homslovision</div>
+                    </div>
+                    <ChevronRight size={16} color="#D1D5DB"/>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Réinitialiser — Directeur seulement */}
+          {estDirecteur && (
+            <div onClick={()=>{
+              if(window.confirm('Effacer toutes les donnees de test ? Cette action est irreversible.')) {
+                if(onReinitialiser) onReinitialiser()
+              }
+            }} style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}>
+              <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF3C7', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Trash2 size={20} color="#C9A84C"/>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:'600', fontSize:'14px', color:'#C9A84C' }}>Reinitialiser les donnees</div>
+                <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Outil de test - efface sejours et caisse</div>
+              </div>
+              <ChevronRight size={16} color="#D1D5DB"/>
+            </div>
+          )}
+
+          {/* Déconnexion — tout le monde */}
           <div onClick={onDeconnexion} style={{ background:'white', borderRadius:'16px', padding:'14px 16px', marginBottom:'24px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogOut size={20} color="#E74C3C"/>
