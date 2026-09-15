@@ -31,11 +31,6 @@ const CONFETTI_STYLES = `
     0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
     100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
   }
-  @keyframes confettiPop {
-    0%   { transform: scale(0) rotate(0deg);   opacity: 1; }
-    50%  { transform: scale(1.2) rotate(180deg); opacity: 1; }
-    100% { transform: scale(0.8) rotate(360deg); opacity: 0; }
-  }
   @keyframes successPulse {
     0%   { transform: scale(0.8); opacity: 0; }
     50%  { transform: scale(1.1); opacity: 1; }
@@ -90,7 +85,7 @@ function Confetti({ onFin }) {
   )
 }
 
-import { Search, Plus, Clock, LogIn, X, RefreshCw, Printer, Share2, LogOut } from 'lucide-react'
+import { Search, Clock, LogIn, X, RefreshCw, Printer, Share2, LogOut } from 'lucide-react'
 
 const CONFIG = {
   toleranceDepassementMinutes: 20,
@@ -152,18 +147,17 @@ function tempsRestant(s) {
   return { label:`${h}h${String(m).padStart(2,'0')}`, depasse:false }
 }
 
-// ─── En-tête du reçu (logo + infos hôtel) ────────────────────────────────────
+// ─── En-tête du reçu ─────────────────────────────────────────────────────────
 function enteteRecu(identite) {
-  const nom      = identite.nom      || CONFIG.nomHotel
-  const slogan   = identite.slogan   || ''
-  const adresse  = identite.adresse  || ''
-  const tel1     = identite.telephone1 || ''
-  const tel2     = identite.telephone2 || ''
-  const email    = identite.email    || ''
-  const rccm     = identite.rccm     || ''
-  const contrib  = identite.contribuable || ''
+  const nom     = identite.nom      || CONFIG.nomHotel
+  const slogan  = identite.slogan   || ''
+  const adresse = identite.adresse  || ''
+  const tel1    = identite.telephone1 || ''
+  const tel2    = identite.telephone2 || ''
+  const email   = identite.email    || ''
+  const rccm    = identite.rccm     || ''
+  const contrib = identite.contribuable || ''
 
-  // Centrage du nom sur 32 caractères
   const centrer = (txt, largeur=32) => {
     const pad = Math.max(0, Math.floor((largeur - txt.length) / 2))
     return ' '.repeat(pad) + txt
@@ -186,15 +180,11 @@ function enteteRecu(identite) {
   return lignes.join('\n')
 }
 
-// ─── Pied de reçu (mention légale) ───────────────────────────────────────────
 function piedRecu(identite) {
   const mention = identite.mentionLegale || 'Merci de votre confiance !'
-  return `================================
-${mention}
-================================`
+  return `================================\n${mention}\n================================`
 }
 
-// ─── Générateur reçu entrée ───────────────────────────────────────────────────
 function genererRecuEntree(s) {
   const identite = lireIdentiteHotel()
   return `${enteteRecu(identite)}
@@ -213,7 +203,6 @@ Paiement: ${s.modePaiement}
 ${piedRecu(identite)}`
 }
 
-// ─── Générateur reçu sortie ───────────────────────────────────────────────────
 function genererRecuSortie(s, supplement, depassage) {
   const identite = lireIdentiteHotel()
   const now = maintenant()
@@ -432,7 +421,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
 
         <div style={{ marginBottom:'14px' }}>
           <label style={labelStyle}>Téléphone <span style={{color:'red'}}>*</span></label>
-          <input value={form.telephone} onChange={e=>setForm({...form,telephone:e.target.value})} placeholder="+225 07 00 00 00 00" type="tel" style={inputStyle}/>
+          <input value={form.telephone} onChange={e=>setForm({...form,telephone:e.target.value})} placeholder="+237 6XX XXX XX" type="tel" style={inputStyle}/>
         </div>
 
         <div style={{ marginBottom:'14px' }}>
@@ -578,10 +567,12 @@ const sejoursInitiaux = [
   { id:3, client:'M. Bamba Seydou', telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite', dateArrivee:'21/08/2026', heureArrivee:'09:30', dateDepart:'21/08/2026', heureDepart:'12:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500', modePaiement:'MTN Mobile Money' },
 ]
 
+// ─── Statuts ──────────────────────────────────────────────────────────────────
 const statuts = {
   en_cours: { label:'En cours', couleur:'#2ECC71' },
-  a_venir:  { label:'A venir',  couleur:'#8B5CF6' },
-  termine:  { label:'Termine',  couleur:'#999'    },
+  a_venir:  { label:'À venir',  couleur:'#8B5CF6' },
+  termine:  { label:'Terminé',  couleur:'#999'    },
+  no_show:  { label:'No-Show',  couleur:'#E74C3C' },
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
@@ -678,13 +669,20 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
             style={{ ...inputStyle, paddingLeft:'42px' }}/>
         </div>
 
+        {/* Filtres statut avec No-Show */}
         <div style={{ display:'flex', gap:'8px', overflowX:'auto', marginBottom:'16px', paddingBottom:'4px' }}>
-          {[{id:'tous',label:'Tous'},{id:'en_cours',label:'En cours'},{id:'a_venir',label:'À venir'},{id:'termine',label:'Terminés'}].map(f=>(
+          {[
+            {id:'tous',    label:'Tous'},
+            {id:'en_cours',label:'En cours'},
+            {id:'a_venir', label:'À venir'},
+            {id:'termine', label:'Terminés'},
+            {id:'no_show', label:'No-Show'},
+          ].map(f=>(
             <button key={f.id} onClick={()=>setFiltre(f.id)} style={{
               padding:'6px 14px', borderRadius:'20px', fontSize:'13px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer',
-              background:filtre===f.id?'#1B3A6B':'#F0F0F0',
+              background:filtre===f.id ? (f.id==='no_show'?'#E74C3C':'#1B3A6B') : '#F0F0F0',
               color:filtre===f.id?'white':'#666',
-            }}>{f.label}</button>
+            }}>{f.id==='no_show'?'🚫 ':''}{f.label}</button>
           ))}
         </div>
 
@@ -698,16 +696,18 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
         {filtresSejours.map(s => {
           const st = statuts[s.statut] || { label:s.statut||'Inconnu', couleur:'#999' }
           const tr = s.statut==='en_cours' ? tempsRestant(s) : null
+          const isNoShow = s.statut === 'no_show'
           return (
             <div key={s.id} style={{
-              background:'white', borderRadius:'12px', padding:'16px', marginBottom:'10px',
+              background: isNoShow ? '#FFF5F5' : 'white',
+              borderRadius:'12px', padding:'16px', marginBottom:'10px',
               boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
-              borderLeft:`4px solid ${tr?.depasse?'#E74C3C':s.type==='heure'?'#E8634A':st.couleur}`
+              borderLeft:`4px solid ${isNoShow ? '#E74C3C' : tr?.depasse?'#E74C3C':s.type==='heure'?'#E8634A':st.couleur}`
             }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
                 <span style={{ fontWeight:'700', fontSize:'15px', color:'#1B3A6B' }}>{s.client}</span>
-                <span style={{ background:tr?.depasse?'#E74C3C':st.couleur, color:'white', fontSize:'10px', fontWeight:'600', padding:'3px 8px', borderRadius:'10px' }}>
-                  {tr?.depasse?'⚠️ Dépassé':st.label}
+                <span style={{ background:isNoShow?'#E74C3C':tr?.depasse?'#E74C3C':st.couleur, color:'white', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px' }}>
+                  {isNoShow ? '🚫 No-Show' : tr?.depasse ? '⚠️ Dépassé' : st.label}
                 </span>
               </div>
               <div style={{ fontSize:'12px', color:'#888', marginBottom:'6px' }}>📞 {s.telephone}</div>
@@ -727,32 +727,41 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
                   </span>
                 )}
               </div>
+
+              {isNoShow && (
+                <div style={{ background:'#FFEBEE', borderRadius:'8px', padding:'8px 12px', marginBottom:'8px', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
+                  🚫 Client non présenté — montant conservé par l'hôtel
+                </div>
+              )}
+
               <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
                 <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px' }}>{s.montant} FCFA</span>
-                <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                  <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
-                    style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
-                    <Printer size={11}/> Entrée
-                  </button>
-                  {s.statut==='en_cours' && (
-                    <>
-                      <button onClick={()=>setSejourAProlonger(s)}
-                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
-                        <RefreshCw size={11}/> Prolonger
-                      </button>
-                      <button onClick={()=>handleCheckout(s)}
-                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
-                        <LogOut size={11}/> Sortie
-                      </button>
-                    </>
-                  )}
-                  {s.statut==='a_venir' && (
-                    <button onClick={()=>{ if(onActiverReservation) onActiverReservation(s.id) }}
-                      style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#F5F3FF', color:'#8B5CF6', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
-                      <LogIn size={11}/> Client arrive
+                {!isNoShow && (
+                  <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
+                    <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
+                      style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                      <Printer size={11}/> Entrée
                     </button>
-                  )}
-                </div>
+                    {s.statut==='en_cours' && (
+                      <>
+                        <button onClick={()=>setSejourAProlonger(s)}
+                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                          <RefreshCw size={11}/> Prolonger
+                        </button>
+                        <button onClick={()=>handleCheckout(s)}
+                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                          <LogOut size={11}/> Sortie
+                        </button>
+                      </>
+                    )}
+                    {s.statut==='a_venir' && (
+                      <button onClick={()=>{ if(onActiverReservation) onActiverReservation(s.id) }}
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#F5F3FF', color:'#8B5CF6', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        <LogIn size={11}/> Client arrive
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )
