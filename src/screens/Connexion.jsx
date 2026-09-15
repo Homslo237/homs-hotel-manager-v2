@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-// ─── Styles d'animation injectés dans le <head> ───────────────────────────────
+// ─── Styles d'animation ───────────────────────────────────────────────────────
 const styleAnim = `
   @keyframes fadeDown {
     from { opacity: 0; transform: translateY(-40px); }
@@ -58,7 +58,6 @@ const styleAnim = `
   .fade-left  { animation: fadeLeft 0.7s ease both; }
 `
 
-// ─── Particules flottantes ────────────────────────────────────────────────────
 const PARTICULES = Array.from({ length: 18 }, (_, i) => ({
   id: i,
   x: Math.random() * 100,
@@ -66,17 +65,23 @@ const PARTICULES = Array.from({ length: 18 }, (_, i) => ({
   size: Math.random() * 5 + 2,
   delay: Math.random() * 4,
   dur: Math.random() * 3 + 3,
-  type: i % 3, // 0=étoile 1=losange 2=cercle
+  type: i % 3,
 }))
 
-// ─── Rôles ────────────────────────────────────────────────────────────────────
 const ROLES = [
-  { id: 'directeur',     label: 'Directeur',       emoji: '👔', couleur: '#C9A84C' },
-  { id: 'receptionniste',label: 'Réceptionniste',   emoji: '🛎️', couleur: '#2ECC71' },
-  { id: 'caissier',      label: 'Caissier',         emoji: '💰', couleur: '#E8634A' },
+  { id:'directeur',      label:'Directeur',      emoji:'👔', couleur:'#C9A84C' },
+  { id:'receptionniste', label:'Réceptionniste',  emoji:'🛎️', couleur:'#2ECC71' },
+  { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
-// ─── Machine à écrire ─────────────────────────────────────────────────────────
+// ─── Lire les utilisateurs depuis localStorage ────────────────────────────────
+function lireUtilisateurs() {
+  try {
+    const s = localStorage.getItem('homs_utilisateurs')
+    return s ? JSON.parse(s) : []
+  } catch { return [] }
+}
+
 function Typewriter({ text, delay = 0, style }) {
   const [displayed, setDisplayed] = useState('')
   const [started, setStarted] = useState(false)
@@ -100,16 +105,21 @@ function Typewriter({ text, delay = 0, style }) {
   return <span style={style}>{displayed}<span style={{ opacity: displayed.length < text.length ? 1 : 0, color:'#C9A84C' }}>|</span></span>
 }
 
-// ─── Composant principal ──────────────────────────────────────────────────────
 export default function Connexion({ onConnexion }) {
-  const [role, setRole]       = useState(null)
-  const [email, setEmail]     = useState('')
-  const [mdp, setMdp]         = useState('')
+  const [role, setRole]   = useState(null)
+  const [mdp, setMdp]     = useState('')
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
-  const [etape, setEtape]     = useState(1) // 1=choix rôle, 2=formulaire
+  const [etape, setEtape] = useState(1)
 
-  // Injection des styles d'animation
+  // ── Mot de passe oublié ──
+  const [showOublie, setShowOublie]   = useState(false)
+  const [nomOublie, setNomOublie]     = useState('')
+  const [reponse, setReponse]         = useState('')
+  const [nouveauMdp, setNouveauMdp]   = useState('')
+  const [userTrouve, setUserTrouve]   = useState(null)
+  const [mdpReset, setMdpReset]       = useState(false)
+
   useEffect(() => {
     const el = document.createElement('style')
     el.textContent = styleAnim
@@ -119,61 +129,119 @@ export default function Connexion({ onConnexion }) {
 
   const handleChoisirRole = (r) => {
     setRole(r)
+    setMdp('')
+    setErreur('')
     setTimeout(() => setEtape(2), 300)
   }
 
   const handleConnexion = () => {
-    if (!email || !mdp) { setErreur('Veuillez remplir tous les champs.'); return }
+    if (!mdp) { setErreur('Veuillez entrer votre mot de passe.'); return }
     setErreur('')
     setLoading(true)
-    // Simulation connexion (Phase 2 : Firebase Auth)
+
     setTimeout(() => {
       setLoading(false)
-      if (onConnexion) onConnexion({ email, role: role.id })
-    }, 1800)
+      const utilisateurs = lireUtilisateurs()
+
+      // Compte directeur par défaut (toujours disponible)
+      if (role.id === 'directeur' && mdp === 'admin1234') {
+        // Enregistrer dernière connexion
+        const now = new Date()
+        const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+        onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', derniereConnexion: horodatage })
+        return
+      }
+
+      // Chercher dans les comptes créés
+      const user = utilisateurs.find(u =>
+        u.role === role.id &&
+        u.motDePasse === mdp &&
+        u.actif !== false
+      )
+
+      if (user) {
+        // Mettre à jour la dernière connexion
+        const now = new Date()
+        const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+        const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
+        localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
+        onConnexion({ nom:user.nom, role:user.role, email:user.email || '', derniereConnexion:horodatage })
+      } else {
+        setErreur('Mot de passe incorrect ou compte désactivé.')
+      }
+    }, 1200)
   }
+
+  // ── Recherche utilisateur pour reset mdp ──
+  const handleChercherUser = () => {
+    const utilisateurs = lireUtilisateurs()
+    const u = utilisateurs.find(u => u.nom.toLowerCase() === nomOublie.trim().toLowerCase() && u.role === role.id)
+    if (!u) { setErreur('Aucun compte trouvé avec ce nom pour ce rôle.'); return }
+    setUserTrouve(u)
+    setErreur('')
+  }
+
+  const handleVerifierReponse = () => {
+    if (!userTrouve) return
+    if (reponse.trim().toLowerCase() === userTrouve.reponseSecrete?.toLowerCase()) {
+      setErreur('')
+      setMdpReset(true)
+    } else {
+      setErreur('Réponse incorrecte.')
+    }
+  }
+
+  const handleNouveauMdp = () => {
+    if (nouveauMdp.length < 4) { setErreur('Minimum 4 caractères.'); return }
+    const utilisateurs = lireUtilisateurs()
+    const maj = utilisateurs.map(u => u.id === userTrouve.id ? { ...u, motDePasse: nouveauMdp } : u)
+    localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
+    setShowOublie(false)
+    setNomOublie(''); setReponse(''); setNouveauMdp(''); setUserTrouve(null); setMdpReset(false)
+    setErreur('')
+    alert('✅ Mot de passe mis à jour ! Vous pouvez vous connecter.')
+  }
+
+  // ── Styles champ ──
+  const champStyle = (couleur) => ({
+    width:'100%', padding:'14px 16px',
+    background:'rgba(255,255,255,0.08)',
+    border:'1.5px solid rgba(255,255,255,0.15)',
+    borderRadius:'12px', color:'white', fontSize:'15px',
+    outline:'none', boxSizing:'border-box', transition:'border 0.2s',
+  })
 
   return (
     <div style={{
-      minHeight: '100vh', width: '100%',
-      background: 'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'flex-start', overflowX: 'hidden',
-      position: 'relative', paddingBottom: '40px'
+      minHeight:'100vh', width:'100%',
+      background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)',
+      display:'flex', flexDirection:'column', alignItems:'center',
+      justifyContent:'flex-start', overflowX:'hidden',
+      position:'relative', paddingBottom:'40px'
     }}>
 
-      {/* ── Particules flottantes ── */}
+      {/* Particules */}
       {PARTICULES.map(p => (
         <div key={p.id} style={{
-          position: 'absolute',
-          left: `${p.x}%`, top: `${p.y}%`,
-          width: `${p.size}px`, height: `${p.size}px`,
-          borderRadius: p.type === 2 ? '50%' : p.type === 0 ? '2px' : '0',
-          background: p.type === 1 ? 'transparent' : '#C9A84C',
-          border: p.type === 1 ? '1.5px solid #C9A84C' : 'none',
-          transform: p.type === 1 ? 'rotate(45deg)' : 'none',
-          animation: `${p.type === 0 ? 'twinkle' : 'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`,
-          pointerEvents: 'none', zIndex: 0,
-          opacity: 0.6,
+          position:'absolute', left:`${p.x}%`, top:`${p.y}%`,
+          width:`${p.size}px`, height:`${p.size}px`,
+          borderRadius: p.type===2?'50%':p.type===0?'2px':'0',
+          background: p.type===1?'transparent':'#C9A84C',
+          border: p.type===1?'1.5px solid #C9A84C':'none',
+          transform: p.type===1?'rotate(45deg)':'none',
+          animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`,
+          pointerEvents:'none', zIndex:0, opacity:0.6,
         }}/>
       ))}
 
-      {/* ── Logo + titre ── */}
+      {/* Logo + titre */}
       <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'8px' }}>
-
-        {/* Logo pulsant */}
         <div className="fade-down" style={{ animationDelay:'0.1s' }}>
           <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
-            <img
-              src="/logo-homs.png"
-              alt="HOMS"
+            <img src="/logo-homs.png" alt="HOMS"
               style={{ height:'88px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }}
-              onError={e => {
-                e.target.style.display = 'none'
-                e.target.nextSibling.style.display = 'flex'
-              }}
+              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
             />
-            {/* Fallback si logo absent */}
             <div style={{
               display:'none', width:'88px', height:'88px', borderRadius:'22px',
               background:'linear-gradient(135deg, #C9A84C, #F5D98A)',
@@ -183,26 +251,14 @@ export default function Connexion({ onConnexion }) {
             }}>H</div>
           </div>
         </div>
-
-        {/* Nom hôtel — machine à écrire */}
         <div className="fade-down" style={{ animationDelay:'0.3s', minHeight:'36px' }}>
-          <Typewriter
-            text="HOMS-HÔTEL MANAGER"
-            delay={600}
-            style={{ fontSize:'26px', fontWeight:'900', color:'#C9A84C', letterSpacing:'4px' }}
-          />
+          <Typewriter text="HOMS-HÔTEL MANAGER" delay={600}
+            style={{ fontSize:'26px', fontWeight:'900', color:'#C9A84C', letterSpacing:'4px' }}/>
         </div>
-
-        {/* Slogan glisse gauche */}
         <div className="fade-left" style={{ animationDelay:'0.5s', marginTop:'6px', minHeight:'20px' }}>
-          <Typewriter
-            text="UNE VISION D'ENSEMBLE"
-            delay={1400}
-            style={{ fontSize:'11px', color:'rgba(201,168,76,0.7)', letterSpacing:'3px', fontWeight:'600' }}
-          />
+          <Typewriter text="UNE VISION D'ENSEMBLE" delay={1400}
+            style={{ fontSize:'11px', color:'rgba(201,168,76,0.7)', letterSpacing:'3px', fontWeight:'600' }}/>
         </div>
-
-        {/* Ligne décorative */}
         <div className="fade-up" style={{ animationDelay:'0.6s', marginTop:'16px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
           <div style={{ height:'1px', width:'50px', background:'linear-gradient(90deg, transparent, #C9A84C)' }}/>
           <div style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#C9A84C', animation:'bounce 1.5s ease infinite' }}/>
@@ -210,7 +266,7 @@ export default function Connexion({ onConnexion }) {
         </div>
       </div>
 
-      {/* ── ÉTAPE 1 : Choix du rôle ── */}
+      {/* ÉTAPE 1 : Choix du rôle */}
       {etape === 1 && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'28px', animationDelay:'0.8s' }}>
           <p style={{ textAlign:'center', color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'20px', letterSpacing:'1px' }}>
@@ -218,41 +274,33 @@ export default function Connexion({ onConnexion }) {
           </p>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
             {ROLES.map((r, i) => (
-              <button
-                key={r.id}
-                onClick={() => handleChoisirRole(r)}
-                style={{
-                  display:'flex', alignItems:'center', gap:'16px',
-                  padding:'18px 20px', borderRadius:'16px',
-                  background:'rgba(255,255,255,0.06)',
-                  border:`1.5px solid rgba(255,255,255,0.12)`,
-                  cursor:'pointer', width:'100%', textAlign:'left',
-                  animation:`fadeUp 0.5s ease ${0.9 + i*0.15}s both`,
-                  transition:'all 0.25s ease',
-                  backdropFilter:'blur(8px)',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = `${r.couleur}22`
-                  e.currentTarget.style.border = `1.5px solid ${r.couleur}`
-                  e.currentTarget.style.transform = 'translateY(-3px)'
-                  e.currentTarget.style.boxShadow = `0 8px 24px ${r.couleur}33`
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                  e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.12)'
-                  e.currentTarget.style.transform = 'none'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
+              <button key={r.id} onClick={() => handleChoisirRole(r)} style={{
+                display:'flex', alignItems:'center', gap:'16px',
+                padding:'18px 20px', borderRadius:'16px',
+                background:'rgba(255,255,255,0.06)',
+                border:'1.5px solid rgba(255,255,255,0.12)',
+                cursor:'pointer', width:'100%', textAlign:'left',
+                animation:`fadeUp 0.5s ease ${0.9+i*0.15}s both`,
+                transition:'all 0.25s ease', backdropFilter:'blur(8px)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background=`${r.couleur}22`
+                e.currentTarget.style.border=`1.5px solid ${r.couleur}`
+                e.currentTarget.style.transform='translateY(-3px)'
+                e.currentTarget.style.boxShadow=`0 8px 24px ${r.couleur}33`
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background='rgba(255,255,255,0.06)'
+                e.currentTarget.style.border='1.5px solid rgba(255,255,255,0.12)'
+                e.currentTarget.style.transform='none'
+                e.currentTarget.style.boxShadow='none'
+              }}>
                 <div style={{
                   width:'52px', height:'52px', borderRadius:'14px',
                   background:`${r.couleur}22`, border:`1.5px solid ${r.couleur}55`,
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:'26px', flexShrink:0,
-                  animation:`cardHover 3s ease ${i*0.5}s infinite`,
-                }}>
-                  {r.emoji}
-                </div>
+                  fontSize:'26px', flexShrink:0, animation:`cardHover 3s ease ${i*0.5}s infinite`,
+                }}>{r.emoji}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ color:'white', fontWeight:'800', fontSize:'16px' }}>{r.label}</div>
                   <div style={{ color:`${r.couleur}99`, fontSize:'12px', marginTop:'2px' }}>
@@ -261,18 +309,16 @@ export default function Connexion({ onConnexion }) {
                       : 'Encaissements · Caisse du jour'}
                   </div>
                 </div>
-                <div style={{ color:`${r.couleur}`, fontSize:'20px' }}>›</div>
+                <div style={{ color:r.couleur, fontSize:'20px' }}>›</div>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── ÉTAPE 2 : Formulaire de connexion ── */}
-      {etape === 2 && role && (
+      {/* ÉTAPE 2 : Mot de passe */}
+      {etape === 2 && role && !showOublie && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
-
-          {/* Badge rôle choisi */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'24px' }}>
             <button onClick={() => setEtape(1)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>
               ‹ Retour
@@ -287,70 +333,40 @@ export default function Connexion({ onConnexion }) {
             </div>
           </div>
 
-          {/* Champs */}
-          <div style={{ marginBottom:'14px', animation:'fadeUp 0.4s ease 0.1s both' }}>
-            <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-              ADRESSE EMAIL
-            </label>
-            <input
-              type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="exemple@hotel.com"
-              style={{
-                width:'100%', padding:'14px 16px',
-                background:'rgba(255,255,255,0.08)',
-                border:'1.5px solid rgba(255,255,255,0.15)',
-                borderRadius:'12px', color:'white', fontSize:'15px',
-                outline:'none', boxSizing:'border-box',
-                transition:'border 0.2s',
-              }}
-              onFocus={e => { e.target.style.border = `1.5px solid ${role.couleur}` }}
-              onBlur={e => { e.target.style.border = '1.5px solid rgba(255,255,255,0.15)' }}
-            />
-          </div>
+          {role.id === 'directeur' && (
+            <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'rgba(201,168,76,0.8)' }}>
+              💡 Compte par défaut — mot de passe : <strong>admin1234</strong>
+            </div>
+          )}
 
-          <div style={{ marginBottom:'10px', animation:'fadeUp 0.4s ease 0.2s both' }}>
+          <div style={{ marginBottom:'14px', animation:'fadeUp 0.4s ease 0.1s both' }}>
             <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
               MOT DE PASSE
             </label>
-            <input
-              type="password" value={mdp}
+            <input type="password" value={mdp}
               onChange={e => setMdp(e.target.value)}
+              onKeyDown={e => e.key==='Enter' && handleConnexion()}
               placeholder="••••••••"
-              style={{
-                width:'100%', padding:'14px 16px',
-                background:'rgba(255,255,255,0.08)',
-                border:'1.5px solid rgba(255,255,255,0.15)',
-                borderRadius:'12px', color:'white', fontSize:'15px',
-                outline:'none', boxSizing:'border-box',
-                transition:'border 0.2s',
-              }}
-              onFocus={e => { e.target.style.border = `1.5px solid ${role.couleur}` }}
-              onBlur={e => { e.target.style.border = '1.5px solid rgba(255,255,255,0.15)' }}
+              style={champStyle(role.couleur)}
+              onFocus={e => { e.target.style.border=`1.5px solid ${role.couleur}` }}
+              onBlur={e => { e.target.style.border='1.5px solid rgba(255,255,255,0.15)' }}
             />
           </div>
 
           {erreur && (
-            <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center', animation:'fadeUp 0.3s ease both' }}>
+            <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>
               ⚠️ {erreur}
             </div>
           )}
 
-          {/* Bouton connexion avec shimmer */}
-          <button
-            className="btn-shimmer"
-            onClick={handleConnexion}
-            disabled={loading}
-            style={{
-              width:'100%', padding:'16px', borderRadius:'14px', border:'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
-              marginTop:'8px', letterSpacing:'1px',
-              animation:'fadeUp 0.4s ease 0.3s both, glowBorder 2s ease infinite',
-              opacity: loading ? 0.8 : 1,
-              boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
-            }}
-          >
+          <button className="btn-shimmer" onClick={handleConnexion} disabled={loading} style={{
+            width:'100%', padding:'16px', borderRadius:'14px', border:'none',
+            cursor:loading?'not-allowed':'pointer',
+            color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+            marginTop:'8px', letterSpacing:'1px',
+            opacity:loading?0.8:1,
+            boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+          }}>
             {loading ? (
               <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
                 <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
@@ -359,29 +375,107 @@ export default function Connexion({ onConnexion }) {
             ) : `Se connecter · ${role.label}`}
           </button>
 
-          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:'11px', marginTop:'16px' }}>
-            Mot de passe oublié ? Contactez votre administrateur
+          <p onClick={() => { setShowOublie(true); setErreur('') }}
+            style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'12px', marginTop:'16px', cursor:'pointer', textDecoration:'underline' }}>
+            Mot de passe oublié ?
           </p>
         </div>
       )}
 
-      {/* ── Footer Homslovision ── */}
+      {/* ÉTAPE 2 : Mot de passe oublié */}
+      {etape === 2 && role && showOublie && (
+        <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px' }}>
+            <button onClick={() => { setShowOublie(false); setErreur(''); setUserTrouve(null); setMdpReset(false) }}
+              style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>
+              ‹ Retour
+            </button>
+            <span style={{ color:'#C9A84C', fontWeight:'700', fontSize:'15px' }}>Mot de passe oublié</span>
+          </div>
+
+          {/* Étape 1 : chercher le nom */}
+          {!userTrouve && (
+            <>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
+                  VOTRE NOM (tel qu'enregistré)
+                </label>
+                <input value={nomOublie} onChange={e => setNomOublie(e.target.value)}
+                  placeholder="Ex. Jean Dupont"
+                  style={champStyle(role.couleur)}
+                  onFocus={e => { e.target.style.border=`1.5px solid ${role.couleur}` }}
+                  onBlur={e => { e.target.style.border='1.5px solid rgba(255,255,255,0.15)' }}
+                />
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleChercherUser} style={{
+                width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+                background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px'
+              }}>Rechercher mon compte</button>
+            </>
+          )}
+
+          {/* Étape 2 : question secrète */}
+          {userTrouve && !mdpReset && (
+            <>
+              <div style={{ background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#2ECC71' }}>
+                ✅ Compte trouvé : <strong>{userTrouve.nom}</strong>
+              </div>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
+                  QUESTION SECRÈTE : {userTrouve.questionSecrete || 'Quel est le nom de votre animal ?'}
+                </label>
+                <input value={reponse} onChange={e => setReponse(e.target.value)}
+                  placeholder="Votre réponse..."
+                  style={champStyle(role.couleur)}
+                  onFocus={e => { e.target.style.border=`1.5px solid ${role.couleur}` }}
+                  onBlur={e => { e.target.style.border='1.5px solid rgba(255,255,255,0.15)' }}
+                />
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleVerifierReponse} style={{
+                width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+                background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px'
+              }}>Vérifier</button>
+            </>
+          )}
+
+          {/* Étape 3 : nouveau mot de passe */}
+          {userTrouve && mdpReset && (
+            <>
+              <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#C9A84C' }}>
+                ✅ Réponse correcte ! Choisissez un nouveau mot de passe.
+              </div>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
+                  NOUVEAU MOT DE PASSE
+                </label>
+                <input type="password" value={nouveauMdp} onChange={e => setNouveauMdp(e.target.value)}
+                  placeholder="Minimum 4 caractères"
+                  style={champStyle(role.couleur)}
+                  onFocus={e => { e.target.style.border=`1.5px solid ${role.couleur}` }}
+                  onBlur={e => { e.target.style.border='1.5px solid rgba(255,255,255,0.15)' }}
+                />
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleNouveauMdp} style={{
+                width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+                background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px'
+              }}>✅ Enregistrer le nouveau mot de passe</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Footer */}
       <div style={{ zIndex:1, width:'100%', paddingTop:'32px', paddingBottom:'20px', textAlign:'center' }}>
-        <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>
-          Propulsé par
-        </p>
+        <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>Propulsé par</p>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
           <div style={{ animation:'rotateSlow 8s linear infinite', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <img
-              src="/logo-homslovision-blanc.png"
-              alt="Homslovision"
+            <img src="/logo-homslovision-blanc.png" alt="Homslovision"
               style={{ height:'28px', opacity:0.6 }}
-              onError={e => {
-                e.target.style.display = 'none'
-                e.target.nextSibling.style.display = 'flex'
-              }}
+              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
             />
-            {/* Fallback logo tournant */}
             <div style={{
               display:'none', width:'28px', height:'28px', borderRadius:'8px',
               background:'linear-gradient(135deg, #C9A84C, #F5D98A)',
@@ -389,15 +483,10 @@ export default function Connexion({ onConnexion }) {
               fontSize:'13px', fontWeight:'900', color:'#1B3A6B'
             }}>HV</div>
           </div>
-          <span style={{ color:'rgba(201,168,76,0.6)', fontSize:'13px', fontWeight:'700', letterSpacing:'2px' }}>
-            HOMSLOVISION
-          </span>
+          <span style={{ color:'rgba(201,168,76,0.6)', fontSize:'13px', fontWeight:'700', letterSpacing:'2px' }}>HOMSLOVISION</span>
         </div>
-        <p style={{ color:'rgba(255,255,255,0.2)', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>
-          Le futur maintenant · v1.0
-        </p>
+        <p style={{ color:'rgba(255,255,255,0.2)', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>Le futur maintenant · v1.0</p>
       </div>
-
     </div>
   )
 }
