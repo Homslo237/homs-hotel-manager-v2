@@ -5,7 +5,7 @@ import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
 import Caisse from './screens/Caisse'
-import Menu from './screens/Menu'
+import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
 
 const styleTransition = `
