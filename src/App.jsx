@@ -1,550 +1,468 @@
-import { useState, useEffect } from 'react'
-import { Search, X, AlertTriangle, Sparkles, CheckCircle, User, Phone, Moon, Wrench } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import Splash from './screens/Splash'
+import Connexion from './screens/Connexion'
+import Dashboard from './screens/Dashboard'
+import Chambres from './screens/Chambres'
+import Sejours from './screens/Sejours'
+import Caisse from './screens/Caisse'
+import Menu from './screens/menu/Menu'
+import NavBar from './components/NavBar'
 
-const statuts = {
-  libre:       { label:'Libre',        couleur:'#2ECC71', bg:'#F0FFF4' },
-  occupee:     { label:'Occupée',      couleur:'#1B3A6B', bg:'#EEF2FF' },
-  a_venir:     { label:'À venir',      couleur:'#8B5CF6', bg:'#F5F3FF' },
-  nettoyage:   { label:'Nettoyage',    couleur:'#C9A84C', bg:'#FFFBF0' },
-  probleme:    { label:'Problème',     couleur:'#E74C3C', bg:'#FFF5F5' },
-  hors_service:{ label:'Hors service', couleur:'#888',    bg:'#F5F5F5' },
+const styleTransition = `
+  @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  .screen-in { animation: screenIn 0.25s ease both; }
+`
+
+const ACCES = {
+  directeur:      ['dashboard','chambres','sejours','caisse','menu'],
+  receptionniste: ['dashboard','chambres','sejours','caisse','menu'],
+  caissier:       ['dashboard','caisse','menu'],
 }
 
-const iconeStatut = {
-  libre:        CheckCircle,
-  occupee:      User,
-  a_venir:      User,
-  nettoyage:    Sparkles,
-  probleme:     AlertTriangle,
-  hors_service: Wrench,
+export const CONFIG_CHAMBRES = {
+  categories: [
+    { nom:'Standard', debut:100, nombre:20, tarifNuit:25000, tarifHeure:2500 },
+    { nom:'Confort',  debut:200, nombre:20, tarifNuit:35000, tarifHeure:3500 },
+    { nom:'Suite',    debut:300, nombre:10, tarifNuit:65000, tarifHeure:6500 },
+  ]
 }
 
-const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
-const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
+function versDate(dateFR, heure) {
+  if (!dateFR) return null
+  const [j, m, a] = dateFR.split('/').map(Number)
+  const [h, min]  = (heure || '00:00').split(':').map(Number)
+  return new Date(a, m - 1, j, h || 0, min || 0)
+}
 
-const typesMaintenance = [
-  { id:'panne',        label:'Panne / Problème technique', emoji:'⚡', couleur:'#E74C3C', description:'Climatisation, plomberie, électricité...' },
-  { id:'nettoyage',    label:'Nettoyage en cours',         emoji:'🧹', couleur:'#C9A84C', description:'Chambre en cours de nettoyage' },
-  { id:'hors_service', label:'Hors service',               emoji:'🚫', couleur:'#888',    description:'Chambre bloquée jusqu\'à réparation' },
+function periodeDuSejour(s) {
+  const debut = versDate(s.dateArrivee, s.heureArrivee)
+  const fin   = versDate(s.dateDepart || s.dateArrivee, s.heureDepart)
+  return [debut, fin]
+}
+
+function periodesSeChevauchent(debutA, finA, debutB, finB) {
+  if (!debutA || !finA || !debutB || !finB) return false
+  return debutA < finB && debutB < finA
+}
+
+export function genererChambres(sejours = []) {
+  const chambres = []
+  const maintenant = new Date()
+  CONFIG_CHAMBRES.categories.forEach(cat => {
+    for (let i = 1; i <= cat.nombre; i++) {
+      const num = String(cat.debut + i)
+      const enCours = sejours.find(s => s.chambre === num && s.statut === 'en_cours')
+      const aVenir = sejours.find(s => {
+        if (s.chambre !== num || s.statut !== 'a_venir') return false
+        const [debut] = periodeDuSejour(s)
+        if (!debut) return false
+        const minutesAvant = (debut - maintenant) / 60000
+        return minutesAvant <= 120 && minutesAvant > -1440
+      })
+      const sejour = enCours || aVenir
+      chambres.push({
+        num, cat: cat.nom,
+        statut: sejour ? (sejour.statut === 'a_venir' ? 'a_venir' : 'occupee') : 'libre',
+        tarifNuit: cat.tarifNuit, tarifHeure: cat.tarifHeure,
+        client: sejour?.client || null,
+        telephone: sejour?.telephone || null,
+        dateDepart: sejour?.dateDepart || null,
+        heureDepart: sejour?.heureDepart || null,
+        probleme: null,
+      })
+    }
+  })
+  return chambres
+}
+
+const STORAGE_KEY = 'homs_data_v1'
+function sauvegarder(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
+}
+function charger() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) { return null }
+}
+
+const SEJOURS_DEMO = [
+  { id:1, client:'M. Kouassi Ama',   telephone:'+225 07 11 22 33', chambre:'205', categorie:'Confort',  dateArrivee:'18/08/2026', heureArrivee:'14:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'3 nuits',  type:'nuit',  statut:'en_cours', montant:'105 000', montantNum:105000, modePaiement:'Orange Money' },
+  { id:2, client:'Mme Diallo Fatou', telephone:'+225 05 44 55 66', chambre:'101', categorie:'Standard', dateArrivee:'17/08/2026', heureArrivee:'10:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'2 nuits',  type:'nuit',  statut:'en_cours', montant:'50 000',  montantNum:50000,  modePaiement:'Especes' },
+  { id:3, client:'M. Bamba Seydou',  telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite',    dateArrivee:'25/08/2026', heureArrivee:'09:30', dateDepart:'25/08/2026', heureDepart:'22:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500',  montantNum:19500,  modePaiement:'MTN Mobile Money' },
 ]
 
-function ModalMaintenance({ chambre, onClose, onSignaler, estDirecteur }) {
-  const [type, setType]        = useState('panne')
-  const [description, setDesc] = useState('')
-  const [bloquer, setBloquer]  = useState(false)
-
-  const handleSignaler = () => {
-    if (!description.trim()) { alert('Décrivez le problème.'); return }
-    onSignaler({
-      chambre: chambre.num,
-      categorie: chambre.cat,
-      type, description: description.trim(),
-      bloquer: estDirecteur ? bloquer : false,
-      date: new Date().toLocaleDateString('fr-FR'),
-      heure: new Date().toTimeString().slice(0,5),
-      statut: 'ouvert',
-      id: Date.now(),
+function jouerSonnerie(type = 'alerte') {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const freqs = type === 'rappel' ? [440, 550] : type === 'urgent' ? [880, 440, 880] : [660, 440]
+    let temps = ctx.currentTime
+    freqs.forEach(freq => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.3, temps)
+      gain.gain.exponentialRampToValueAtTime(0.001, temps + 0.4)
+      osc.start(temps)
+      osc.stop(temps + 0.4)
+      temps += 0.45
     })
-    onClose()
-  }
+  } catch (e) {}
+}
 
+function AlerteNoShow({ sejours, onLiberer, onPatienter }) {
+  if (!sejours || sejours.length === 0) return null
+  const s = sejours[0]
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'flex-end' }}>
-      <div style={{ background:'white', width:'100%', borderRadius:'20px 20px 0 0', maxHeight:'90vh', overflowY:'auto', padding:'20px 20px 40px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-          <span style={{ color:'#E74C3C', fontSize:'11px', fontWeight:'700', letterSpacing:'1px' }}>🔧 MAINTENANCE</span>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer' }}><X size={20} color="#999"/></button>
+    <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
+      <div style={{ background:'white', borderRadius:'20px', width:'100%', maxWidth:'360px', overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
+        <div style={{ background:'linear-gradient(135deg, #E74C3C, #C0392B)', padding:'20px', textAlign:'center' }}>
+          <div style={{ fontSize:'36px', marginBottom:'8px' }}>⚠️</div>
+          <div style={{ color:'white', fontWeight:'800', fontSize:'17px' }}>No-Show détecté</div>
+          <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'12px', marginTop:'4px' }}>Client absent depuis plus d'1 heure</div>
         </div>
-        <h2 style={{ fontSize:'20px', fontWeight:'800', color:'#1B3A6B', marginBottom:'4px' }}>Signaler un problème</h2>
-        <p style={{ fontSize:'13px', color:'#888', marginBottom:'20px' }}>Chambre {chambre.num} · {chambre.cat}</p>
-
-        <div style={{ marginBottom:'16px' }}>
-          <label style={labelStyle}>Type de signalement</label>
-          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-            {typesMaintenance.map(t => (
-              <button key={t.id} onClick={()=>setType(t.id)} style={{
-                padding:'12px 14px', borderRadius:'12px', cursor:'pointer', textAlign:'left',
-                border:type===t.id?`2px solid ${t.couleur}`:'2px solid #E0E0E0',
-                background:type===t.id?t.couleur+'10':'white',
-                display:'flex', alignItems:'center', gap:'12px'
-              }}>
-                <span style={{ fontSize:'22px' }}>{t.emoji}</span>
-                <div>
-                  <div style={{ fontWeight:'700', fontSize:'13px', color:type===t.id?t.couleur:'#333' }}>{t.label}</div>
-                  <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>{t.description}</div>
-                </div>
-              </button>
-            ))}
+        <div style={{ padding:'20px' }}>
+          <div style={{ background:'#FFF5F5', borderRadius:'12px', padding:'14px', marginBottom:'16px', border:'1px solid #FFCDD2' }}>
+            <div style={{ fontWeight:'800', fontSize:'15px', color:'#1B3A6B', marginBottom:'6px' }}>{s.client}</div>
+            <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>📞 {s.telephone}</div>
+            <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>🏨 Chambre {s.chambre} · {s.categorie}</div>
+            <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>📅 Arrivée prévue : {s.dateArrivee} à {s.heureArrivee}</div>
+            <div style={{ fontSize:'13px', color:'#E74C3C', fontWeight:'700' }}>⏰ Dépassement : +1h sans présentation</div>
           </div>
-        </div>
-
-        <div style={{ marginBottom:'16px' }}>
-          <label style={labelStyle}>Description <span style={{color:'red'}}>*</span></label>
-          <textarea value={description} onChange={e=>setDesc(e.target.value)}
-            placeholder="Ex. Le climatiseur ne fonctionne plus..."
-            rows={3} style={{ ...inputStyle, resize:'none', fontFamily:'inherit' }}/>
-        </div>
-
-        {estDirecteur && (
-          <div style={{ marginBottom:'20px' }}>
-            <div style={{ background:'#FFF8E1', border:'1px solid #C9A84C', borderRadius:'12px', padding:'14px 16px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <div style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B' }}>🔒 Bloquer la chambre</div>
-                  <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Empêche toute nouvelle réservation</div>
-                </div>
-                <button onClick={()=>setBloquer(!bloquer)} style={{
-                  width:'48px', height:'26px', borderRadius:'13px', border:'none', cursor:'pointer',
-                  background:bloquer?'#1B3A6B':'#E0E0E0', position:'relative', transition:'background 0.3s'
-                }}>
-                  <div style={{
-                    width:'20px', height:'20px', borderRadius:'10px', background:'white',
-                    position:'absolute', top:'3px', transition:'left 0.3s',
-                    left:bloquer?'25px':'3px', boxShadow:'0 1px 3px rgba(0,0,0,0.2)'
-                  }}/>
-                </button>
-              </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+            <button onClick={() => onLiberer(s.id)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#E74C3C', color:'white', fontWeight:'800', fontSize:'14px' }}>
+              🔓 Libérer la chambre (No-Show)
+            </button>
+            <button onClick={() => onPatienter(s.id)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'2px solid #1B3A6B', cursor:'pointer', background:'white', color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>
+              ⏳ Patienter encore
+            </button>
+          </div>
+          {sejours.length > 1 && (
+            <div style={{ marginTop:'12px', textAlign:'center', fontSize:'12px', color:'#999' }}>
+              + {sejours.length - 1} autre{sejours.length > 2 ? 's' : ''} no-show en attente
             </div>
-          </div>
-        )}
-
-        <button onClick={handleSignaler} style={{
-          width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
-          background:'#E74C3C', color:'white', fontWeight:'800', fontSize:'15px'
-        }}>
-          🔧 Enregistrer le signalement
-        </button>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-function ModalChambre({ chambre, onClose, onChangerStatut, onSignalerMaintenance, estDirecteur, signalements=[] }) {
-  const [nouveauStatut,     setNouveauStatut]     = useState(chambre.statut)
-  const [noteProblem,       setNoteProblem]       = useState(chambre.probleme || '')
-  const [showMaintenance,   setShowMaintenance]   = useState(false)
-  const s = statuts[chambre.statut] || statuts.libre
-  const signalementsActifs = signalements.filter(s => s.chambre === chambre.num && s.statut === 'ouvert')
+export default function App() {
+  const [ecran,            setEcran]            = useState('splash')
+  const [onglet,           setOnglet]           = useState('dashboard')
+  const [utilisateur,      setUtilisateur]      = useState(null)
+  const [cle,              setCle]              = useState(0)
+  const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
+  const [chargé,           setChargé]           = useState(false)
 
-  return (
-    <>
-      <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end' }}>
-        <div style={{ background:'white', width:'100%', borderRadius:'20px 20px 0 0', maxHeight:'90vh', overflowY:'auto', padding:'20px 20px 40px' }}>
+  const [sejours,         setSejours]         = useState([])
+  const [entreesDiverses, setEntreesDiverses] = useState([])
+  const [sortiesDiverses, setSortiesDiverses] = useState([])
+  const [historique,      setHistorique]      = useState([])
+  const [alertesSonnees,  setAlertesSonnees]  = useState({})
+  const [noShowASignaler, setNoShowASignaler] = useState([])
+  const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
-          {/* Header */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
-            <div>
-              <span style={{ color:'#C9A84C', fontSize:'11px', fontWeight:'700', letterSpacing:'1px' }}>CHAMBRE</span>
-              <h2 style={{ fontSize:'28px', fontWeight:'800', color:'#1B3A6B' }}>N° {chambre.num}</h2>
-              <span style={{ fontSize:'13px', color:'#888' }}>{chambre.cat}</span>
-            </div>
-            <button onClick={onClose} style={{ background:'#F0F0F0', border:'none', borderRadius:'10px', padding:'8px', cursor:'pointer' }}>
-              <X size={20} color="#666"/>
-            </button>
-          </div>
-
-          {/* Statut actuel */}
-          <div style={{ background:s.bg, borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', border:`1px solid ${s.couleur}`, display:'flex', alignItems:'center', gap:'10px' }}>
-            <div style={{ width:'10px', height:'10px', borderRadius:'5px', background:s.couleur }}/>
-            <span style={{ fontWeight:'700', color:s.couleur }}>Statut : {s.label}</span>
-          </div>
-
-          {/* Bouton Signaler maintenance — EN PREMIER bien visible */}
-          <button onClick={() => setShowMaintenance(true)} style={{
-            width:'100%', padding:'14px', borderRadius:'12px',
-            border:'2px solid #E74C3C', cursor:'pointer',
-            background:'#FFF5F5', color:'#E74C3C',
-            fontWeight:'800', fontSize:'14px',
-            display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
-            marginBottom:'16px'
-          }}>
-            <Wrench size={16}/> Signaler une maintenance
-          </button>
-
-          {/* Signalements actifs */}
-          {signalementsActifs.length > 0 && (
-            <div style={{ marginBottom:'16px' }}>
-              <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px' }}>
-                🔧 Signalements actifs ({signalementsActifs.length})
-              </div>
-              {signalementsActifs.map(sig => (
-                <div key={sig.id} style={{ background:'#FFF5F5', border:'1px solid #E74C3C', borderRadius:'10px', padding:'10px 12px', marginBottom:'6px' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
-                    <span style={{ fontWeight:'700', fontSize:'12px', color:'#E74C3C' }}>
-                      {typesMaintenance.find(t=>t.id===sig.type)?.emoji} {typesMaintenance.find(t=>t.id===sig.type)?.label}
-                    </span>
-                    <span style={{ fontSize:'11px', color:'#999' }}>{sig.date} {sig.heure}</span>
-                  </div>
-                  <div style={{ fontSize:'12px', color:'#666' }}>{sig.description}</div>
-                  {estDirecteur && (
-                    <button onClick={()=>onSignalerMaintenance({...sig, statut:'resolu'})} style={{
-                      marginTop:'8px', padding:'4px 10px', borderRadius:'6px', border:'none',
-                      cursor:'pointer', background:'#E8F5E9', color:'#2ECC71', fontSize:'11px', fontWeight:'700'
-                    }}>
-                      ✅ Marquer résolu
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Infos client */}
-          {(chambre.statut==='occupee'||chambre.statut==='a_venir') && chambre.client && (
-            <div style={{ background:'#F8F9FA', borderRadius:'12px', padding:'14px 16px', marginBottom:'16px' }}>
-              <div style={{ fontWeight:'700', fontSize:'13px', color:'#1B3A6B', marginBottom:'10px' }}>
-                {chambre.statut==='a_venir' ? '📅 Réservation' : '👤 Client en cours'}
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', fontSize:'13px' }}>
-                <User size={14} color="#666"/>
-                <span style={{ fontWeight:'600' }}>{chambre.client}</span>
-              </div>
-              {chambre.telephone && (
-                <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', fontSize:'13px', color:'#666' }}>
-                  <Phone size={14} color="#666"/>
-                  <span>{chambre.telephone}</span>
-                </div>
-              )}
-              {chambre.dateDepart && (
-                <div style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', color:'#666' }}>
-                  <Moon size={14} color="#666"/>
-                  <span>Départ : {chambre.dateDepart} à {chambre.heureDepart}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tarifs */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
-            <div style={{ background:'#F8F9FA', borderRadius:'10px', padding:'12px', textAlign:'center' }}>
-              <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>Nuit</div>
-              <div style={{ fontSize:'16px', fontWeight:'800', color:'#C9A84C' }}>{(chambre.tarifNuit||0).toLocaleString('fr-FR')}</div>
-              <div style={{ fontSize:'10px', color:'#888' }}>FCFA</div>
-            </div>
-            <div style={{ background:'#F8F9FA', borderRadius:'10px', padding:'12px', textAlign:'center' }}>
-              <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>Heure</div>
-              <div style={{ fontSize:'16px', fontWeight:'800', color:'#C9A84C' }}>{(chambre.tarifHeure||0).toLocaleString('fr-FR')}</div>
-              <div style={{ fontSize:'10px', color:'#888' }}>FCFA</div>
-            </div>
-          </div>
-
-          {/* Changer statut */}
-          {(chambre.statut !== 'occupee' && chambre.statut !== 'a_venir') && (
-            <div style={{ marginBottom:'16px' }}>
-              <label style={labelStyle}>Changer le statut</label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
-                {Object.entries(statuts)
-                  .filter(([k])=>k!=='occupee'&&k!=='a_venir'&&k!=='hors_service')
-                  .map(([key, val]) => (
-                    <button key={key} onClick={() => setNouveauStatut(key)} style={{
-                      padding:'10px', borderRadius:'10px', fontWeight:'700', fontSize:'13px', cursor:'pointer',
-                      border: nouveauStatut===key ? `2px solid ${val.couleur}` : '2px solid #E0E0E0',
-                      background: nouveauStatut===key ? val.bg : 'white',
-                      color: nouveauStatut===key ? val.couleur : '#666',
-                    }}>{val.label}</button>
-                  ))
-                }
-              </div>
-            </div>
-          )}
-
-          {nouveauStatut==='probleme' && (
-            <div style={{ marginBottom:'16px' }}>
-              <label style={labelStyle}>Description du problème</label>
-              <textarea value={noteProblem} onChange={e=>setNoteProblem(e.target.value)}
-                placeholder="Ex. Climatisation en panne..." rows={3}
-                style={{ ...inputStyle, resize:'none' }}/>
-            </div>
-          )}
-
-          <button onClick={() => { onChangerStatut(chambre.num, nouveauStatut, noteProblem); onClose() }}
-            style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px' }}>
-            Mettre à jour le statut
-          </button>
-        </div>
-      </div>
-
-      {showMaintenance && (
-        <ModalMaintenance
-          chambre={chambre}
-          estDirecteur={estDirecteur}
-          onClose={() => setShowMaintenance(false)}
-          onSignaler={(signalement) => {
-            onSignalerMaintenance(signalement)
-            if (signalement.bloquer) {
-              onChangerStatut(chambre.num, 'hors_service', signalement.description)
-            } else if (signalement.type === 'nettoyage') {
-              onChangerStatut(chambre.num, 'nettoyage', '')
-            } else if (signalement.type === 'panne') {
-              onChangerStatut(chambre.num, 'probleme', signalement.description)
-            }
-          }}
-        />
-      )}
-    </>
-  )
-}
-
-export default function Chambres({ chambres:chambresProps=[], chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, onMajStats, onMajChambre, utilisateur }) {
-  const [chambres,        setChambres]        = useState([])
-  const [recherche,       setRecherche]       = useState('')
-  const [filtre,          setFiltre]          = useState('tous')
-  const [filtrecat,       setFiltrecat]       = useState('tous')
-  const [vue,             setVue]             = useState('grille')
-  const [chambreSelectee, setChambreSelectee] = useState(null)
-  const [signalements,    setSignalements]    = useState(() => {
-    try { const s=localStorage.getItem('homs_maintenance'); return s?JSON.parse(s):[] } catch { return [] }
-  })
-  const [showMaintenanceListe, setShowMaintenanceListe] = useState(false)
-
-  const estDirecteur = utilisateur?.role === 'directeur'
+  const intervalRef = useRef(null)
 
   useEffect(() => {
-    if (chambresProps && chambresProps.length > 0) setChambres(chambresProps)
-  }, [chambresProps])
-
-  const sauvegarderSignalements = (liste) => {
-    setSignalements(liste)
-    try { localStorage.setItem('homs_maintenance', JSON.stringify(liste)) } catch {}
-  }
-
-  const handleSignalerMaintenance = (signalement) => {
-    if (signalement.statut === 'resolu') {
-      sauvegarderSignalements(signalements.map(s => s.id===signalement.id ? {...s,statut:'resolu'} : s))
+    const el = document.createElement('style')
+    el.textContent = styleTransition
+    document.head.appendChild(el)
+    const sauvegarde = charger()
+    if (sauvegarde) {
+      setSejours(sauvegarde.sejours || SEJOURS_DEMO)
+      setEntreesDiverses(sauvegarde.entreesDiverses || [])
+      setSortiesDiverses(sauvegarde.sortiesDiverses || [])
+      setHistorique(sauvegarde.historique || [])
     } else {
-      sauvegarderSignalements([signalement, ...signalements])
+      setSejours(SEJOURS_DEMO)
     }
+    setChargé(true)
+    return () => document.head.removeChild(el)
+  }, [])
+
+  useEffect(() => {
+    if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0 || historique.length > 0) {
+      sauvegarder({ sejours, entreesDiverses, sortiesDiverses, historique })
+    }
+  }, [sejours, entreesDiverses, sortiesDiverses, historique])
+
+  useEffect(() => {
+    const verifier = () => {
+      const now = new Date()
+      const idsALiberer = []
+      sejours.filter(s => s.statut === 'en_cours').forEach(s => {
+        const [, fin] = periodeDuSejour(s)
+        if (!fin) return
+        const diffMin = (fin - now) / 60000
+        if (diffMin > 0 && diffMin <= 5 && !alertesSonnees[`rappel_${s.id}`]) {
+          jouerSonnerie('rappel')
+          setAlertesSonnees(prev => ({ ...prev, [`rappel_${s.id}`]: true }))
+        }
+        if (diffMin <= 0 && diffMin > -1 && !alertesSonnees[`alerte_${s.id}`]) {
+          jouerSonnerie('alerte')
+          setAlertesSonnees(prev => ({ ...prev, [`alerte_${s.id}`]: true }))
+        }
+        if (diffMin <= -20 && !alertesSonnees[`urgent_${s.id}`]) {
+          jouerSonnerie('urgent')
+          setAlertesSonnees(prev => ({ ...prev, [`urgent_${s.id}`]: true }))
+        }
+        if (diffMin <= -180) idsALiberer.push(s.id)
+      })
+      if (idsALiberer.length > 0) {
+        setSejours(prev => prev.map(s =>
+          idsALiberer.includes(s.id) ? { ...s, statut:'termine', depassementNonRegle:true } : s
+        ))
+      }
+      const noShows = sejours.filter(s => {
+        if (s.statut !== 'a_venir') return false
+        if (noShowIgnores[s.id]) return false
+        const [debut] = periodeDuSejour(s)
+        if (!debut) return false
+        return (now - debut) / 60000 >= 60
+      })
+      if (noShows.length > 0) setNoShowASignaler(noShows)
+    }
+    verifier()
+    intervalRef.current = setInterval(verifier, 60000)
+    return () => clearInterval(intervalRef.current)
+  }, [sejours, alertesSonnees, noShowIgnores])
+
+  const confirmerNoShow = (id) => {
+    setSejours(prev => prev.map(s => s.id === id ? { ...s, statut:'no_show' } : s))
+    setNoShowASignaler(prev => prev.filter(s => s.id !== id))
+    jouerSonnerie('alerte')
   }
 
-  const total = chambres.length || chambresStats.total || 50
-  const stats = {
-    libre:        chambres.filter(c=>c.statut==='libre').length,
-    occupee:      chambres.filter(c=>c.statut==='occupee').length,
-    a_venir:      chambres.filter(c=>c.statut==='a_venir').length,
-    nettoyage:    chambres.filter(c=>c.statut==='nettoyage').length,
-    probleme:     chambres.filter(c=>c.statut==='probleme').length,
-    hors_service: chambres.filter(c=>c.statut==='hors_service').length,
+  const ignorerNoShow = (id) => {
+    setNoShowIgnores(prev => ({ ...prev, [id]: true }))
+    setNoShowASignaler(prev => prev.filter(s => s.id !== id))
   }
 
-  const signalementsOuverts = signalements.filter(s=>s.statut==='ouvert')
-  const categories = [...new Set(chambres.map(c=>c.cat))].filter(Boolean)
-
-  const filtrees = chambres.filter(c => {
-    const matchR = (c.num||'').includes(recherche) ||
-      (c.cat||'').toLowerCase().includes(recherche.toLowerCase()) ||
-      (c.client||'').toLowerCase().includes(recherche.toLowerCase())
-    const matchF = filtre==='tous' || c.statut===filtre
-    const matchC = filtrecat==='tous' || c.cat===filtrecat
-    return matchR && matchF && matchC
-  })
-
-  const handleChangerStatut = (num, nouveauStatut, note) => {
-    setChambres(prev => prev.map(c =>
-      c.num===num ? {
-        ...c, statut:nouveauStatut,
-        probleme: nouveauStatut==='probleme'||nouveauStatut==='hors_service' ? note : null,
-        client: nouveauStatut!=='occupee'&&nouveauStatut!=='a_venir' ? null : c.client,
-      } : c
-    ))
-    if (onMajChambre) onMajChambre(num, nouveauStatut, note)
+  const chambresGenerees = genererChambres(sejours)
+  const chambresStats = {
+    total:       chambresGenerees.length,
+    occupees:    chambresGenerees.filter(c => c.statut === 'occupee').length,
+    disponibles: chambresGenerees.filter(c => c.statut === 'libre').length,
+    nettoyer:    chambresGenerees.filter(c => c.statut === 'nettoyage').length,
+    problemes:   chambresGenerees.filter(c => c.statut === 'probleme').length,
+    aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
-  if (chambres.length === 0) {
-    return (
-      <div style={{ paddingBottom:'80px' }}>
-        <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
-          <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Chambres</h1>
-          <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>Chargement...</p>
-        </div>
-        <div style={{ textAlign:'center', padding:'60px 20px', color:'#999' }}>
-          <div style={{ fontSize:'40px', marginBottom:'12px' }}>🏨</div>
-          <p>Chargement des chambres...</p>
-        </div>
-      </div>
-    )
+  const sejoursEncaisses = sejours.filter(s =>
+    s.statut === 'en_cours' || s.statut === 'a_venir' ||
+    s.statut === 'termine'  || s.statut === 'no_show'
+  )
+
+  const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalNuits     = sejoursEncaisses.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalHeures    = sejoursEncaisses.filter(s => s.type === 'heure').reduce((sum, s) => sum + (s.montantNum || 0), 0)
+  const totalEntrees   = entreesDiverses.reduce((sum, e) => sum + (e.montant || 0), 0)
+  const totalSorties   = sortiesDiverses.reduce((sum, s) => sum + (s.montant || 0), 0)
+  const soldeNet       = totalSejours + totalEntrees - totalSorties
+  const tauxOccupation = chambresStats.total > 0 ? Math.round((chambresStats.occupees / chambresStats.total) * 100) : 0
+  const caisse = { totalSejours, totalNuits, totalHeures, totalEntrees, totalSorties, soldeNet }
+
+  const ajouterSejour = (nouveau) => {
+    const [debutNouveau, finNouveau] = periodeDuSejour(nouveau)
+    const conflit = sejours.find(s => {
+      if (s.chambre !== nouveau.chambre) return false
+      if (s.statut !== 'en_cours' && s.statut !== 'a_venir') return false
+      const [debutExistant, finExistant] = periodeDuSejour(s)
+      return periodesSeChevauchent(debutNouveau, finNouveau, debutExistant, finExistant)
+    })
+    if (conflit) return false
+    const statut = nouveau.statut || 'en_cours'
+    const heureReelle = statut === 'en_cours'
+      ? new Date().toTimeString().slice(0, 5)
+      : nouveau.heureArrivee
+    const ns = {
+      ...nouveau, id:Date.now(), heureArrivee:heureReelle,
+      montantNum: parseInt((nouveau.montant || '0').replace(/\s/g, ''), 10) || 0,
+      statut,
+    }
+    setSejours(prev => [ns, ...prev])
+    return true
   }
+
+  const terminerSejour = (id) => {
+    setSejours(prev => prev.map(s => s.id === id ? { ...s, statut:'termine' } : s))
+    setAlertesSonnees(prev => {
+      const updated = { ...prev }
+      delete updated[`rappel_${id}`]
+      delete updated[`alerte_${id}`]
+      delete updated[`urgent_${id}`]
+      return updated
+    })
+  }
+
+  const activerReservation = (id) => {
+    setSejours(prev => prev.map(s => {
+      if (s.id !== id) return s
+      return { ...s, statut:'en_cours', heureArrivee:new Date().toTimeString().slice(0,5) }
+    }))
+    setNoShowIgnores(prev => { const u={...prev}; delete u[id]; return u })
+    setNoShowASignaler(prev => prev.filter(s => s.id !== id))
+  }
+
+  const prolongerSejour = (id, ajout, supplement) => {
+    setSejours(prev => prev.map(s => {
+      if (s.id !== id) return s
+      const nouveauMontant = (s.montantNum || 0) + supplement
+      const historiquePrecedent = s.historiqueProlongations || []
+      if (s.type === 'nuit') {
+        const ancienneDateDepart = s.dateDepart
+        const [j, m, a] = s.dateDepart.split('/').map(Number)
+        const d = new Date(a, m-1, j)
+        d.setDate(d.getDate() + (ajout || 0))
+        const nouvelleDateDepart = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+        return { ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'), dateDepart:nouvelleDateDepart, historiqueProlongations:[...historiquePrecedent, { avant:ancienneDateDepart, apres:nouvelleDateDepart, montant:supplement, unite:'nuit' }] }
+      } else {
+        const ancienneHeureDepart = s.heureDepart
+        const [h, min] = s.heureDepart.split(':').map(Number)
+        const totalMin = h*60 + min + (ajout||0)*60
+        const nouvelleHeureDepart = `${String(Math.floor(totalMin/60)%24).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}`
+        return { ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'), heureDepart:nouvelleHeureDepart, historiqueProlongations:[...historiquePrecedent, { avant:ancienneHeureDepart, apres:nouvelleHeureDepart, montant:supplement, unite:'heure' }] }
+      }
+    }))
+    setAlertesSonnees(prev => {
+      const updated = { ...prev }
+      delete updated[`rappel_${id}`]
+      delete updated[`alerte_${id}`]
+      delete updated[`urgent_${id}`]
+      return updated
+    })
+  }
+
+  const changerOnglet = (nouvelOnglet) => {
+    if (nouvelOnglet === onglet) return
+    const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
+    if (!accesRole.includes(nouvelOnglet)) return
+    setOnglet(nouvelOnglet)
+    setCle(k => k + 1)
+  }
+
+  const handleConnexion = (user) => {
+    setUtilisateur(user)
+    setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
+    setEcran('app')
+  }
+
+  const handleDeconnexion = () => {
+    setUtilisateur(null)
+    setOnglet('dashboard')
+    setEcran('connexion')
+  }
+
+  const cloturerCaisse = () => {
+    const maintenant = new Date()
+    const horodatage = `${String(maintenant.getDate()).padStart(2,'0')}/${String(maintenant.getMonth()+1).padStart(2,'0')}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2,'0')}:${String(maintenant.getMinutes()).padStart(2,'0')}`
+    const entreesSejours = sejours
+      .filter(s => s.statut==='en_cours'||s.statut==='a_venir'||s.statut==='termine'||s.statut==='no_show')
+      .map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show' }))
+    const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage }))
+    const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
+    setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
+    setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+    setNoShowASignaler([])
+  }
+
+  const handleReinitialiser = () => {
+    try { localStorage.removeItem(STORAGE_KEY) } catch (e) {}
+    setSejours(SEJOURS_DEMO)
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+    setAlertesSonnees({})
+    setNoShowASignaler([])
+    setNoShowIgnores({})
+  }
+
+  if (ecran === 'splash')    return <Splash onFin={() => setEcran('connexion')}/>
+  if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion}/>
+
+  const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
 
   return (
-    <div style={{ paddingBottom:'80px' }}>
+    <div style={{ paddingBottom:'70px', background:'#F5F7FA', minHeight:'100vh' }}>
+      <div key={cle} className="screen-in">
 
-      {/* Header */}
-      <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-          <div>
-            <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Chambres</h1>
-            <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>
-              {total} chambres · {stats.occupee} occupées · {stats.libre} libres
-            </p>
-          </div>
-          {signalementsOuverts.length > 0 && (
-            <button onClick={()=>setShowMaintenanceListe(!showMaintenanceListe)} style={{
-              background:'#E74C3C', border:'none', borderRadius:'10px', padding:'8px 12px',
-              cursor:'pointer', display:'flex', alignItems:'center', gap:'6px'
-            }}>
-              <Wrench size={14} color="white"/>
-              <span style={{ color:'white', fontWeight:'700', fontSize:'12px' }}>{signalementsOuverts.length}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Liste maintenance */}
-      {showMaintenanceListe && signalementsOuverts.length > 0 && (
-        <div style={{ background:'#FFF5F5', borderBottom:'2px solid #E74C3C', padding:'12px 20px' }}>
-          <div style={{ fontSize:'11px', fontWeight:'700', color:'#E74C3C', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px' }}>
-            🔧 Maintenances ouvertes ({signalementsOuverts.length})
-          </div>
-          {signalementsOuverts.map(sig => (
-            <div key={sig.id} style={{ background:'white', borderRadius:'10px', padding:'10px 12px', marginBottom:'6px', borderLeft:'3px solid #E74C3C' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
-                <span style={{ fontWeight:'700', fontSize:'12px', color:'#1B3A6B' }}>
-                  Ch. {sig.chambre} · {typesMaintenance.find(t=>t.id===sig.type)?.emoji} {typesMaintenance.find(t=>t.id===sig.type)?.label}
-                </span>
-                <span style={{ fontSize:'10px', color:'#999' }}>{sig.date}</span>
-              </div>
-              <div style={{ fontSize:'12px', color:'#666' }}>{sig.description}</div>
-              {estDirecteur && (
-                <button onClick={()=>handleSignalerMaintenance({...sig,statut:'resolu'})} style={{
-                  marginTop:'6px', padding:'3px 10px', borderRadius:'6px', border:'none',
-                  cursor:'pointer', background:'#E8F5E9', color:'#2ECC71', fontSize:'11px', fontWeight:'700'
-                }}>
-                  ✅ Résolu
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ padding:'16px 20px' }}>
-
-        {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'6px', marginBottom:'12px' }}>
-          {[
-            { key:'libre',         val:statuts.libre },
-            { key:'occupee',       val:statuts.occupee },
-            { key:'a_venir',       val:statuts.a_venir },
-            { key:'nettoyage',     val:statuts.nettoyage },
-            { key:'probleme',      val:statuts.probleme },
-            { key:'hors_service',  val:statuts.hors_service },
-          ].map(({key, val}) => (
-            <button key={key} onClick={() => setFiltre(filtre===key?'tous':key)}
-              style={{ background:filtre===key?val.couleur:'white', borderRadius:'10px', padding:'8px 4px', textAlign:'center', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', border:'none', cursor:'pointer', borderTop:`3px solid ${val.couleur}` }}>
-              <div style={{ fontSize:'16px', fontWeight:'800', color:filtre===key?'white':val.couleur }}>{stats[key]||0}</div>
-              <div style={{ fontSize:'8px', fontWeight:'600', color:filtre===key?'rgba(255,255,255,0.85)':'#888', marginTop:'2px' }}>{val.label}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Filtre catégorie */}
-        <div style={{ display:'flex', gap:'8px', marginBottom:'12px', overflowX:'auto', paddingBottom:'4px' }}>
-          <button onClick={()=>setFiltrecat('tous')} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat==='tous'?'#1B3A6B':'#F0F0F0', color:filtrecat==='tous'?'white':'#666' }}>
-            Toutes
-          </button>
-          {categories.map(cat => (
-            <button key={cat} onClick={()=>setFiltrecat(filtrecat===cat?'tous':cat)} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat===cat?'#1B3A6B':'#F0F0F0', color:filtrecat===cat?'white':'#666' }}>
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Recherche + vue */}
-        <div style={{ display:'flex', gap:'8px', marginBottom:'16px' }}>
-          <div style={{ position:'relative', flex:1 }}>
-            <Search size={16} style={{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#999' }}/>
-            <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="N° chambre, client..."
-              style={{ width:'100%', padding:'11px 12px 11px 36px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }}/>
-          </div>
-          <button onClick={()=>setVue(vue==='grille'?'liste':'grille')} style={{ padding:'0 14px', borderRadius:'10px', border:'2px solid #E0E0E0', background:'white', cursor:'pointer', fontWeight:'700', fontSize:'16px', color:'#666' }}>
-            {vue==='grille' ? '☰' : '⊞'}
-          </button>
-        </div>
-
-        <p style={{ fontSize:'12px', color:'#888', marginBottom:'12px' }}>
-          {filtrees.length} chambre{filtrees.length>1?'s':''} affichée{filtrees.length>1?'s':''}
-        </p>
-
-        {/* Vue Grille */}
-        {vue==='grille' && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
-            {filtrees.map(c => {
-              const s = statuts[c.statut] || statuts.libre
-              const Icone = iconeStatut[c.statut] || CheckCircle
-              const sigActifs = signalements.filter(sig=>sig.chambre===c.num&&sig.statut==='ouvert')
-              return (
-                <div key={c.num} onClick={()=>setChambreSelectee(c)}
-                  style={{ background:'white', borderRadius:'12px', padding:'14px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderTop:`4px solid ${s.couleur}`, cursor:'pointer', position:'relative' }}>
-                  {sigActifs.length > 0 && (
-                    <div style={{ position:'absolute', top:'8px', right:'8px', background:'#E74C3C', borderRadius:'10px', width:'18px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <span style={{ color:'white', fontSize:'10px', fontWeight:'700' }}>{sigActifs.length}</span>
-                    </div>
-                  )}
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                    <span style={{ fontSize:'20px', fontWeight:'800', color:'#1B3A6B' }}>{c.num}</span>
-                    <div style={{ background:s.bg, borderRadius:'8px', padding:'4px 6px' }}>
-                      <Icone size={14} color={s.couleur}/>
-                    </div>
-                  </div>
-                  <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>{c.cat}</div>
-                  {c.client && <div style={{ fontSize:'12px', color:'#333', fontWeight:'600', marginBottom:'2px' }}>👤 {c.client.split(' ').pop()}</div>}
-                  {c.probleme && <div style={{ fontSize:'11px', color:'#E74C3C' }}>⚠️ {c.probleme.substring(0,20)}</div>}
-                  <div style={{ fontSize:'11px', color:'#C9A84C', fontWeight:'700', marginTop:'6px' }}>
-                    {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        {onglet === 'dashboard' && (
+          <Dashboard
+            utilisateur={utilisateur}
+            sejours={sejours}
+            caisse={caisse}
+            chambresStats={chambresStats}
+            tauxOccupation={tauxOccupation}
+          />
         )}
 
-        {/* Vue Liste */}
-        {vue==='liste' && (
-          <div>
-            {filtrees.map(c => {
-              const s = statuts[c.statut] || statuts.libre
-              const sigActifs = signalements.filter(sig=>sig.chambre===c.num&&sig.statut==='ouvert')
-              return (
-                <div key={c.num} onClick={()=>setChambreSelectee(c)}
-                  style={{ background:'white', borderRadius:'12px', padding:'12px 16px', marginBottom:'8px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', borderLeft:`4px solid ${s.couleur}`, display:'flex', alignItems:'center', gap:'12px', cursor:'pointer' }}>
-                  <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, position:'relative' }}>
-                    <span style={{ fontSize:'14px', fontWeight:'800', color:s.couleur }}>{c.num}</span>
-                    {sigActifs.length > 0 && (
-                      <div style={{ position:'absolute', top:'-4px', right:'-4px', background:'#E74C3C', borderRadius:'8px', width:'16px', height:'16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <span style={{ color:'white', fontSize:'9px', fontWeight:'700' }}>{sigActifs.length}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>Ch. {c.num}</span>
-                      <span style={{ background:s.couleur, color:'white', fontSize:'10px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px' }}>{s.label}</span>
-                    </div>
-                    <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>{c.cat} · {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit</div>
-                    {c.client && <div style={{ fontSize:'12px', color:'#333', fontWeight:'600', marginTop:'2px' }}>👤 {c.client}</div>}
-                    {sigActifs.length > 0 && <div style={{ fontSize:'11px', color:'#E74C3C', marginTop:'2px' }}>🔧 {sigActifs.length} signalement{sigActifs.length>1?'s':''} actif{sigActifs.length>1?'s':''}</div>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        {onglet === 'chambres' && accesRole.includes('chambres') && (
+          <Chambres
+            key={chargé ? 'loaded' : 'loading'}
+            chambres={chambresGenerees}
+            chambresStats={chambresStats}
+            utilisateur={utilisateur}
+          />
         )}
 
-        {filtrees.length===0 && chambres.length > 0 && (
-          <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
-            <div style={{ fontSize:'32px', marginBottom:'8px' }}>🏨</div>
-            <p>Aucune chambre trouvée</p>
-          </div>
+        {onglet === 'sejours' && accesRole.includes('sejours') && (
+          <Sejours
+            sejours={sejours}
+            chambresGenerees={chambresGenerees}
+            onAjouter={ajouterSejour}
+            onTerminer={terminerSejour}
+            onProlonger={prolongerSejour}
+            onActiverReservation={activerReservation}
+            ouvrirFormulaire={ouvrirFormulaire}
+            onFormulaireOuvert={() => setOuvrirFormulaire(false)}
+          />
+        )}
+
+        {onglet === 'caisse' && accesRole.includes('caisse') && (
+          <Caisse
+            sejours={sejoursEncaisses}
+            entreesDiverses={entreesDiverses}
+            sortiesDiverses={sortiesDiverses}
+            onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])}
+            onAjouterSortie={s => setSortiesDiverses(prev => [s, ...prev])}
+            caisse={caisse}
+            onCloturerCaisse={cloturerCaisse}
+            chambres={chambresGenerees}
+          />
+        )}
+
+        {onglet === 'menu' && (
+          <Menu
+            utilisateur={utilisateur}
+            onDeconnexion={handleDeconnexion}
+            onReinitialiser={handleReinitialiser}
+            historique={historique}
+          />
         )}
       </div>
 
-      {chambreSelectee && (
-        <ModalChambre
-          chambre={chambreSelectee}
-          onClose={()=>setChambreSelectee(null)}
-          onChangerStatut={handleChangerStatut}
-          onSignalerMaintenance={handleSignalerMaintenance}
-          estDirecteur={estDirecteur}
-          signalements={signalements}
+      <NavBar
+        onglet={onglet}
+        setOnglet={changerOnglet}
+        role={utilisateur?.role}
+        onAjouterSejour={() => {
+          setOuvrirFormulaire(true)
+          if (onglet !== 'sejours') changerOnglet('sejours')
+        }}
+      />
+
+      {noShowASignaler.length > 0 && ecran === 'app' && (
+        <AlerteNoShow
+          sejours={noShowASignaler}
+          onLiberer={confirmerNoShow}
+          onPatienter={ignorerNoShow}
         />
       )}
     </div>
