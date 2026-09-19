@@ -114,66 +114,30 @@ function jouerSonnerie(type = 'alerte') {
   } catch (e) {}
 }
 
-// ─── Modal Alerte No-Show ─────────────────────────────────────────────────────
 function AlerteNoShow({ sejours, onLiberer, onPatienter }) {
   if (!sejours || sejours.length === 0) return null
   const s = sejours[0]
-
   return (
-    <div style={{
-      position:'fixed', inset:0, zIndex:500,
-      background:'rgba(0,0,0,0.7)',
-      display:'flex', alignItems:'center', justifyContent:'center',
-      padding:'20px'
-    }}>
-      <div style={{
-        background:'white', borderRadius:'20px',
-        width:'100%', maxWidth:'360px',
-        overflow:'hidden',
-        boxShadow:'0 8px 32px rgba(0,0,0,0.3)'
-      }}>
-        <div style={{
-          background:'linear-gradient(135deg, #E74C3C, #C0392B)',
-          padding:'20px', textAlign:'center'
-        }}>
+    <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
+      <div style={{ background:'white', borderRadius:'20px', width:'100%', maxWidth:'360px', overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
+        <div style={{ background:'linear-gradient(135deg, #E74C3C, #C0392B)', padding:'20px', textAlign:'center' }}>
           <div style={{ fontSize:'36px', marginBottom:'8px' }}>⚠️</div>
           <div style={{ color:'white', fontWeight:'800', fontSize:'17px' }}>No-Show détecté</div>
-          <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'12px', marginTop:'4px' }}>
-            Client absent depuis plus d'1 heure
-          </div>
+          <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'12px', marginTop:'4px' }}>Client absent depuis plus d'1 heure</div>
         </div>
         <div style={{ padding:'20px' }}>
-          <div style={{
-            background:'#FFF5F5', borderRadius:'12px',
-            padding:'14px', marginBottom:'16px',
-            border:'1px solid #FFCDD2'
-          }}>
+          <div style={{ background:'#FFF5F5', borderRadius:'12px', padding:'14px', marginBottom:'16px', border:'1px solid #FFCDD2' }}>
             <div style={{ fontWeight:'800', fontSize:'15px', color:'#1B3A6B', marginBottom:'6px' }}>{s.client}</div>
             <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>📞 {s.telephone}</div>
             <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>🏨 Chambre {s.chambre} · {s.categorie}</div>
             <div style={{ fontSize:'13px', color:'#666', marginBottom:'4px' }}>📅 Arrivée prévue : {s.dateArrivee} à {s.heureArrivee}</div>
             <div style={{ fontSize:'13px', color:'#E74C3C', fontWeight:'700' }}>⏰ Dépassement : +1h sans présentation</div>
           </div>
-          <div style={{ background:'#FFF8E1', borderRadius:'10px', padding:'10px 14px', marginBottom:'16px', fontSize:'12px', color:'#B7791F', fontWeight:'600' }}>
-            💡 Que souhaitez-vous faire ?
-          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-            <button onClick={() => onLiberer(s.id)} style={{
-              width:'100%', padding:'14px', borderRadius:'12px',
-              border:'none', cursor:'pointer',
-              background:'#E74C3C', color:'white',
-              fontWeight:'800', fontSize:'14px',
-              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-            }}>
+            <button onClick={() => onLiberer(s.id)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#E74C3C', color:'white', fontWeight:'800', fontSize:'14px' }}>
               🔓 Libérer la chambre (No-Show)
             </button>
-            <button onClick={() => onPatienter(s.id)} style={{
-              width:'100%', padding:'14px', borderRadius:'12px',
-              border:'2px solid #1B3A6B', cursor:'pointer',
-              background:'white', color:'#1B3A6B',
-              fontWeight:'800', fontSize:'14px',
-              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-            }}>
+            <button onClick={() => onPatienter(s.id)} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'2px solid #1B3A6B', cursor:'pointer', background:'white', color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>
               ⏳ Patienter encore
             </button>
           </div>
@@ -200,7 +164,6 @@ export default function App() {
   const [sortiesDiverses, setSortiesDiverses] = useState([])
   const [historique,      setHistorique]      = useState([])
   const [alertesSonnees,  setAlertesSonnees]  = useState({})
-
   const [noShowASignaler, setNoShowASignaler] = useState([])
   const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
@@ -233,12 +196,10 @@ export default function App() {
       const now = new Date()
       const idsALiberer = []
 
-      // Sonneries et libération automatique
       sejours.filter(s => s.statut === 'en_cours').forEach(s => {
         const [, fin] = periodeDuSejour(s)
         if (!fin) return
         const diffMin = (fin - now) / 60000
-
         if (diffMin > 0 && diffMin <= 5 && !alertesSonnees[`rappel_${s.id}`]) {
           jouerSonnerie('rappel')
           setAlertesSonnees(prev => ({ ...prev, [`rappel_${s.id}`]: true }))
@@ -251,32 +212,23 @@ export default function App() {
           jouerSonnerie('urgent')
           setAlertesSonnees(prev => ({ ...prev, [`urgent_${s.id}`]: true }))
         }
-        if (diffMin <= -180) {
-          idsALiberer.push(s.id)
-        }
+        if (diffMin <= -180) idsALiberer.push(s.id)
       })
 
       if (idsALiberer.length > 0) {
         setSejours(prev => prev.map(s =>
-          idsALiberer.includes(s.id)
-            ? { ...s, statut:'termine', depassementNonRegle:true }
-            : s
+          idsALiberer.includes(s.id) ? { ...s, statut:'termine', depassementNonRegle:true } : s
         ))
       }
 
-      // Détection No-Show
       const noShows = sejours.filter(s => {
         if (s.statut !== 'a_venir') return false
         if (noShowIgnores[s.id]) return false
         const [debut] = periodeDuSejour(s)
         if (!debut) return false
-        const depasseMin = (now - debut) / 60000
-        return depasseMin >= 60
+        return (now - debut) / 60000 >= 60
       })
-
-      if (noShows.length > 0) {
-        setNoShowASignaler(noShows)
-      }
+      if (noShows.length > 0) setNoShowASignaler(noShows)
     }
 
     verifier()
@@ -284,16 +236,12 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [sejours, alertesSonnees, noShowIgnores])
 
-  // Confirmer No-Show → statut no_show
   const confirmerNoShow = (id) => {
-    setSejours(prev => prev.map(s =>
-      s.id === id ? { ...s, statut:'no_show' } : s
-    ))
+    setSejours(prev => prev.map(s => s.id === id ? { ...s, statut:'no_show' } : s))
     setNoShowASignaler(prev => prev.filter(s => s.id !== id))
     jouerSonnerie('alerte')
   }
 
-  // Patienter
   const ignorerNoShow = (id) => {
     setNoShowIgnores(prev => ({ ...prev, [id]: true }))
     setNoShowASignaler(prev => prev.filter(s => s.id !== id))
@@ -309,12 +257,9 @@ export default function App() {
     aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
-  // ── sejoursEncaisses inclut les no_show (montant conservé) ──
   const sejoursEncaisses = sejours.filter(s =>
-    s.statut === 'en_cours' ||
-    s.statut === 'a_venir'  ||
-    s.statut === 'termine'  ||
-    s.statut === 'no_show'
+    s.statut === 'en_cours' || s.statut === 'a_venir' ||
+    s.statut === 'termine'  || s.statut === 'no_show'
   )
 
   const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
@@ -335,12 +280,10 @@ export default function App() {
       return periodesSeChevauchent(debutNouveau, finNouveau, debutExistant, finExistant)
     })
     if (conflit) return false
-
     const statut = nouveau.statut || 'en_cours'
     const heureReelle = statut === 'en_cours'
       ? new Date().toTimeString().slice(0, 5)
       : nouveau.heureArrivee
-
     const ns = {
       ...nouveau, id:Date.now(), heureArrivee:heureReelle,
       montantNum: parseInt((nouveau.montant || '0').replace(/\s/g, ''), 10) || 0,
@@ -375,28 +318,19 @@ export default function App() {
       if (s.id !== id) return s
       const nouveauMontant = (s.montantNum || 0) + supplement
       const historiquePrecedent = s.historiqueProlongations || []
-
       if (s.type === 'nuit') {
         const ancienneDateDepart = s.dateDepart
         const [j, m, a] = s.dateDepart.split('/').map(Number)
         const d = new Date(a, m-1, j)
         d.setDate(d.getDate() + (ajout || 0))
         const nouvelleDateDepart = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
-        return {
-          ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'),
-          dateDepart:nouvelleDateDepart,
-          historiqueProlongations:[...historiquePrecedent, { avant:ancienneDateDepart, apres:nouvelleDateDepart, montant:supplement, unite:'nuit' }]
-        }
+        return { ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'), dateDepart:nouvelleDateDepart, historiqueProlongations:[...historiquePrecedent, { avant:ancienneDateDepart, apres:nouvelleDateDepart, montant:supplement, unite:'nuit' }] }
       } else {
         const ancienneHeureDepart = s.heureDepart
         const [h, min] = s.heureDepart.split(':').map(Number)
         const totalMin = h*60 + min + (ajout||0)*60
         const nouvelleHeureDepart = `${String(Math.floor(totalMin/60)%24).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}`
-        return {
-          ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'),
-          heureDepart:nouvelleHeureDepart,
-          historiqueProlongations:[...historiquePrecedent, { avant:ancienneHeureDepart, apres:nouvelleHeureDepart, montant:supplement, unite:'heure' }]
-        }
+        return { ...s, montantNum:nouveauMontant, montant:nouveauMontant.toLocaleString('fr-FR'), heureDepart:nouvelleHeureDepart, historiqueProlongations:[...historiquePrecedent, { avant:ancienneHeureDepart, apres:nouvelleHeureDepart, montant:supplement, unite:'heure' }] }
       }
     }))
     setAlertesSonnees(prev => {
@@ -428,39 +362,15 @@ export default function App() {
     setEcran('connexion')
   }
 
-  // ── Clôture de caisse : archive tout + vide la caisse active ──
-  // Les no_show sont archivés ET retirés de la liste après clôture
   const cloturerCaisse = () => {
     const maintenant = new Date()
     const horodatage = `${String(maintenant.getDate()).padStart(2,'0')}/${String(maintenant.getMonth()+1).padStart(2,'0')}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2,'0')}:${String(maintenant.getMinutes()).padStart(2,'0')}`
-
-    // Archiver séjours + no_show dans l'historique permanent
     const entreesSejours = sejours
-      .filter(s => s.statut === 'en_cours' || s.statut === 'a_venir' || s.statut === 'termine' || s.statut === 'no_show')
-      .map(s => ({
-        type: 'sejour',
-        client: s.client,
-        chambre: s.chambre,
-        montant: s.montantNum || 0,
-        mode: s.modePaiement,
-        date: s.dateArrivee,
-        cloture: horodatage,
-        noShow: s.statut === 'no_show',
-      }))
-
-    const entreesArchivees = entreesDiverses.map(e => ({
-      type: 'entree', libelle: e.libelle, montant: e.montant || 0,
-      mode: e.mode, date: e.heure, cloture: horodatage,
-    }))
-
-    const sortiesArchivees = sortiesDiverses.map(s => ({
-      type: 'sortie', libelle: s.libelle, montant: s.montant || 0,
-      mode: s.mode, date: s.heure, cloture: horodatage,
-    }))
-
+      .filter(s => s.statut==='en_cours'||s.statut==='a_venir'||s.statut==='termine'||s.statut==='no_show')
+      .map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show' }))
+    const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage }))
+    const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
     setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
-
-    // Vider la caisse : retirer terminés ET no_show
     setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
     setEntreesDiverses([])
     setSortiesDiverses([])
@@ -497,7 +407,11 @@ export default function App() {
         )}
 
         {onglet === 'chambres' && accesRole.includes('chambres') && (
-          <Chambres chambres={chambresGenerees} chambresStats={chambresStats}/>
+          <Chambres
+            chambres={chambresGenerees}
+            chambresStats={chambresStats}
+            utilisateur={utilisateur}
+          />
         )}
 
         {onglet === 'sejours' && accesRole.includes('sejours') && (
@@ -546,7 +460,6 @@ export default function App() {
         }}
       />
 
-      {/* Alerte No-Show */}
       {noShowASignaler.length > 0 && ecran === 'app' && (
         <AlerteNoShow
           sejours={noShowASignaler}
