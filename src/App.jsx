@@ -403,9 +403,9 @@ export default function App() {
           />
         )}
 
-        {onglet === 'chambres' && accesRole.includes('chambres') && (
+        {onglet === 'chambres' && accesRole.includes('chambres') && chargé && (
           <Chambres
-            key={chargé ? 'loaded' : 'loading'}
+            key="loaded"
             chambres={chambresGenerees}
             chambresStats={chambresStats}
             utilisateur={utilisateur}
