@@ -48,6 +48,7 @@ function periodesSeChevauchent(debutA, finA, debutB, finB) {
 export function genererChambres(sejours = []) {
   const chambres = []
   const maintenant = new Date()
+
   CONFIG_CHAMBRES.categories.forEach(cat => {
     for (let i = 1; i <= cat.nombre; i++) {
       const num = String(cat.debut + i)
@@ -157,7 +158,6 @@ export default function App() {
   const [utilisateur,      setUtilisateur]      = useState(null)
   const [cle,              setCle]              = useState(0)
   const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
-  const [chargé,           setChargé]           = useState(false)
 
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
@@ -182,7 +182,6 @@ export default function App() {
     } else {
       setSejours(SEJOURS_DEMO)
     }
-    setChargé(true)
     return () => document.head.removeChild(el)
   }, [])
 
@@ -196,6 +195,7 @@ export default function App() {
     const verifier = () => {
       const now = new Date()
       const idsALiberer = []
+
       sejours.filter(s => s.statut === 'en_cours').forEach(s => {
         const [, fin] = periodeDuSejour(s)
         if (!fin) return
@@ -214,11 +214,13 @@ export default function App() {
         }
         if (diffMin <= -180) idsALiberer.push(s.id)
       })
+
       if (idsALiberer.length > 0) {
         setSejours(prev => prev.map(s =>
           idsALiberer.includes(s.id) ? { ...s, statut:'termine', depassementNonRegle:true } : s
         ))
       }
+
       const noShows = sejours.filter(s => {
         if (s.statut !== 'a_venir') return false
         if (noShowIgnores[s.id]) return false
@@ -228,6 +230,7 @@ export default function App() {
       })
       if (noShows.length > 0) setNoShowASignaler(noShows)
     }
+
     verifier()
     intervalRef.current = setInterval(verifier, 60000)
     return () => clearInterval(intervalRef.current)
@@ -403,9 +406,8 @@ export default function App() {
           />
         )}
 
-        {onglet === 'chambres' && accesRole.includes('chambres') && chargé && (
+        {onglet === 'chambres' && accesRole.includes('chambres') && (
           <Chambres
-            key="loaded"
             chambres={chambresGenerees}
             chambresStats={chambresStats}
             utilisateur={utilisateur}
