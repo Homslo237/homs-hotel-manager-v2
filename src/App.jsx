@@ -11,7 +11,7 @@ import NavBar from './components/NavBar'
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
   .screen-in { animation: screenIn 0.25s ease both; }
-`
+` 
 
 const ACCES = {
   directeur:      ['dashboard','chambres','sejours','caisse','menu'],
