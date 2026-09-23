@@ -11,7 +11,7 @@ import NavBar from './components/NavBar'
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
   .screen-in { animation: screenIn 0.25s ease both; }
-` 
+`
 
 const ACCES = {
   directeur:      ['dashboard','chambres','sejours','caisse','menu'],
@@ -85,6 +85,22 @@ function charger() {
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
   } catch (e) { return null }
+}
+
+// ─── Journal des opérations ───────────────────────────────────────────────────
+const JOURNAL_KEY = 'homs_journal'
+function chargerJournal() {
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch (e) { return [] }
+}
+function sauvegarderJournal(journal) {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)) } catch (e) {}
+}
+function horodatageActuel() {
+  const now = new Date()
+  return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 }
 
 const SEJOURS_DEMO = [
@@ -199,12 +215,22 @@ export default function App() {
   const [entreesDiverses, setEntreesDiverses] = useState([])
   const [sortiesDiverses, setSortiesDiverses] = useState([])
   const [historique,      setHistorique]      = useState([])
+  const [journal,         setJournal]         = useState([])
   const [alertesSonnees,  setAlertesSonnees]  = useState({})
 
   const [noShowASignaler, setNoShowASignaler] = useState([])
   const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
   const intervalRef = useRef(null)
+
+  // ── Ajouter une entrée au journal ──
+  const ajouterAuJournal = (entree) => {
+    setJournal(prev => {
+      const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
+      sauvegarderJournal(maj)
+      return maj
+    })
+  }
 
   useEffect(() => {
     const el = document.createElement('style')
@@ -219,6 +245,7 @@ export default function App() {
     } else {
       setSejours(SEJOURS_DEMO)
     }
+    setJournal(chargerJournal())
     return () => document.head.removeChild(el)
   }, [])
 
@@ -347,10 +374,17 @@ export default function App() {
       statut,
     }
     setSejours(prev => [ns, ...prev])
+    ajouterAuJournal({
+      type: 'sejour_cree',
+      utilisateur: utilisateur?.nom || 'Inconnu',
+      role: utilisateur?.role || '',
+      details: `Séjour créé : ${ns.client} · Ch. ${ns.chambre} · ${ns.montant} FCFA`,
+    })
     return true
   }
 
   const terminerSejour = (id) => {
+    const s = sejours.find(x => x.id === id)
     setSejours(prev => prev.map(s => s.id === id ? { ...s, statut:'termine' } : s))
     setAlertesSonnees(prev => {
       const updated = { ...prev }
@@ -359,6 +393,14 @@ export default function App() {
       delete updated[`urgent_${id}`]
       return updated
     })
+    if (s) {
+      ajouterAuJournal({
+        type: 'sejour_termine',
+        utilisateur: utilisateur?.nom || 'Inconnu',
+        role: utilisateur?.role || '',
+        details: `Séjour terminé : ${s.client} · Ch. ${s.chambre}`,
+      })
+    }
   }
 
   const activerReservation = (id) => {
@@ -371,6 +413,7 @@ export default function App() {
   }
 
   const prolongerSejour = (id, ajout, supplement) => {
+    const s = sejours.find(x => x.id === id)
     setSejours(prev => prev.map(s => {
       if (s.id !== id) return s
       const nouveauMontant = (s.montantNum || 0) + supplement
@@ -406,6 +449,14 @@ export default function App() {
       delete updated[`urgent_${id}`]
       return updated
     })
+    if (s) {
+      ajouterAuJournal({
+        type: 'sejour_prolonge',
+        utilisateur: utilisateur?.nom || 'Inconnu',
+        role: utilisateur?.role || '',
+        details: `Séjour prolongé : ${s.client} · Ch. ${s.chambre} · +${supplement.toLocaleString('fr-FR')} FCFA`,
+      })
+    }
   }
 
   const changerOnglet = (nouvelOnglet) => {
@@ -423,6 +474,12 @@ export default function App() {
   }
 
   const handleDeconnexion = () => {
+    ajouterAuJournal({
+      type: 'deconnexion',
+      utilisateur: utilisateur?.nom || 'Inconnu',
+      role: utilisateur?.role || '',
+      details: `${utilisateur?.nom || 'Utilisateur'} s'est déconnecté`,
+    })
     setUtilisateur(null)
     setOnglet('dashboard')
     setEcran('connexion')
@@ -465,6 +522,13 @@ export default function App() {
     setEntreesDiverses([])
     setSortiesDiverses([])
     setNoShowASignaler([])
+
+    ajouterAuJournal({
+      type: 'cloture_caisse',
+      utilisateur: utilisateur?.nom || 'Inconnu',
+      role: utilisateur?.role || '',
+      details: `Clôture de caisse · Solde net : ${soldeNet.toLocaleString('fr-FR')} FCFA`,
+    })
   }
 
   const handleReinitialiser = () => {
@@ -532,6 +596,7 @@ export default function App() {
             onDeconnexion={handleDeconnexion}
             onReinitialiser={handleReinitialiser}
             historique={historique}
+            journal={journal}
           />
         )}
       </div>
