@@ -9,6 +9,7 @@ import EcranStatistiques from './EcranStatistiques'
 import EcranIdentite     from './EcranIdentite'
 import EcranUtilisateurs from './EcranUtilisateurs'
 import EcranProfil       from './EcranProfil'
+import EcranJournal      from './EcranJournal'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
@@ -182,7 +183,7 @@ const menuItemsDirecteur = [
     section: 'Opérations',
     items: [
       { icone:Wrench,   label:'Maintenance',            sous:'Signalements et réparations', couleur:'#E74C3C', action:null },
-      { icone:BookOpen, label:'Journal des opérations', sous:'Historique des activités',    couleur:'#1B3A6B', action:null },
+      { icone:BookOpen, label:'Journal des opérations', sous:'Historique des activités',    couleur:'#1B3A6B', action:'journal' },
     ]
   },
   {
@@ -193,7 +194,7 @@ const menuItemsDirecteur = [
   },
 ]
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[], utilisateur }) {
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur }) {
   const [ecranActif, setEcranActif] = useState(null)
   const [identite, setIdentite] = useState(() => {
     try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
@@ -276,6 +277,16 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
                     </div>
                     <ChevronRight size={16} color="#D1D5DB"/>
                   </div>
+                  <div onClick={()=>setEcranActif('journal')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
+                    <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#1B3A6B15', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <BookOpen size={20} color="#1B3A6B"/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>Journal des opérations</div>
+                      <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Historique des activités</div>
+                    </div>
+                    <ChevronRight size={16} color="#D1D5DB"/>
+                  </div>
                   <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px' }}>
                     <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#E8634A15', display:'flex', alignItems:'center', justifyContent:'center' }}>
                       <Info size={20} color="#E8634A"/>
@@ -327,6 +338,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], ut
       {ecranActif==='utilisateurs' && <EcranUtilisateurs   onClose={()=>setEcranActif(null)}/>}
       {ecranActif==='statistiques' && <EcranStatistiques   onClose={()=>setEcranActif(null)} historique={historique}/>}
       {ecranActif==='profil'       && <EcranProfil         onClose={()=>setEcranActif(null)} utilisateur={utilisateur} onProfilChange={setProfilUtilisateur}/>}
+      {ecranActif==='journal'      && <EcranJournal        onClose={()=>setEcranActif(null)} journal={journal} utilisateur={utilisateur}/>}
     </>
   )
 }
