@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings,
-  AlertTriangle, Plus, Trash2, Save, Lock
+  AlertTriangle, Plus, Trash2, Save, Lock, Sun, Moon
 } from 'lucide-react'
 
 import EcranStatistiques from './EcranStatistiques'
@@ -194,7 +194,14 @@ const menuItemsDirecteur = [
   },
 ]
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur }) {
+function lireThemeUtilisateur(userId) {
+  try { return localStorage.getItem(`homs_theme_${userId}`) === 'sombre' } catch { return false }
+}
+function sauvegarderThemeUtilisateur(userId, sombre) {
+  try { localStorage.setItem(`homs_theme_${userId}`, sombre ? 'sombre' : 'clair') } catch {}
+}
+
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange }) {
   const [ecranActif, setEcranActif] = useState(null)
   const [identite, setIdentite] = useState(() => {
     try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
@@ -202,12 +209,20 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
 
   const userId = utilisateur?.nom || 'directeur'
   const [profilUtilisateur, setProfilUtilisateur] = useState(()=>lireProfil(userId))
+  const [themeSombre, setThemeSombre] = useState(()=>lireThemeUtilisateur(userId))
 
   const estDirecteur = utilisateur?.role === 'directeur'
   const roleInfo = ROLES_LABELS[utilisateur?.role] || ROLES_LABELS.receptionniste
   const nomAffiche = profilUtilisateur?.nom || utilisateur?.nom || 'Utilisateur'
   const photoAffichee = profilUtilisateur?.photoUrl || null
   const premiereLettre = nomAffiche ? nomAffiche.charAt(0).toUpperCase() : 'H'
+
+  const handleToggleTheme = () => {
+    const nouveau = !themeSombre
+    setThemeSombre(nouveau)
+    sauvegarderThemeUtilisateur(userId, nouveau)
+    if (onThemeChange) onThemeChange(nouveau)
+  }
 
   return (
     <>
@@ -233,6 +248,33 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
         </div>
 
         <div style={{ padding:'16px 20px' }}>
+
+          {/* Bouton Mode sombre - visible pour tous */}
+          <div style={{ marginBottom:'20px' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>Affichage</div>
+            <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div onClick={handleToggleTheme} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer' }}>
+                <div style={{ width:'40px', height:'40px', borderRadius:'10px', background: themeSombre ? '#1B3A6B15' : '#FFF8E115', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {themeSombre ? <Moon size={20} color="#1B3A6B"/> : <Sun size={20} color="#C9A84C"/>}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>Mode {themeSombre ? 'sombre' : 'clair'}</div>
+                  <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Tableau de bord, Chambres, Séjours</div>
+                </div>
+                <div style={{
+                  width:'48px', height:'26px', borderRadius:'13px', position:'relative',
+                  background: themeSombre ? '#1B3A6B' : '#E0E0E0', transition:'background 0.3s'
+                }}>
+                  <div style={{
+                    width:'20px', height:'20px', borderRadius:'10px', background:'white',
+                    position:'absolute', top:'3px', transition:'left 0.3s',
+                    left: themeSombre ? '25px' : '3px', boxShadow:'0 1px 3px rgba(0,0,0,0.2)'
+                  }}/>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {estDirecteur && menuItemsDirecteur.map((section,si) => (
             <div key={si} style={{ marginBottom:'20px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>
