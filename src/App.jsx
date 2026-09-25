@@ -103,6 +103,11 @@ function horodatageActuel() {
   return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 }
 
+// ─── Thème (par utilisateur) ──────────────────────────────────────────────────
+function lireThemeUtilisateur(userId) {
+  try { return localStorage.getItem(`homs_theme_${userId}`) === 'sombre' } catch { return false }
+}
+
 const SEJOURS_DEMO = [
   { id:1, client:'M. Kouassi Ama',   telephone:'+225 07 11 22 33', chambre:'205', categorie:'Confort',  dateArrivee:'18/08/2026', heureArrivee:'14:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'3 nuits',  type:'nuit',  statut:'en_cours', montant:'105 000', montantNum:105000, modePaiement:'Orange Money' },
   { id:2, client:'Mme Diallo Fatou', telephone:'+225 05 44 55 66', chambre:'101', categorie:'Standard', dateArrivee:'17/08/2026', heureArrivee:'10:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'2 nuits',  type:'nuit',  statut:'en_cours', montant:'50 000',  montantNum:50000,  modePaiement:'Especes' },
@@ -210,6 +215,7 @@ export default function App() {
   const [utilisateur,      setUtilisateur]      = useState(null)
   const [cle,              setCle]              = useState(0)
   const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
+  const [themeSombre,      setThemeSombre]      = useState(false)
 
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
@@ -469,6 +475,7 @@ export default function App() {
 
   const handleConnexion = (user) => {
     setUtilisateur(user)
+    setThemeSombre(lireThemeUtilisateur(user.nom))
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
   }
@@ -481,6 +488,7 @@ export default function App() {
       details: `${utilisateur?.nom || 'Utilisateur'} s'est déconnecté`,
     })
     setUtilisateur(null)
+    setThemeSombre(false)
     setOnglet('dashboard')
     setEcran('connexion')
   }
@@ -547,7 +555,7 @@ export default function App() {
   const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
 
   return (
-    <div style={{ paddingBottom:'70px', background:'#F5F7FA', minHeight:'100vh' }}>
+    <div style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
       <div key={cle} className="screen-in">
 
         {onglet === 'dashboard' && (
@@ -557,11 +565,12 @@ export default function App() {
             caisse={caisse}
             chambresStats={chambresStats}
             tauxOccupation={tauxOccupation}
+            sombre={themeSombre}
           />
         )}
 
         {onglet === 'chambres' && accesRole.includes('chambres') && (
-          <Chambres chambres={chambresGenerees} chambresStats={chambresStats}/>
+          <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre}/>
         )}
 
         {onglet === 'sejours' && accesRole.includes('sejours') && (
@@ -574,6 +583,7 @@ export default function App() {
             onActiverReservation={activerReservation}
             ouvrirFormulaire={ouvrirFormulaire}
             onFormulaireOuvert={() => setOuvrirFormulaire(false)}
+            sombre={themeSombre}
           />
         )}
 
@@ -597,6 +607,7 @@ export default function App() {
             onReinitialiser={handleReinitialiser}
             historique={historique}
             journal={journal}
+            onThemeChange={setThemeSombre}
           />
         )}
       </div>
