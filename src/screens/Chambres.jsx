@@ -3,11 +3,11 @@ import { Search, X, AlertTriangle, Sparkles, CheckCircle, User, Phone, Moon } fr
 
 // ─── Statuts ──────────────────────────────────────────────────────────────────
 const statuts = {
-  libre:     { label:'Libre',     couleur:'#2ECC71', bg:'#F0FFF4' },
-  occupee:   { label:'Occupee',   couleur:'#1B3A6B', bg:'#EEF2FF' },
-  a_venir:   { label:'A venir',    couleur:'#8B5CF6', bg:'#F5F3FF' },
-  nettoyage: { label:'Nettoyage', couleur:'#C9A84C', bg:'#FFFBF0' },
-  probleme:  { label:'Probleme',  couleur:'#E74C3C', bg:'#FFF5F5' },
+  libre:     { label:'Libre',     couleur:'#2ECC71', bg:'#F0FFF4', bgSombre:'#0F2818' },
+  occupee:   { label:'Occupee',   couleur:'#1B3A6B', bg:'#EEF2FF', bgSombre:'#1A2744' },
+  a_venir:   { label:'A venir',    couleur:'#8B5CF6', bg:'#F5F3FF', bgSombre:'#2A1F44' },
+  nettoyage: { label:'Nettoyage', couleur:'#C9A84C', bg:'#FFFBF0', bgSombre:'#2E2711' },
+  probleme:  { label:'Probleme',  couleur:'#E74C3C', bg:'#FFF5F5', bgSombre:'#2E1414' },
 }
 const iconeStatut = {
   libre:     CheckCircle,
@@ -129,7 +129,7 @@ function ModalChambre({ chambre, onClose, onChangerStatut }) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Chambres({ chambres:chambresProps=[], chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, onMajStats, onMajChambre }) {
+export default function Chambres({ chambres:chambresProps=[], chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, onMajStats, onMajChambre, sombre=false }) {
   const [chambres,         setChambres]         = useState([])
   const [recherche,        setRecherche]        = useState('')
   const [filtre,           setFiltre]           = useState('tous')
@@ -175,6 +175,18 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
     if (onMajChambre) onMajChambre(num, nouveauStatut, note)
   }
 
+  // ── Palette selon le thème ──
+  const bg          = sombre ? '#0F172A' : '#F5F7FA'
+  const cardBg       = sombre ? '#1E293B' : 'white'
+  const cardShadow    = sombre ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.08)'
+  const cardShadow2   = sombre ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.06)'
+  const texteTitre    = sombre ? '#F1F5F9' : '#1B3A6B'
+  const texteSecond   = sombre ? '#94A3B8' : '#888'
+  const inputBg        = sombre ? '#1E293B' : 'white'
+  const inputBorder    = sombre ? '#334155' : '#E0E0E0'
+  const chipBg          = sombre ? '#1E293B' : '#F0F0F0'
+  const chipTexte       = sombre ? '#94A3B8' : '#666'
+
   if (chambres.length === 0) {
     return (
       <div style={{ paddingBottom:'80px' }}>
@@ -191,7 +203,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
   }
 
   return (
-    <div style={{ paddingBottom:'80px' }}>
+    <div style={{ paddingBottom:'80px', background:bg, minHeight:'100vh' }}>
 
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
@@ -207,20 +219,20 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'6px', marginBottom:'12px' }}>
           {Object.entries(statuts).map(([key, val]) => (
             <button key={key} onClick={() => setFiltre(filtre===key?'tous':key)}
-              style={{ background:filtre===key?val.couleur:'white', borderRadius:'10px', padding:'8px 4px', textAlign:'center', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', border:'none', cursor:'pointer', borderTop:`3px solid ${val.couleur}` }}>
+              style={{ background:filtre===key?val.couleur:cardBg, borderRadius:'10px', padding:'8px 4px', textAlign:'center', boxShadow:cardShadow, border:'none', cursor:'pointer', borderTop:`3px solid ${val.couleur}` }}>
               <div style={{ fontSize:'16px', fontWeight:'800', color:filtre===key?'white':val.couleur }}>{stats[key]||0}</div>
-              <div style={{ fontSize:'8px', fontWeight:'600', color:filtre===key?'rgba(255,255,255,0.85)':'#888', marginTop:'2px' }}>{val.label}</div>
+              <div style={{ fontSize:'8px', fontWeight:'600', color:filtre===key?'rgba(255,255,255,0.85)':texteSecond, marginTop:'2px' }}>{val.label}</div>
             </button>
           ))}
         </div>
 
         {/* Filtre catégorie */}
         <div style={{ display:'flex', gap:'8px', marginBottom:'12px', overflowX:'auto', paddingBottom:'4px' }}>
-          <button onClick={()=>setFiltrecat('tous')} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat==='tous'?'#1B3A6B':'#F0F0F0', color:filtrecat==='tous'?'white':'#666' }}>
+          <button onClick={()=>setFiltrecat('tous')} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat==='tous'?'#1B3A6B':chipBg, color:filtrecat==='tous'?'white':chipTexte }}>
             Toutes
           </button>
           {categories.map(cat => (
-            <button key={cat} onClick={()=>setFiltrecat(filtrecat===cat?'tous':cat)} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat===cat?'#1B3A6B':'#F0F0F0', color:filtrecat===cat?'white':'#666' }}>
+            <button key={cat} onClick={()=>setFiltrecat(filtrecat===cat?'tous':cat)} style={{ padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer', background:filtrecat===cat?'#1B3A6B':chipBg, color:filtrecat===cat?'white':chipTexte }}>
               {cat}
             </button>
           ))}
@@ -231,14 +243,14 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
           <div style={{ position:'relative', flex:1 }}>
             <Search size={16} style={{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#999' }}/>
             <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="N° chambre, client..."
-              style={{ width:'100%', padding:'11px 12px 11px 36px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }}/>
+              style={{ width:'100%', padding:'11px 12px 11px 36px', border:`2px solid ${inputBorder}`, borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box', background:inputBg, color:texteTitre }}/>
           </div>
-          <button onClick={()=>setVue(vue==='grille'?'liste':'grille')} style={{ padding:'0 14px', borderRadius:'10px', border:'2px solid #E0E0E0', background:'white', cursor:'pointer', fontWeight:'700', fontSize:'16px', color:'#666' }}>
+          <button onClick={()=>setVue(vue==='grille'?'liste':'grille')} style={{ padding:'0 14px', borderRadius:'10px', border:`2px solid ${inputBorder}`, background:inputBg, cursor:'pointer', fontWeight:'700', fontSize:'16px', color:chipTexte }}>
             {vue==='grille' ? '☰' : '⊞'}
           </button>
         </div>
 
-        <p style={{ fontSize:'12px', color:'#888', marginBottom:'12px' }}>
+        <p style={{ fontSize:'12px', color:texteSecond, marginBottom:'12px' }}>
           {filtrees.length} chambre{filtrees.length>1?'s':''} affichee{filtrees.length>1?'s':''}
         </p>
 
@@ -250,15 +262,15 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
               const Icone = iconeStatut[c.statut] || CheckCircle
               return (
                 <div key={c.num} onClick={()=>setChambreSelectee(c)}
-                  style={{ background:'white', borderRadius:'12px', padding:'14px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderTop:`4px solid ${s.couleur}`, cursor:'pointer' }}>
+                  style={{ background:cardBg, borderRadius:'12px', padding:'14px', boxShadow:cardShadow2, borderTop:`4px solid ${s.couleur}`, cursor:'pointer' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                    <span style={{ fontSize:'20px', fontWeight:'800', color:'#1B3A6B' }}>{c.num}</span>
-                    <div style={{ background:s.bg, borderRadius:'8px', padding:'4px 6px' }}>
+                    <span style={{ fontSize:'20px', fontWeight:'800', color:texteTitre }}>{c.num}</span>
+                    <div style={{ background: sombre ? s.bgSombre : s.bg, borderRadius:'8px', padding:'4px 6px' }}>
                       <Icone size={14} color={s.couleur}/>
                     </div>
                   </div>
-                  <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>{c.cat}</div>
-                  {c.client && <div style={{ fontSize:'12px', color:'#333', fontWeight:'600', marginBottom:'2px' }}>👤 {c.client.split(' ').pop()}</div>}
+                  <div style={{ fontSize:'11px', color:texteSecond, marginBottom:'4px' }}>{c.cat}</div>
+                  {c.client && <div style={{ fontSize:'12px', color:texteTitre, fontWeight:'600', marginBottom:'2px' }}>👤 {c.client.split(' ').pop()}</div>}
                   {c.probleme && <div style={{ fontSize:'11px', color:'#E74C3C' }}>⚠️ {c.probleme.substring(0,20)}</div>}
                   <div style={{ fontSize:'11px', color:'#C9A84C', fontWeight:'700', marginTop:'6px' }}>
                     {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit
@@ -276,17 +288,17 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
               const s = statuts[c.statut] || statuts.libre
               return (
                 <div key={c.num} onClick={()=>setChambreSelectee(c)}
-                  style={{ background:'white', borderRadius:'12px', padding:'12px 16px', marginBottom:'8px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', borderLeft:`4px solid ${s.couleur}`, display:'flex', alignItems:'center', gap:'12px', cursor:'pointer' }}>
-                  <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  style={{ background:cardBg, borderRadius:'12px', padding:'12px 16px', marginBottom:'8px', boxShadow:cardShadow2, borderLeft:`4px solid ${s.couleur}`, display:'flex', alignItems:'center', gap:'12px', cursor:'pointer' }}>
+                  <div style={{ width:'44px', height:'44px', borderRadius:'10px', background: sombre ? s.bgSombre : s.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                     <span style={{ fontSize:'14px', fontWeight:'800', color:s.couleur }}>{c.num}</span>
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>Ch. {c.num}</span>
+                      <span style={{ fontWeight:'700', fontSize:'14px', color:texteTitre }}>Ch. {c.num}</span>
                       <span style={{ background:s.couleur, color:'white', fontSize:'10px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px' }}>{s.label}</span>
                     </div>
-                    <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>{c.cat} · {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit</div>
-                    {c.client && <div style={{ fontSize:'12px', color:'#333', fontWeight:'600', marginTop:'2px' }}>👤 {c.client}</div>}
+                    <div style={{ fontSize:'12px', color:texteSecond, marginTop:'2px' }}>{c.cat} · {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit</div>
+                    {c.client && <div style={{ fontSize:'12px', color:texteTitre, fontWeight:'600', marginTop:'2px' }}>👤 {c.client}</div>}
                   </div>
                 </div>
               )
@@ -295,7 +307,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
         )}
 
         {filtrees.length===0 && chambres.length > 0 && (
-          <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
+          <div style={{ textAlign:'center', padding:'40px 20px', color:texteSecond }}>
             <div style={{ fontSize:'32px', marginBottom:'8px' }}>🏨</div>
             <p>Aucune chambre trouvee</p>
           </div>
