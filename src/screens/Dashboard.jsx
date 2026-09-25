@@ -107,7 +107,7 @@ function CompteurAnime({ valeur, visible }) {
   return <span>{fmt(affiche)}</span>
 }
 
-export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16 }) {
+export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16, sombre=false }) {
   const [heureActuelle, setHeureActuelle] = useState(heure())
   const [visible, setVisible] = useState(false)
   const [refresh, setRefresh] = useState(false)
@@ -155,8 +155,19 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
     .filter(s => s.dateDepart === aujourdhuiFR)
     .map(s => ({ nom: s.client, chambre: s.chambre, heure: s.heureDepart, statut: 'en_attente' }))
 
+  // ── Palette selon le thème ──
+  const bg          = sombre ? '#0F172A' : '#F5F7FA'
+  const cardBg       = sombre ? '#1E293B' : 'white'
+  const cardShadow    = sombre ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.06)'
+  const cardShadow2   = sombre ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.08)'
+  const texteTitre    = sombre ? '#F1F5F9' : '#1B3A6B'
+  const texteSecond   = sombre ? '#94A3B8' : '#888'
+  const texteMuted    = sombre ? '#64748B' : '#999'
+  const borderCol      = sombre ? '#334155' : '#F0F0F0'
+  const encartBg1      = sombre ? '#1E293B' : '#FFF8F0'
+
   return (
-    <div style={{ paddingBottom:'90px', background:'#F5F7FA', minHeight:'100vh' }}>
+    <div style={{ paddingBottom:'90px', background:bg, minHeight:'100vh' }}>
 
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg, #0A1628, #1B3A6B, #2C5282)', padding:'20px 20px 24px', position:'relative', overflow:'hidden' }}>
@@ -236,25 +247,25 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
         {/* 5 cases chambres - hauteur reduite, incluant les reservations a venir */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px', marginBottom:'16px' }}>
           {[
-            { label:'Disponibles', valeur:chambresStats.disponibles, couleur:'#2ECC71', icone:Home,          bg:'#F0FFF4', delay:0   },
-            { label:'Occupées',    valeur:chambresStats.occupees,    couleur:'#1B3A6B', icone:Briefcase,     bg:'#EEF2FF', delay:0.1 },
-            { label:'A venir',     valeur:chambresStats.aVenir||0,   couleur:'#8B5CF6', icone:Clock,         bg:'#F5F3FF', delay:0.15},
-            { label:'A nettoyer',  valeur:chambresStats.nettoyer,    couleur:'#C9A84C', icone:Sparkles,      bg:'#FFFBF0', delay:0.2 },
-            { label:'Problemes',   valeur:chambresStats.problemes,   couleur:'#E74C3C', icone:AlertTriangle, bg:'#FFF5F5', delay:0.3 },
+            { label:'Disponibles', valeur:chambresStats.disponibles, couleur:'#2ECC71', icone:Home,          bg: sombre?'#0F2818':'#F0FFF4', delay:0   },
+            { label:'Occupées',    valeur:chambresStats.occupees,    couleur:'#1B3A6B', icone:Briefcase,     bg: sombre?'#1A2744':'#EEF2FF', delay:0.1 },
+            { label:'A venir',     valeur:chambresStats.aVenir||0,   couleur:'#8B5CF6', icone:Clock,         bg: sombre?'#2A1F44':'#F5F3FF', delay:0.15},
+            { label:'A nettoyer',  valeur:chambresStats.nettoyer,    couleur:'#C9A84C', icone:Sparkles,      bg: sombre?'#2E2711':'#FFFBF0', delay:0.2 },
+            { label:'Problemes',   valeur:chambresStats.problemes,   couleur:'#E74C3C', icone:AlertTriangle, bg: sombre?'#2E1414':'#FFF5F5', delay:0.3 },
           ].map((s,i) => {
             const Icone = s.icone
             const pct = Math.round(((s.valeur||0) / (chambresStats.total||50)) * 100)
             return (
-              <div key={i} className="card-anim" style={{ background:'white', borderRadius:'12px', padding:'8px', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: s.delay+'s', borderBottom:`3px solid ${s.couleur}` }}>
+              <div key={i} className="card-anim" style={{ background:cardBg, borderRadius:'12px', padding:'8px', boxShadow:cardShadow, animationDelay: s.delay+'s', borderBottom:`3px solid ${s.couleur}` }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <div style={{ width:'22px', height:'22px', borderRadius:'7px', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <Icone size={12} color={s.couleur}/>
                   </div>
-                  <span style={{ fontSize:'9px', color:'#999' }}>/{chambresStats.total}</span>
+                  <span style={{ fontSize:'9px', color:texteMuted }}>/{chambresStats.total}</span>
                 </div>
                 <div style={{ fontSize:'20px', fontWeight:'900', color:s.couleur, lineHeight:1 }}>{s.valeur||0}</div>
-                <div style={{ fontSize:'9px', color:'#888', margin:'2px 0 4px', whiteSpace:'nowrap' }}>{s.label}</div>
-                <div style={{ height:'3px', background:'#F0F0F0', borderRadius:'2px', overflow:'hidden' }}>
+                <div style={{ fontSize:'9px', color:texteSecond, margin:'2px 0 4px', whiteSpace:'nowrap' }}>{s.label}</div>
+                <div style={{ height:'3px', background: sombre?'#334155':'#F0F0F0', borderRadius:'2px', overflow:'hidden' }}>
                   <div style={{ height:'3px', borderRadius:'2px', background:s.couleur, width: visible ? `${pct}%` : '0%', transition:`width 1s ${s.delay}s ease` }}/>
                 </div>
               </div>
@@ -264,7 +275,7 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
 
         {/* Séjours à l'heure */}
         {sejoursEnCours.filter(s=>s.type==='heure').length > 0 && (
-          <div style={{ background:'#FFF8F0', borderRadius:'16px', padding:'14px 16px', marginBottom:'16px', border:'1px solid #E8634A22' }}>
+          <div style={{ background:encartBg1, borderRadius:'16px', padding:'14px 16px', marginBottom:'16px', border: sombre?'1px solid #334155':'1px solid #E8634A22' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
               <Clock size={18} color="#E8634A"/>
               <span style={{ fontWeight:'800', fontSize:'13px', color:'#E8634A' }}>
@@ -272,10 +283,10 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
               </span>
             </div>
             {sejoursEnCours.filter(s=>s.type==='heure').map((s,i)=>(
-              <div key={s.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'white', borderRadius:'10px', marginBottom:'6px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div key={s.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:cardBg, borderRadius:'10px', marginBottom:'6px', boxShadow:cardShadow2 }}>
                 <div>
-                  <div style={{ fontSize:'13px', fontWeight:'700', color:'#1B3A6B' }}>{s.client.split(' ').pop()}</div>
-                  <div style={{ fontSize:'11px', color:'#888' }}>Ch. {s.chambre} · {s.categorie}</div>
+                  <div style={{ fontSize:'13px', fontWeight:'700', color:texteTitre }}>{s.client.split(' ').pop()}</div>
+                  <div style={{ fontSize:'11px', color:texteSecond }}>Ch. {s.chambre} · {s.categorie}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:'12px', color:'#E8634A', fontWeight:'700' }}>jusqu'a {s.heureDepart}</div>
@@ -289,21 +300,21 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
         {/* Arrivées */}
         <div style={{ marginBottom:'16px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#F0FFF4', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background: sombre?'#0F2818':'#F0FFF4', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogIn size={16} color="#2ECC71"/>
             </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Arrivées du jour</h3>
+            <h3 style={{ color:texteTitre, fontWeight:'800', fontSize:'15px', margin:0 }}>Arrivées du jour</h3>
             <span style={{ background:'#2ECC71', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
               {arriveesDuJour.length}
             </span>
           </div>
           {arriveesDuJour.map((a,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:'4px solid #2ECC71', boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s' }}>
+            <div key={i} className="fade-slide" style={{ background:cardBg, borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:'4px solid #2ECC71', boxShadow:cardShadow, display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s' }}>
               <div>
-                <div style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{a.nom}</div>
-                <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {a.chambre} · {a.categorie}</div>
+                <div style={{ fontWeight:'700', fontSize:'14px', color:texteTitre }}>{a.nom}</div>
+                <div style={{ color:texteSecond, fontSize:'12px', marginTop:'2px' }}>Ch. {a.chambre} · {a.categorie}</div>
               </div>
-              <div style={{ background:'#F0FFF4', borderRadius:'10px', padding:'6px 12px', color:'#2ECC71', fontWeight:'800', fontSize:'13px' }}>
+              <div style={{ background: sombre?'#0F2818':'#F0FFF4', borderRadius:'10px', padding:'6px 12px', color:'#2ECC71', fontWeight:'800', fontSize:'13px' }}>
                 {a.heure}
               </div>
             </div>
@@ -313,22 +324,22 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
         {/* Départs */}
         <div style={{ marginBottom:'16px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#FFF3E0', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background: sombre?'#2E2313':'#FFF3E0', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <LogOut size={16} color="#E8634A"/>
             </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Départs du jour</h3>
+            <h3 style={{ color:texteTitre, fontWeight:'800', fontSize:'15px', margin:0 }}>Départs du jour</h3>
             <span style={{ background:'#E8634A', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
               {departsDuJour.length}
             </span>
           </div>
           {departsDuJour.map((d,i) => (
-            <div key={i} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${d.statut==='fait'?'#CCC':'#E8634A'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s' }}>
+            <div key={i} className="fade-slide" style={{ background:cardBg, borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${d.statut==='fait'?'#CCC':'#E8634A'}`, boxShadow:cardShadow, display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay: (i*0.1)+'s' }}>
               <div>
-                <div style={{ fontWeight:'700', fontSize:'14px', color:d.statut==='fait'?'#999':'#1B3A6B' }}>{d.nom}</div>
-                <div style={{ color:'#888', fontSize:'12px', marginTop:'2px' }}>Ch. {d.chambre}</div>
+                <div style={{ fontWeight:'700', fontSize:'14px', color:d.statut==='fait'?texteMuted:texteTitre }}>{d.nom}</div>
+                <div style={{ color:texteSecond, fontSize:'12px', marginTop:'2px' }}>Ch. {d.chambre}</div>
               </div>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px' }}>
-                <div style={{ background:d.statut==='fait'?'#F5F5F5':'#FFF3E0', borderRadius:'10px', padding:'6px 12px', color:d.statut==='fait'?'#999':'#E8634A', fontWeight:'800', fontSize:'13px' }}>{d.heure}</div>
+                <div style={{ background:d.statut==='fait'?(sombre?'#1E293B':'#F5F5F5'):(sombre?'#2E2313':'#FFF3E0'), borderRadius:'10px', padding:'6px 12px', color:d.statut==='fait'?texteMuted:'#E8634A', fontWeight:'800', fontSize:'13px' }}>{d.heure}</div>
                 <div style={{ fontSize:'11px', fontWeight:'700', color:d.statut==='fait'?'#2ECC71':'#E8634A' }}>
                   {d.statut==='fait' ? 'Parti' : 'En attente'}
                 </div>
@@ -340,21 +351,21 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
         {/* Séjours en cours */}
         <div>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background:'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ width:'32px', height:'32px', borderRadius:'10px', background: sombre?'#1A2744':'#EEF2FF', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <Moon size={16} color="#1B3A6B"/>
             </div>
-            <h3 style={{ color:'#1B3A6B', fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
+            <h3 style={{ color:texteTitre, fontWeight:'800', fontSize:'15px', margin:0 }}>Séjours en cours</h3>
             <span style={{ background:'#1B3A6B', color:'white', fontSize:'11px', fontWeight:'800', padding:'3px 10px', borderRadius:'12px' }}>
               {sejoursEnCours.length}
             </span>
           </div>
           {sejoursEnCours.map((s,i) => (
-            <div key={s.id} className="fade-slide" style={{ background:'white', borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', animationDelay: (i*0.08)+'s' }}>
+            <div key={s.id} className="fade-slide" style={{ background:cardBg, borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:cardShadow, animationDelay: (i*0.08)+'s' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
-                <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.client}</span>
+                <span style={{ fontWeight:'700', fontSize:'14px', color:texteTitre }}>{s.client}</span>
                 <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montantNum)} F</span>
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#888' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:texteSecond }}>
                 <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
                 <span style={{ color:s.type==='heure'?'#E8634A':'#1B3A6B', fontWeight:'600' }}>
                   Depart : {s.type==='nuit' ? s.dateDepart : s.heureDepart}
