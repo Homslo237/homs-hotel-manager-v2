@@ -560,13 +560,6 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
   )
 }
 
-// ─── Séjours initiaux ─────────────────────────────────────────────────────────
-const sejoursInitiaux = [
-  { id:1, client:'M. Kouassi Ama', telephone:'+225 07 11 22 33', chambre:'205', categorie:'Confort', dateArrivee:'18/08/2026', heureArrivee:'14:00', dateDepart:'21/08/2026', heureDepart:'12:00', duree:'3 nuits', type:'nuit', statut:'en_cours', montant:'105 000', modePaiement:'Orange Money' },
-  { id:2, client:'Mme Diallo Fatou', telephone:'+225 05 44 55 66', chambre:'101', categorie:'Standard', dateArrivee:'17/08/2026', heureArrivee:'10:00', dateDepart:'19/08/2026', heureDepart:'12:00', duree:'2 nuits', type:'nuit', statut:'en_cours', montant:'50 000', modePaiement:'Espèces' },
-  { id:3, client:'M. Bamba Seydou', telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite', dateArrivee:'21/08/2026', heureArrivee:'09:30', dateDepart:'21/08/2026', heureDepart:'12:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500', modePaiement:'MTN Mobile Money' },
-]
-
 // ─── Statuts ──────────────────────────────────────────────────────────────────
 const statuts = {
   en_cours: { label:'En cours', couleur:'#2ECC71' },
@@ -576,7 +569,7 @@ const statuts = {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert }) {
+export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert, sombre=false }) {
   const sejours = sejoursProps || []
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState('tous')
@@ -630,8 +623,22 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
     setRecuVisible({ texte, titre:"🧾 REÇU DE SORTIE" })
   }
 
+  // ── Palette selon le thème ──
+  const bg          = sombre ? '#0F172A' : '#F5F7FA'
+  const cardBg       = sombre ? '#1E293B' : 'white'
+  const cardBgNoShow  = sombre ? '#2E1414' : '#FFF5F5'
+  const cardShadow    = sombre ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.08)'
+  const texteTitre    = sombre ? '#F1F5F9' : '#1B3A6B'
+  const texteSecond   = sombre ? '#94A3B8' : '#888'
+  const texteMuted    = sombre ? '#64748B' : '#666'
+  const inputBg        = sombre ? '#1E293B' : 'white'
+  const inputBorder    = sombre ? '#334155' : '#E0E0E0'
+  const chipBg          = sombre ? '#1E293B' : '#F0F0F0'
+  const chipTexte       = sombre ? '#94A3B8' : '#666'
+  const inputStyleTheme = { ...inputStyle, background:inputBg, border:`2px solid ${inputBorder}`, color:texteTitre }
+
   return (
-    <div style={{ paddingBottom:'80px' }}>
+    <div style={{ paddingBottom:'80px', background:bg, minHeight:'100vh' }}>
       <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'24px 20px 20px' }}>
         <h1 style={{ color:'#C9A84C', fontSize:'22px', fontWeight:'700' }}>Séjours</h1>
         <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px', marginTop:'4px' }}>
@@ -657,8 +664,8 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
           {['tous','nuit','heure'].map(t=>(
             <button key={t} onClick={()=>setTypeFiltre(t)} style={{
               padding:'6px 14px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', border:'none', cursor:'pointer',
-              background:typeFiltre===t?'#E8634A':'#F0F0F0',
-              color:typeFiltre===t?'white':'#666',
+              background:typeFiltre===t?'#E8634A':chipBg,
+              color:typeFiltre===t?'white':chipTexte,
             }}>{t==='tous'?'Tous types':t==='nuit'?'🌙 Nuit':'⏱️ Heure'}</button>
           ))}
         </div>
@@ -666,7 +673,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
         <div style={{ position:'relative', marginBottom:'12px' }}>
           <Search size={18} style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#999' }}/>
           <input value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="Rechercher un client ou chambre..."
-            style={{ ...inputStyle, paddingLeft:'42px' }}/>
+            style={{ ...inputStyleTheme, paddingLeft:'42px' }}/>
         </div>
 
         {/* Filtres statut avec No-Show */}
@@ -680,14 +687,14 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
           ].map(f=>(
             <button key={f.id} onClick={()=>setFiltre(f.id)} style={{
               padding:'6px 14px', borderRadius:'20px', fontSize:'13px', fontWeight:'600', whiteSpace:'nowrap', border:'none', cursor:'pointer',
-              background:filtre===f.id ? (f.id==='no_show'?'#E74C3C':'#1B3A6B') : '#F0F0F0',
-              color:filtre===f.id?'white':'#666',
+              background:filtre===f.id ? (f.id==='no_show'?'#E74C3C':'#1B3A6B') : chipBg,
+              color:filtre===f.id?'white':chipTexte,
             }}>{f.id==='no_show'?'🚫 ':''}{f.label}</button>
           ))}
         </div>
 
         {filtresSejours.length===0 && (
-          <div style={{ textAlign:'center', padding:'40px 20px', color:'#999' }}>
+          <div style={{ textAlign:'center', padding:'40px 20px', color:texteSecond }}>
             <div style={{ fontSize:'32px', marginBottom:'8px' }}>🏨</div>
             <p>Aucun séjour trouvé</p>
           </div>
@@ -699,37 +706,37 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
           const isNoShow = s.statut === 'no_show'
           return (
             <div key={s.id} style={{
-              background: isNoShow ? '#FFF5F5' : 'white',
+              background: isNoShow ? cardBgNoShow : cardBg,
               borderRadius:'12px', padding:'16px', marginBottom:'10px',
-              boxShadow:'0 1px 4px rgba(0,0,0,0.08)',
+              boxShadow:cardShadow,
               borderLeft:`4px solid ${isNoShow ? '#E74C3C' : tr?.depasse?'#E74C3C':s.type==='heure'?'#E8634A':st.couleur}`
             }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
-                <span style={{ fontWeight:'700', fontSize:'15px', color:'#1B3A6B' }}>{s.client}</span>
+                <span style={{ fontWeight:'700', fontSize:'15px', color:texteTitre }}>{s.client}</span>
                 <span style={{ background:isNoShow?'#E74C3C':tr?.depasse?'#E74C3C':st.couleur, color:'white', fontSize:'10px', fontWeight:'700', padding:'3px 8px', borderRadius:'10px' }}>
                   {isNoShow ? '🚫 No-Show' : tr?.depasse ? '⚠️ Dépassé' : st.label}
                 </span>
               </div>
-              <div style={{ fontSize:'12px', color:'#888', marginBottom:'6px' }}>📞 {s.telephone}</div>
-              <div style={{ display:'flex', gap:'10px', fontSize:'12px', color:'#666', marginBottom:'6px', flexWrap:'wrap' }}>
+              <div style={{ fontSize:'12px', color:texteSecond, marginBottom:'6px' }}>📞 {s.telephone}</div>
+              <div style={{ display:'flex', gap:'10px', fontSize:'12px', color:texteMuted, marginBottom:'6px', flexWrap:'wrap' }}>
                 <span>🏨 Ch. {s.chambre}</span>
                 <span>📋 {s.categorie}</span>
                 <span>{s.type==='heure'?'⏱️':'🌙'} {s.duree}</span>
                 <span>💰 {s.modePaiement}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', marginBottom:'10px' }}>
-                <span style={{ color:'#999' }}>
+                <span style={{ color:texteSecond }}>
                   {s.type==='nuit' ? `${s.dateArrivee} → ${s.dateDepart}` : `${s.heureArrivee} → ${s.heureDepart}`}
                 </span>
                 {tr && (
-                  <span style={{ color:tr.depasse?'#E74C3C':'#888', fontWeight:'600', fontSize:'11px' }}>
+                  <span style={{ color:tr.depasse?'#E74C3C':texteSecond, fontWeight:'600', fontSize:'11px' }}>
                     {tr.depasse?'🔴 Dépassé':`⏳ ${tr.label}`}
                   </span>
                 )}
               </div>
 
               {isNoShow && (
-                <div style={{ background:'#FFEBEE', borderRadius:'8px', padding:'8px 12px', marginBottom:'8px', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
+                <div style={{ background: sombre?'#3D1A1A':'#FFEBEE', borderRadius:'8px', padding:'8px 12px', marginBottom:'8px', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
                   🚫 Client non présenté — montant conservé par l'hôtel
                 </div>
               )}
@@ -739,24 +746,24 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
                 {!isNoShow && (
                   <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
                     <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
-                      style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#EEF2FF', color:'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                      style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#1A2744':'#EEF2FF', color: sombre?'#93C5FD':'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                       <Printer size={11}/> Entrée
                     </button>
                     {s.statut==='en_cours' && (
                       <>
                         <button onClick={()=>setSejourAProlonger(s)}
-                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#2E2711':'#FFF8E1', color:'#C9A84C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                           <RefreshCw size={11}/> Prolonger
                         </button>
                         <button onClick={()=>handleCheckout(s)}
-                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                          style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#2E1414':'#FFF0F0', color:'#E74C3C', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                           <LogOut size={11}/> Sortie
                         </button>
                       </>
                     )}
                     {s.statut==='a_venir' && (
                       <button onClick={()=>{ if(onActiverReservation) onActiverReservation(s.id) }}
-                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'#F5F3FF', color:'#8B5CF6', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
+                        style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#2A1F44':'#F5F3FF', color:'#8B5CF6', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                         <LogIn size={11}/> Client arrive
                       </button>
                     )}
