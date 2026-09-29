@@ -7,6 +7,7 @@ import Sejours from './screens/Sejours'
 import Caisse from './screens/Caisse'
 import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
+import { DEVISES, detecterDevise, lireDevise, sauvegarderDevise, trouverDevise } from './devises'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -209,6 +210,74 @@ function AlerteNoShow({ sejours, onLiberer, onPatienter }) {
   )
 }
 
+// ─── Modal Premier lancement : choix de la devise ────────────────────────────
+function ModalChoixDevise({ codeDetecte, onValider }) {
+  const codeInitial = codeDetecte || 'XOF'
+  const [code, setCode] = useState(codeInitial)
+  const devise = trouverDevise(code)
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:600,
+      background:'rgba(0,0,0,0.75)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      padding:'20px'
+    }}>
+      <div style={{
+        background:'white', borderRadius:'20px',
+        width:'100%', maxWidth:'380px',
+        overflow:'hidden',
+        boxShadow:'0 8px 32px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'20px', textAlign:'center' }}>
+          <div style={{ fontSize:'36px', marginBottom:'8px' }}>💱</div>
+          <div style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Devise de votre établissement</div>
+          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'12px', marginTop:'4px' }}>
+            Bienvenue sur HOMS-HÔTEL MANAGER
+          </div>
+        </div>
+        <div style={{ padding:'20px' }}>
+          {codeDetecte ? (
+            <div style={{ background:'#F0FFF4', border:'1px solid #2ECC71', borderRadius:'12px', padding:'12px 14px', marginBottom:'14px', fontSize:'13px', color:'#1B3A6B' }}>
+              📍 D'après votre téléphone, nous vous recommandons : <strong>{trouverDevise(codeDetecte).nom} ({trouverDevise(codeDetecte).symbole})</strong>
+            </div>
+          ) : (
+            <div style={{ background:'#FFF8E1', border:'1px solid #C9A84C', borderRadius:'12px', padding:'12px 14px', marginBottom:'14px', fontSize:'13px', color:'#666' }}>
+              Nous n'avons pas pu détecter votre pays. Veuillez choisir votre devise.
+            </div>
+          )}
+
+          <label style={{ display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }}>
+            Choisir la devise
+          </label>
+          <select value={code} onChange={e=>setCode(e.target.value)} style={{
+            width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px',
+            fontSize:'14px', outline:'none', boxSizing:'border-box', background:'white', marginBottom:'12px'
+          }}>
+            {DEVISES.map(d => (
+              <option key={d.code} value={d.code}>{d.nom} ({d.code}) — {d.symbole}</option>
+            ))}
+          </select>
+
+          <div style={{ background:'#F0F4FF', borderRadius:'8px', padding:'10px 12px', fontSize:'12px', color:'#1B3A6B', fontWeight:'600', marginBottom:'16px' }}>
+            Sélection : <strong>{devise.nom}</strong> ({devise.symbole})
+            <div style={{ fontWeight:'400', color:'#888', marginTop:'4px' }}>
+              Le directeur pourra la modifier à tout moment dans Menu → Paramètres directeur.
+            </div>
+          </div>
+
+          <button onClick={() => onValider(code)} style={{
+            width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer',
+            background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'14px'
+          }}>
+            ✅ Confirmer cette devise
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [ecran,            setEcran]            = useState('splash')
   const [onglet,           setOnglet]           = useState('dashboard')
@@ -216,6 +285,8 @@ export default function App() {
   const [cle,              setCle]              = useState(0)
   const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
   const [themeSombre,      setThemeSombre]      = useState(false)
+  const [codeDevise,       setCodeDevise]       = useState(() => lireDevise())
+  const [showChoixDevise,  setShowChoixDevise]  = useState(false)
 
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
@@ -478,6 +549,8 @@ export default function App() {
     setThemeSombre(lireThemeUtilisateur(user.nom))
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
+    // Premier lancement : aucune devise enregistrée → on demande à choisir
+    if (!lireDevise()) setShowChoixDevise(true)
   }
 
   const handleDeconnexion = () => {
@@ -491,6 +564,12 @@ export default function App() {
     setThemeSombre(false)
     setOnglet('dashboard')
     setEcran('connexion')
+  }
+
+  const handleValiderDevise = (code) => {
+    sauvegarderDevise(code)
+    setCodeDevise(code)
+    setShowChoixDevise(false)
   }
 
   // ── Clôture de caisse : archive tout + vide la caisse active ──
@@ -608,6 +687,7 @@ export default function App() {
             historique={historique}
             journal={journal}
             onThemeChange={setThemeSombre}
+            onDeviseChange={setCodeDevise}
           />
         )}
       </div>
@@ -628,6 +708,14 @@ export default function App() {
           sejours={noShowASignaler}
           onLiberer={confirmerNoShow}
           onPatienter={ignorerNoShow}
+        />
+      )}
+
+      {/* Choix de la devise au premier lancement */}
+      {showChoixDevise && ecran === 'app' && (
+        <ModalChoixDevise
+          codeDetecte={detecterDevise()}
+          onValider={handleValiderDevise}
         />
       )}
     </div>
