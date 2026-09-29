@@ -10,6 +10,7 @@ import EcranIdentite     from './EcranIdentite'
 import EcranUtilisateurs from './EcranUtilisateurs'
 import EcranProfil       from './EcranProfil'
 import EcranJournal      from './EcranJournal'
+import { DEVISES, lireDevise, sauvegarderDevise, trouverDevise } from '../../devises'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
@@ -50,13 +51,22 @@ function BanniereAccesReserve() {
   )
 }
 
-function EcranDirecteur({ onClose }) {
+function EcranDirecteur({ onClose, onDeviseChange }) {
   const [params, setParams] = useState(paramsDefaut)
   const [sauvegarde, setSauvegarde] = useState(false)
+  const [codeDevise, setCodeDevise] = useState(() => lireDevise() || 'XOF')
+  const deviseActuelle = trouverDevise(codeDevise)
+
   const handleSauvegarder = () => { setSauvegarde(true); setTimeout(()=>setSauvegarde(false),2000) }
   const ajouterVacation = () => setParams({...params,vacations:[...params.vacations,{id:Date.now(),nom:'Nouvelle vacation',debut:'00:00',fin:'08:00'}]})
   const supprimerVacation = (id) => setParams({...params,vacations:params.vacations.filter(v=>v.id!==id)})
   const modifierVacation = (id,champ,valeur) => setParams({...params,vacations:params.vacations.map(v=>v.id===id?{...v,[champ]:valeur}:v)})
+
+  const handleChangerDevise = (code) => {
+    setCodeDevise(code)
+    sauvegarderDevise(code)
+    if (onDeviseChange) onDeviseChange(code)
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'white', overflowY:'auto', paddingBottom:'40px' }}>
@@ -85,6 +95,26 @@ function EcranDirecteur({ onClose }) {
             </div>
           </div>
         </div>
+
+        {/* ── Devise ── */}
+        <div style={{ marginBottom:'20px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>💱 DEVISE</div>
+          <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
+            <label style={labelStyle}>Devise de l'établissement</label>
+            <p style={{ fontSize:'12px', color:'#888', marginBottom:'10px' }}>
+              Change uniquement le symbole affiché. Les montants ne sont pas convertis.
+            </p>
+            <select value={codeDevise} onChange={e=>handleChangerDevise(e.target.value)} style={{ ...inputStyle, background:'white' }}>
+              {DEVISES.map(d => (
+                <option key={d.code} value={d.code}>{d.nom} ({d.code}) — {d.symbole}</option>
+              ))}
+            </select>
+            <div style={{ marginTop:'10px', background:'#F0F4FF', borderRadius:'8px', padding:'10px 12px', fontSize:'12px', color:'#1B3A6B', fontWeight:'600' }}>
+              💱 Actuellement : <strong>{deviseActuelle.nom}</strong> ({deviseActuelle.symbole})
+            </div>
+          </div>
+        </div>
+
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>⏱️ TOLÉRANCE DÉPASSEMENT</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
@@ -166,7 +196,7 @@ const menuItemsDirecteur = [
   {
     section: 'Directeur / Gérant',
     items: [
-      { icone:Settings,  label:'Paramètres directeur',        sous:'Vacations, tolérance, établissement',    couleur:'#C9A84C', action:'directeur' },
+      { icone:Settings,  label:'Paramètres directeur',        sous:'Vacations, tolérance, devise',           couleur:'#C9A84C', action:'directeur' },
       { icone:()=><span style={{fontSize:'18px'}}>🏨</span>, label:"Identité de l'établissement", sous:'Logo, en-tête, contacts, infos légales', couleur:'#2C5282', action:'identite' },
       { icone:Users,     label:'Utilisateurs & rôles',        sous:'Gérer le personnel et les accès',        couleur:'#1B3A6B', action:'utilisateurs' },
       { icone:BarChart2, label:'Rapports & statistiques',     sous:'KPI, graphiques, top clients',           couleur:'#2ECC71', action:'statistiques' },
@@ -201,7 +231,7 @@ function sauvegarderThemeUtilisateur(userId, sombre) {
   try { localStorage.setItem(`homs_theme_${userId}`, sombre ? 'sombre' : 'clair') } catch {}
 }
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange }) {
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange }) {
   const [ecranActif, setEcranActif] = useState(null)
   const [identite, setIdentite] = useState(() => {
     try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
@@ -375,7 +405,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
         </div>
       </div>
 
-      {ecranActif==='directeur'    && <EcranDirecteur      onClose={()=>setEcranActif(null)}/>}
+      {ecranActif==='directeur'    && <EcranDirecteur      onClose={()=>setEcranActif(null)} onDeviseChange={onDeviseChange}/>}
       {ecranActif==='identite'     && <EcranIdentite       onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite}/>}
       {ecranActif==='utilisateurs' && <EcranUtilisateurs   onClose={()=>setEcranActif(null)}/>}
       {ecranActif==='statistiques' && <EcranStatistiques   onClose={()=>setEcranActif(null)} historique={historique}/>}
