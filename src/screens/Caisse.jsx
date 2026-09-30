@@ -52,7 +52,7 @@ function ModalConfirmation({ onConfirmer, onAnnuler }) {
   )
 }
 
-function FormulaireEntree({ onClose, onAjouter }) {
+function FormulaireEntree({ onClose, onAjouter, devise }) {
   const [form, setForm] = useState({ libelle:'', emetteurNom:'', emetteurContact:'', montant:'', mode:'Espèces' })
   const ok = form.libelle.trim() && form.montant && Number(form.montant) > 0
   return (
@@ -84,7 +84,7 @@ function FormulaireEntree({ onClose, onAjouter }) {
           </div>
         </div>
         <div style={{ marginBottom:'20px' }}>
-          <label style={labelStyle}>Montant (FCFA) <span style={{color:'red'}}>*</span></label>
+          <label style={labelStyle}>Montant ({devise}) <span style={{color:'red'}}>*</span></label>
           <input value={form.montant} onChange={e=>setForm({...form,montant:e.target.value})} placeholder="0" type="number" style={{ ...inputStyle, fontSize:'20px', fontWeight:'700' }}/>
         </div>
         <button onClick={() => { if(!ok) return; onAjouter({ id:Date.now(), sens:'entree', libelle:form.libelle.trim(), emetteurNom:form.emetteurNom.trim(), emetteurContact:form.emetteurContact.trim(), montant:Number(form.montant), mode:form.mode, heure:maintenant() }); onClose() }}
@@ -96,7 +96,7 @@ function FormulaireEntree({ onClose, onAjouter }) {
   )
 }
 
-function FormulaireSortie({ onClose, onAjouter }) {
+function FormulaireSortie({ onClose, onAjouter, devise }) {
   const [form, setForm] = useState({ libelle:'', beneficiaireNom:'', beneficiaireContact:'', montant:'', mode:'Espèces' })
   const ok = form.libelle.trim() && form.montant && Number(form.montant) > 0
   return (
@@ -128,7 +128,7 @@ function FormulaireSortie({ onClose, onAjouter }) {
           </div>
         </div>
         <div style={{ marginBottom:'20px' }}>
-          <label style={labelStyle}>Montant (FCFA) <span style={{color:'red'}}>*</span></label>
+          <label style={labelStyle}>Montant ({devise}) <span style={{color:'red'}}>*</span></label>
           <input value={form.montant} onChange={e=>setForm({...form,montant:e.target.value})} placeholder="0" type="number" style={{ ...inputStyle, fontSize:'20px', fontWeight:'700' }}/>
         </div>
         <button onClick={() => { if(!ok) return; onAjouter({ id:Date.now(), sens:'sortie', libelle:form.libelle.trim(), beneficiaireNom:form.beneficiaireNom.trim(), beneficiaireContact:form.beneficiaireContact.trim(), montant:Number(form.montant), mode:form.mode, heure:maintenant() }); onClose() }}
@@ -140,7 +140,7 @@ function FormulaireSortie({ onClose, onAjouter }) {
   )
 }
 
-function ModalPassation({ sejours, entrees, sorties, caisse, chambres=[], onClose, onCloturerCaisse }) {
+function ModalPassation({ sejours, entrees, sorties, caisse, chambres=[], onClose, onCloturerCaisse, devise }) {
   const [form, setForm] = useState({
     numeroPassation:'001', vacation:'Matin (06h00 - 14h00)',
     recSortantNom:'', recEntrantNom:'',
@@ -181,7 +181,7 @@ function ModalPassation({ sejours, entrees, sorties, caisse, chambres=[], onClos
 
     const lignesNoShow = noShows.length === 0
       ? '<tr><td colspan="4" style="text-align:center;color:#999">Aucun no-show</td></tr>'
-      : noShows.map(s => `<tr><td>${s.client}</td><td>Ch. ${s.chambre}</td><td>${s.dateArrivee} ${s.heureArrivee}</td><td style="color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} FCFA</td></tr>`).join('')
+      : noShows.map(s => `<tr><td>${s.client}</td><td>Ch. ${s.chambre}</td><td>${s.dateArrivee} ${s.heureArrivee}</td><td style="color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} ${devise}</td></tr>`).join('')
 
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Passation</title>
 <style>
@@ -250,9 +250,9 @@ th{background:#1B3A6B;color:white;font-size:8pt}
       <tr><th colspan="2">No-Show cette vacation</th></tr>
       ${noShows.length===0
         ? '<tr><td colspan="2" style="text-align:center;color:#999">Aucun no-show</td></tr>'
-        : noShows.map(s=>`<tr><td>${s.client} (Ch.${s.chambre})</td><td style="text-align:right;color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} F</td></tr>`).join('')
+        : noShows.map(s=>`<tr><td>${s.client} (Ch.${s.chambre})</td><td style="text-align:right;color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} ${devise}</td></tr>`).join('')
       }
-      ${noShows.length>0?`<tr class="total-row"><td>Total conservé</td><td style="text-align:right" class="gold">${fmt(noShows.reduce((sum,s)=>sum+(s.montantNum||0),0))} F</td></tr>`:''}
+      ${noShows.length>0?`<tr class="total-row"><td>Total conservé</td><td style="text-align:right" class="gold">${fmt(noShows.reduce((sum,s)=>sum+(s.montantNum||0),0))} ${devise}</td></tr>`:''}
     </table>
   </div>
 </div>
@@ -272,11 +272,11 @@ ${nbOccupees > 0 ? `
   <div class="box">
     <h2>RECETTES</h2>
     <table>
-      <tr><td>Séjours nuits</td><td style="text-align:right">${fmt(caisse.totalNuits||0)} F</td></tr>
-      <tr><td>Séjours heures</td><td style="text-align:right">${fmt(caisse.totalHeures||0)} F</td></tr>
-      <tr><td>No-show conservés</td><td style="text-align:right">${fmt(noShows.reduce((sum,s)=>sum+(s.montantNum||0),0))} F</td></tr>
-      <tr><td>Entrées diverses</td><td style="text-align:right">${fmt(caisse.totalEntrees||0)} F</td></tr>
-      <tr class="total-row"><td>TOTAL</td><td style="text-align:right" class="gold">${fmt(totalRecettes)} F</td></tr>
+      <tr><td>Séjours nuits</td><td style="text-align:right">${fmt(caisse.totalNuits||0)} ${devise}</td></tr>
+      <tr><td>Séjours heures</td><td style="text-align:right">${fmt(caisse.totalHeures||0)} ${devise}</td></tr>
+      <tr><td>No-show conservés</td><td style="text-align:right">${fmt(noShows.reduce((sum,s)=>sum+(s.montantNum||0),0))} ${devise}</td></tr>
+      <tr><td>Entrées diverses</td><td style="text-align:right">${fmt(caisse.totalEntrees||0)} ${devise}</td></tr>
+      <tr class="total-row"><td>TOTAL</td><td style="text-align:right" class="gold">${fmt(totalRecettes)} ${devise}</td></tr>
     </table>
   </div>
   <div class="box">
@@ -284,9 +284,9 @@ ${nbOccupees > 0 ? `
     <table>
       ${sorties.length===0
         ? '<tr><td colspan="2" style="text-align:center;color:#999">Aucune</td></tr>'
-        : sorties.map(s=>`<tr><td>${s.libelle}</td><td style="text-align:right">${fmt(s.montant)} F</td></tr>`).join('')
+        : sorties.map(s=>`<tr><td>${s.libelle}</td><td style="text-align:right">${fmt(s.montant)} ${devise}</td></tr>`).join('')
       }
-      <tr class="total-row"><td>TOTAL</td><td style="text-align:right;color:#E74C3C">${fmt(totalDepenses)} F</td></tr>
+      <tr class="total-row"><td>TOTAL</td><td style="text-align:right;color:#E74C3C">${fmt(totalDepenses)} ${devise}</td></tr>
     </table>
   </div>
 </div>
@@ -295,19 +295,19 @@ ${nbOccupees > 0 ? `
   <div class="box" style="background:#F0F4FF">
     <h2>SOLDE NET</h2>
     <table>
-      <tr><td>Recettes</td><td style="text-align:right">${fmt(totalRecettes)} F</td></tr>
-      <tr><td>Dépenses</td><td style="text-align:right;color:#E74C3C">- ${fmt(totalDepenses)} F</td></tr>
-      <tr class="total-row"><td>SOLDE NET</td><td style="text-align:right" class="gold">${fmt(solde)} F</td></tr>
+      <tr><td>Recettes</td><td style="text-align:right">${fmt(totalRecettes)} ${devise}</td></tr>
+      <tr><td>Dépenses</td><td style="text-align:right;color:#E74C3C">- ${fmt(totalDepenses)} ${devise}</td></tr>
+      <tr class="total-row"><td>SOLDE NET</td><td style="text-align:right" class="gold">${fmt(solde)} ${devise}</td></tr>
     </table>
   </div>
   <div class="box">
     <h2>PAR MODE DE PAIEMENT</h2>
     <table>
-      <tr><td>💵 Espèces</td><td style="text-align:right">${fmt(totalEspeces)} F</td></tr>
-      <tr><td>🟠 Orange Money</td><td style="text-align:right">${fmt(totalOM)} F</td></tr>
-      <tr><td>🟡 MTN MoMo</td><td style="text-align:right">${fmt(totalMOMO)} F</td></tr>
-      <tr><td>💳 Carte</td><td style="text-align:right">${fmt(totalCarte)} F</td></tr>
-      <tr class="total-row"><td>SOLDE</td><td style="text-align:right" class="gold">${fmt(solde)} F</td></tr>
+      <tr><td>💵 Espèces</td><td style="text-align:right">${fmt(totalEspeces)} ${devise}</td></tr>
+      <tr><td>🟠 Orange Money</td><td style="text-align:right">${fmt(totalOM)} ${devise}</td></tr>
+      <tr><td>🟡 MTN MoMo</td><td style="text-align:right">${fmt(totalMOMO)} ${devise}</td></tr>
+      <tr><td>💳 Carte</td><td style="text-align:right">${fmt(totalCarte)} ${devise}</td></tr>
+      <tr class="total-row"><td>SOLDE</td><td style="text-align:right" class="gold">${fmt(solde)} ${devise}</td></tr>
     </table>
   </div>
 </div>
@@ -387,7 +387,7 @@ ${nbOccupees > 0 ? `
             </div>
             {noShows.length > 0 && (
               <div style={{ marginTop:'8px', background:'#FFF0F0', borderRadius:'8px', padding:'8px 10px', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
-                🚫 {noShows.length} no-show — {fmt(noShows.reduce((s,n)=>s+(n.montantNum||0),0))} FCFA conservés
+                🚫 {noShows.length} no-show — {fmt(noShows.reduce((s,n)=>s+(n.montantNum||0),0))} {devise} conservés
               </div>
             )}
           </div>
@@ -434,7 +434,7 @@ ${nbOccupees > 0 ? `
   )
 }
 
-export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses=[], onAjouterEntree, onAjouterSortie, caisse={}, onCloturerCaisse, chambres=[] }) {
+export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses=[], onAjouterEntree, onAjouterSortie, caisse={}, onCloturerCaisse, chambres=[], devise='FCFA' }) {
   const [onglet,        setOnglet]        = useState('sejours')
   const [showEntree,    setShowEntree]    = useState(false)
   const [showSortie,    setShowSortie]    = useState(false)
@@ -457,7 +457,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
   const tCarte   = allIn.filter(p=>p.mode==='Carte bancaire').reduce((s,p)=>s+p.montant,0)
 
   const handlePartager = () => {
-    const texte = `${(() => { try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s).nom:'HOMS-HOTEL' } catch{return 'HOMS-HOTEL'} })()} - CAISSE DU ${aujourdhui()}\nSolde net: ${fmt(totalGeneral)} FCFA\nSejours: ${fmt(totalSejours)} | Entrees: ${fmt(totalEntrees)} | Sorties: -${fmt(totalSorties)}`
+    const texte = `${(() => { try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s).nom:'HOMS-HOTEL' } catch{return 'HOMS-HOTEL'} })()} - CAISSE DU ${aujourdhui()}\nSolde net: ${fmt(totalGeneral)} ${devise}\nSejours: ${fmt(totalSejours)} | Entrees: ${fmt(totalEntrees)} | Sorties: -${fmt(totalSorties)}`
     if (navigator.share) navigator.share({ title:'Rapport caisse', text:texte })
     else window.open(`https://wa.me/?text=${encodeURIComponent(texte)}`, '_blank')
   }
@@ -487,7 +487,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
             <TrendingUp size={18} color="#C9A84C"/>
             <span style={{ fontSize:'13px', opacity:0.8 }}>Solde net du jour</span>
           </div>
-          <div style={{ fontSize:'32px', fontWeight:'700', color:'#C9A84C' }}>{fmt(totalGeneral)} FCFA</div>
+          <div style={{ fontSize:'32px', fontWeight:'700', color:'#C9A84C' }}>{fmt(totalGeneral)} {devise}</div>
           <div style={{ display:'flex', gap:'16px', marginTop:'10px', fontSize:'12px', flexWrap:'wrap' }}>
             <span>🏨 {fmt(totalSejours)}</span>
             <span>📥 +{fmt(totalEntrees)}</span>
@@ -499,12 +499,12 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
           <div style={{ background:'#2ECC71', borderRadius:'12px', padding:'14px', color:'white' }}>
             <TrendingUp size={16} style={{ marginBottom:'4px' }}/>
             <div style={{ fontSize:'18px', fontWeight:'800' }}>{fmt(totalSejours+totalEntrees)}</div>
-            <div style={{ fontSize:'11px', opacity:0.9 }}>Total entrees FCFA</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>Total entrees {devise}</div>
           </div>
           <div style={{ background:'#E74C3C', borderRadius:'12px', padding:'14px', color:'white' }}>
             <TrendingDown size={16} style={{ marginBottom:'4px' }}/>
             <div style={{ fontSize:'18px', fontWeight:'800' }}>{fmt(totalSorties)}</div>
-            <div style={{ fontSize:'11px', opacity:0.9 }}>Total sorties FCFA</div>
+            <div style={{ fontSize:'11px', opacity:0.9 }}>Total sorties {devise}</div>
           </div>
         </div>
 
@@ -519,7 +519,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
               <span style={{ fontSize:'20px' }}>{m.icon}</span>
               <div>
                 <div style={{ fontSize:'13px', fontWeight:'800', color:'#1B3A6B' }}>{fmt(m.montant)}</div>
-                <div style={{ fontSize:'10px', color:'#888', fontWeight:'600' }}>{m.label} FCFA</div>
+                <div style={{ fontSize:'10px', color:'#888', fontWeight:'600' }}>{m.label} {devise}</div>
               </div>
             </div>
           ))}
@@ -536,8 +536,8 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
         {onglet==='sejours' && (
           <>
             <div style={{ display:'flex', gap:'8px', marginBottom:'12px' }}>
-              <span style={{ background:'#EEF2FF', color:'#1B3A6B', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>🌙 {fmt(totalNuits)} FCFA</span>
-              <span style={{ background:'#FFF3E0', color:'#E8634A', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>⏱️ {fmt(totalHeures)} FCFA</span>
+              <span style={{ background:'#EEF2FF', color:'#1B3A6B', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>🌙 {fmt(totalNuits)} {devise}</span>
+              <span style={{ background:'#FFF3E0', color:'#E8634A', padding:'4px 10px', borderRadius:'20px', fontSize:'11px', fontWeight:'700' }}>⏱️ {fmt(totalHeures)} {devise}</span>
             </div>
             <p style={{ fontSize:'11px', color:'#999', marginBottom:'12px', fontStyle:'italic' }}>Alimente automatiquement depuis les sejours</p>
             {sejours.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#999' }}><div style={{ fontSize:'28px' }}>🏨</div><p>Aucun sejour</p></div>}
@@ -548,7 +548,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
                   <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                     {p.statut==='no_show' && <span style={{ background:'#FFF0F0', color:'#E74C3C', fontSize:'9px', fontWeight:'700', padding:'2px 6px', borderRadius:'8px' }}>🚫 NO-SHOW</span>}
                     {p.statut==='a_venir' && <span style={{ background:'#F5F3FF', color:'#8B5CF6', fontSize:'9px', fontWeight:'700', padding:'2px 6px', borderRadius:'8px' }}>RÉSERVÉ</span>}
-                    <span style={{ fontWeight:'800', color:'#C9A84C', fontSize:'14px' }}>{fmt(p.montantNum)} FCFA</span>
+                    <span style={{ fontWeight:'800', color:'#C9A84C', fontSize:'14px' }}>{fmt(p.montantNum)} {devise}</span>
                   </div>
                 </div>
                 <div style={{ fontSize:'12px', color:'#999' }}>Ch. {p.chambre} · {p.duree} · {p.modePaiement}</div>
@@ -567,7 +567,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
               <div key={e.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #2ECC71' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
                   <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{e.libelle}</span>
-                  <span style={{ fontWeight:'800', color:'#2ECC71', fontSize:'14px' }}>+{fmt(e.montant)} FCFA</span>
+                  <span style={{ fontWeight:'800', color:'#2ECC71', fontSize:'14px' }}>+{fmt(e.montant)} {devise}</span>
                 </div>
                 <div style={{ fontSize:'12px', color:'#999' }}>{e.emetteurNom&&`${e.emetteurNom} · `}{e.mode} · {e.heure}</div>
               </div>
@@ -585,7 +585,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
               <div key={s.id} style={{ background:'white', borderRadius:'12px', padding:'14px 16px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:'4px solid #E74C3C' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
                   <span style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{s.libelle}</span>
-                  <span style={{ fontWeight:'800', color:'#E74C3C', fontSize:'14px' }}>-{fmt(s.montant)} FCFA</span>
+                  <span style={{ fontWeight:'800', color:'#E74C3C', fontSize:'14px' }}>-{fmt(s.montant)} {devise}</span>
                 </div>
                 <div style={{ fontSize:'12px', color:'#999' }}>{s.beneficiaireNom&&`${s.beneficiaireNom} · `}{s.mode} · {s.heure}</div>
               </div>
@@ -594,8 +594,8 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
         )}
       </div>
 
-      {showEntree    && <FormulaireEntree  onClose={()=>setShowEntree(false)}    onAjouter={onAjouterEntree}/>}
-      {showSortie    && <FormulaireSortie  onClose={()=>setShowSortie(false)}    onAjouter={onAjouterSortie}/>}
+      {showEntree    && <FormulaireEntree  onClose={()=>setShowEntree(false)}    onAjouter={onAjouterEntree} devise={devise}/>}
+      {showSortie    && <FormulaireSortie  onClose={()=>setShowSortie(false)}    onAjouter={onAjouterSortie} devise={devise}/>}
       {showPassation && (
         <ModalPassation
           sejours={sejours}
@@ -605,6 +605,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
           chambres={chambres}
           onClose={()=>setShowPassation(false)}
           onCloturerCaisse={onCloturerCaisse}
+          devise={devise}
         />
       )}
     </div>
