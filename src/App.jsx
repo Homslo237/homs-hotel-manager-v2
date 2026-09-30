@@ -676,6 +676,7 @@ export default function App() {
             caisse={caisse}
             onCloturerCaisse={cloturerCaisse}
             chambres={chambresGenerees}
+            devise={trouverDevise(codeDevise).symbole}
           />
         )}
 
