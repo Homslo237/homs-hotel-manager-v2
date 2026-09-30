@@ -645,6 +645,7 @@ export default function App() {
             chambresStats={chambresStats}
             tauxOccupation={tauxOccupation}
             sombre={themeSombre}
+            devise={trouverDevise(codeDevise).symbole}
           />
         )}
 
