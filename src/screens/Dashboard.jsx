@@ -107,7 +107,7 @@ function CompteurAnime({ valeur, visible }) {
   return <span>{fmt(affiche)}</span>
 }
 
-export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16, sombre=false }) {
+export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16, sombre=false, devise='FCFA' }) {
   const [heureActuelle, setHeureActuelle] = useState(heure())
   const [visible, setVisible] = useState(false)
   const [refresh, setRefresh] = useState(false)
@@ -221,25 +221,25 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
             <span style={{ fontSize:'12px', opacity:0.7, letterSpacing:'1px' }}>SOLDE NET DU JOUR</span>
           </div>
           <div style={{ fontSize:'32px', fontWeight:'900', color:'#C9A84C', marginBottom:'4px' }}>
-            <CompteurAnime valeur={soldeNet} visible={visible}/> <span style={{ fontSize:'16px', opacity:0.7 }}>FCFA</span>
+            <CompteurAnime valeur={soldeNet} visible={visible}/> <span style={{ fontSize:'16px', opacity:0.7 }}>{devise}</span>
           </div>
           <GraphiqueCA data={graphData} visible={visible}/>
           <div style={{ marginTop:'12px', paddingTop:'12px', borderTop:'1px solid rgba(255,255,255,0.1)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', fontSize:'11px' }}>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>🌙 Nuits</div>
-              <div style={{ color:'#C9A84C', fontWeight:'700' }}>{fmt(totalNuits)} F</div>
+              <div style={{ color:'#C9A84C', fontWeight:'700' }}>{fmt(totalNuits)} {devise}</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>⏱️ Heures</div>
-              <div style={{ color:'#E8634A', fontWeight:'700' }}>{fmt(totalHeur)} F</div>
+              <div style={{ color:'#E8634A', fontWeight:'700' }}>{fmt(totalHeur)} {devise}</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>📥 Entrées div.</div>
-              <div style={{ color:'#2ECC71', fontWeight:'700' }}>+{fmt(totalEnt)} F</div>
+              <div style={{ color:'#2ECC71', fontWeight:'700' }}>+{fmt(totalEnt)} {devise}</div>
             </div>
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'8px', padding:'8px 10px' }}>
               <div style={{ color:'rgba(255,255,255,0.5)', marginBottom:'2px' }}>📤 Sorties</div>
-              <div style={{ color:'#FF8A80', fontWeight:'700' }}>-{fmt(totalSort)} F</div>
+              <div style={{ color:'#FF8A80', fontWeight:'700' }}>-{fmt(totalSort)} {devise}</div>
             </div>
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:'12px', color:'#E8634A', fontWeight:'700' }}>jusqu'a {s.heureDepart}</div>
-                  <div style={{ fontSize:'11px', color:'#C9A84C', fontWeight:'700' }}>{fmt(s.montantNum)} F</div>
+                  <div style={{ fontSize:'11px', color:'#C9A84C', fontWeight:'700' }}>{fmt(s.montantNum)} {devise}</div>
                 </div>
               </div>
             ))}
@@ -363,7 +363,7 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
             <div key={s.id} className="fade-slide" style={{ background:cardBg, borderRadius:'14px', padding:'14px 16px', marginBottom:'8px', borderLeft:`4px solid ${s.type==='heure'?'#E8634A':'#1B3A6B'}`, boxShadow:cardShadow, animationDelay: (i*0.08)+'s' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
                 <span style={{ fontWeight:'700', fontSize:'14px', color:texteTitre }}>{s.client}</span>
-                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montantNum)} F</span>
+                <span style={{ color:'#C9A84C', fontWeight:'900', fontSize:'14px' }}>{fmt(s.montantNum)} {devise}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:texteSecond }}>
                 <span>Ch. {s.chambre} · {s.categorie} · {s.type==='heure'?'⏱️':'🌙'}</span>
