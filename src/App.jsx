@@ -650,7 +650,12 @@ export default function App() {
         )}
 
         {onglet === 'chambres' && accesRole.includes('chambres') && (
-          <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre}/>
+          <Chambres
+            chambres={chambresGenerees}
+            chambresStats={chambresStats}
+            sombre={themeSombre}
+            devise={trouverDevise(codeDevise).symbole}
+          />
         )}
 
         {onglet === 'sejours' && accesRole.includes('sejours') && (
@@ -664,6 +669,7 @@ export default function App() {
             ouvrirFormulaire={ouvrirFormulaire}
             onFormulaireOuvert={() => setOuvrirFormulaire(false)}
             sombre={themeSombre}
+            devise={trouverDevise(codeDevise).symbole}
           />
         )}
 
