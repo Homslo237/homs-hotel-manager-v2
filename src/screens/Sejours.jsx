@@ -185,7 +185,7 @@ function piedRecu(identite) {
   return `================================\n${mention}\n================================`
 }
 
-function genererRecuEntree(s) {
+function genererRecuEntree(s, devise) {
   const identite = lireIdentiteHotel()
   return `${enteteRecu(identite)}
         REÇU D'ENTRÉE
@@ -197,13 +197,13 @@ Arrivée : ${s.dateArrivee} à ${s.heureArrivee}
 Départ  : ${s.type==='nuit' ? s.dateDepart : s.dateArrivee} à ${s.heureDepart}
 Durée   : ${s.duree}
 --------------------------------
-Montant : ${s.montant} FCFA
+Montant : ${s.montant} ${devise}
 Paiement: ${s.modePaiement}
 --------------------------------
 ${piedRecu(identite)}`
 }
 
-function genererRecuSortie(s, supplement, depassage) {
+function genererRecuSortie(s, supplement, depassage, devise) {
   const identite = lireIdentiteHotel()
   const now = maintenant()
   const aSuppl = supplement > 0
@@ -219,7 +219,7 @@ HISTORIQUE DU SEJOUR
 Entree initiale : ${s.type==='nuit' ? s.dateArrivee : s.heureArrivee} -> ${finInitiale}`
 
   historique.forEach((h, i) => {
-    sectionHistorique += `\nProlongation ${i+1}   : ${h.avant} -> ${h.apres} (+${h.montant.toLocaleString('fr-FR')} FCFA)`
+    sectionHistorique += `\nProlongation ${i+1}   : ${h.avant} -> ${h.apres} (+${h.montant.toLocaleString('fr-FR')} ${devise})`
   })
   sectionHistorique += `\n--------------------------------`
 
@@ -231,10 +231,10 @@ Chambre : ${s.chambre}
 ${sectionHistorique}
 Sortie reelle : ${now.date} à ${now.heure}${aSuppl ? `
 Dépassement   : ${depassage}
-Supplément    : ${supplement.toLocaleString('fr-FR')} FCFA` : `
+Supplément    : ${supplement.toLocaleString('fr-FR')} ${devise}` : `
 Dépassement   : Aucun`}
 --------------------------------
-Total encaissé : ${s.montant} FCFA${aSuppl ? ` + ${supplement.toLocaleString('fr-FR')} FCFA` : ''}
+Total encaissé : ${s.montant} ${devise}${aSuppl ? ` + ${supplement.toLocaleString('fr-FR')} ${devise}` : ''}
 --------------------------------
 ${piedRecu(identite)}`
 }
@@ -288,7 +288,7 @@ function ModalRecu({ texte, titre, onClose }) {
 }
 
 // ─── Modal Prolongation ───────────────────────────────────────────────────────
-function ModalProlongation({ sejour, onClose, onProlonger }) {
+function ModalProlongation({ sejour, onClose, onProlonger, devise }) {
   const [ajout, setAjout] = useState(1)
   const tarif = sejour.type==='nuit' ? tarifsNuit[sejour.categorie] : tarifsHeure[sejour.categorie]
   const supplement = tarif * ajout
@@ -306,7 +306,7 @@ function ModalProlongation({ sejour, onClose, onProlonger }) {
         </div>
         <div style={{ background:'#F0F7F0', borderRadius:'10px', padding:'12px', marginBottom:'20px', border:'1px solid #2ECC71' }}>
           <div style={{ fontSize:'12px', color:'#666' }}>Supplément à encaisser</div>
-          <div style={{ fontSize:'22px', fontWeight:'800', color:'#1B3A6B' }}>+{supplement.toLocaleString('fr-FR')} FCFA</div>
+          <div style={{ fontSize:'22px', fontWeight:'800', color:'#1B3A6B' }}>+{supplement.toLocaleString('fr-FR')} {devise}</div>
         </div>
         <div style={{ display:'flex', gap:'10px' }}>
           <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'700', color:'#666', border:'none', cursor:'pointer' }}>Annuler</button>
@@ -326,7 +326,7 @@ const inputStyle = { width:'100%', padding:'12px 14px', border:'2px solid #E0E0E
 const btnQtyStyle = { width:'40px', height:'40px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'800', fontSize:'20px', color:'#1B3A6B', border:'none', cursor:'pointer' }
 
 // ─── Formulaire nouveau séjour ────────────────────────────────────────────────
-function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tousLesSejours=[] }) {
+function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tousLesSejours=[], devise }) {
   const now = maintenant()
   const [form, setForm] = useState({
     client:'', telephone:'', categorie:'Standard', chambre:'',
@@ -398,7 +398,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
     }
     const succes = onAjouter(nouveau)
     if (succes === false) { alert('Cette chambre est deja occupee ou reservee !'); return }
-    setRecuEntree(genererRecuEntree(nouveau))
+    setRecuEntree(genererRecuEntree(nouveau, devise))
   }
 
   if (recuEntree) {
@@ -542,7 +542,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
         {form.chambre && (
           <div style={{ background:'#F0F7F0', borderRadius:'12px', padding:'14px', marginBottom:'16px', border:'1px solid #2ECC71' }}>
             <div style={{ fontSize:'12px', color:'#666', marginBottom:'4px' }}>Montant total calculé</div>
-            <div style={{ fontSize:'26px', fontWeight:'800', color:'#1B3A6B' }}>{montantTotal().toLocaleString('fr-FR')} FCFA</div>
+            <div style={{ fontSize:'26px', fontWeight:'800', color:'#1B3A6B' }}>{montantTotal().toLocaleString('fr-FR')} {devise}</div>
             <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Ch. {form.chambre} · {form.categorie} · {dureeCalculee().label}</div>
           </div>
         )}
@@ -569,7 +569,7 @@ const statuts = {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert, sombre=false }) {
+export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert, sombre=false, devise='FCFA' }) {
   const sejours = sejoursProps || []
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState('tous')
@@ -618,7 +618,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       supplement = tarif * unites
       depassage = `${Math.floor(tr.depasseMinutes/60)}h${String(tr.depasseMinutes%60).padStart(2,'0')}`
     }
-    const texte = genererRecuSortie(s, supplement, depassage)
+    const texte = genererRecuSortie(s, supplement, depassage, devise)
     if (onTerminer) onTerminer(s.id)
     setRecuVisible({ texte, titre:"🧾 REÇU DE SORTIE" })
   }
@@ -742,10 +742,10 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
               )}
 
               <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px' }}>{s.montant} FCFA</span>
+                <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px' }}>{s.montant} {devise}</span>
                 {!isNoShow && (
                   <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                    <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s), titre:"🧾 REÇU D'ENTRÉE" })}
+                    <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s, devise), titre:"🧾 REÇU D'ENTRÉE" })}
                       style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#1A2744':'#EEF2FF', color: sombre?'#93C5FD':'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                       <Printer size={11}/> Entrée
                     </button>
@@ -776,8 +776,8 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       </div>
 
       {showConfetti && <Confetti onFin={()=>setShowConfetti(false)}/>}
-      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours}/>}
-      {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger}/>}
+      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours} devise={devise}/>}
+      {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger} devise={devise}/>}
       {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
     </div>
   )
