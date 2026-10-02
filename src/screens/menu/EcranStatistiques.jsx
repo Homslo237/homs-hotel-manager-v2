@@ -124,7 +124,7 @@ function GraphDonut({ data }) {
   )
 }
 
-export default function EcranStatistiques({ onClose, historique = [] }) {
+export default function EcranStatistiques({ onClose, historique = [], devise='FCFA' }) {
   const [periode, setPeriode] = useState('mois')
   const [onglet, setOnglet] = useState('kpi')
 
@@ -241,7 +241,7 @@ export default function EcranStatistiques({ onClose, historique = [] }) {
           <>
             <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', borderRadius:'16px', padding:'20px', marginBottom:'12px' }}>
               <div style={{ fontSize:'13px', color:'rgba(255,255,255,0.8)', marginBottom:'6px' }}>💰 Solde net · {periodes.find(p=>p.id===periode)?.label}</div>
-              <div style={{ fontSize:'34px', fontWeight:'800', color:'#C9A84C' }}>{fmt(soldeNet)} FCFA</div>
+              <div style={{ fontSize:'34px', fontWeight:'800', color:'#C9A84C' }}>{fmt(soldeNet)} {devise}</div>
               <div style={{ display:'flex', gap:'16px', marginTop:'10px', fontSize:'12px', color:'rgba(255,255,255,0.8)' }}>
                 <span>📥 +{fmt(totalEntrees)}</span>
                 <span style={{ color:'#FF8A80' }}>📤 -{fmt(totalSorties)}</span>
@@ -250,10 +250,10 @@ export default function EcranStatistiques({ onClose, historique = [] }) {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
               {[
-                { label:'Recettes séjours', valeur:`${fmt(totalSejours)} FCFA`, couleur:'#2ECC71', icon:'🏨' },
-                { label:'RevPAR',           valeur:`${fmt(revPAR)} FCFA`,       couleur:'#C9A84C', icon:'📊' },
+                { label:'Recettes séjours', valeur:`${fmt(totalSejours)} ${devise}`, couleur:'#2ECC71', icon:'🏨' },
+                { label:'RevPAR',           valeur:`${fmt(revPAR)} ${devise}`,       couleur:'#C9A84C', icon:'📊' },
                 { label:'Mouvements',       valeur:items.length,                couleur:'#1B3A6B', icon:'📋' },
-                { label:'No-show conservés',valeur:`${fmt(totalNoShow)} FCFA`,  couleur:'#E8634A', icon:'🚫' },
+                { label:'No-show conservés',valeur:`${fmt(totalNoShow)} ${devise}`,  couleur:'#E8634A', icon:'🚫' },
               ].map(k => (
                 <div key={k.label} style={{ background:'white', borderRadius:'12px', padding:'14px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderTop:`3px solid ${k.couleur}` }}>
                   <div style={{ fontSize:'18px', marginBottom:'4px' }}>{k.icon}</div>
@@ -316,7 +316,7 @@ export default function EcranStatistiques({ onClose, historique = [] }) {
               ].map(r => (
                 <div key={r.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid #F0F0F0' }}>
                   <span style={{ fontSize:'13px', color:'#666' }}>{r.icon} {r.label}</span>
-                  <span style={{ fontWeight:'800', fontSize:'14px', color:r.couleur }}>{fmt(r.montant)} FCFA</span>
+                  <span style={{ fontWeight:'800', fontSize:'14px', color:r.couleur }}>{fmt(r.montant)} {devise}</span>
                 </div>
               ))}
             </div>
@@ -339,7 +339,7 @@ export default function EcranStatistiques({ onClose, historique = [] }) {
                     <div style={{ fontSize:'11px', color:'#999' }}>{c.sejours} séjour{c.sejours>1?'s':''}</div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontWeight:'800', fontSize:'13px', color:'#C9A84C' }}>{fmt(c.total)} FCFA</div>
+                    <div style={{ fontWeight:'800', fontSize:'13px', color:'#C9A84C' }}>{fmt(c.total)} {devise}</div>
                     {i===0 && <div style={{ fontSize:'10px', color:'#C9A84C', fontWeight:'700' }}>⭐ VIP</div>}
                   </div>
                 </div>
@@ -351,8 +351,8 @@ export default function EcranStatistiques({ onClose, historique = [] }) {
               {[
                 { label:'Clients uniques',       valeur:Object.keys(clientsMap).length, icon:'👥' },
                 { label:'Séjours enregistrés',   valeur:items.filter(h=>h.type==='sejour'&&!h.noShow).length, icon:'🏨' },
-                { label:'Panier moyen / séjour', valeur:`${fmt(Math.round(totalSejours/Math.max(items.filter(h=>h.type==='sejour'&&!h.noShow).length,1)))} FCFA`, icon:'💰' },
-                { label:'No-show conservés',     valeur:`${fmt(totalNoShow)} FCFA`, icon:'🚫' },
+                { label:'Panier moyen / séjour', valeur:`${fmt(Math.round(totalSejours/Math.max(items.filter(h=>h.type==='sejour'&&!h.noShow).length,1)))} ${devise}`, icon:'💰' },
+                { label:'No-show conservés',     valeur:`${fmt(totalNoShow)} ${devise}`, icon:'🚫' },
               ].map(s => (
                 <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid #F0F0F0' }}>
                   <span style={{ fontSize:'13px', color:'#666' }}>{s.icon} {s.label}</span>
