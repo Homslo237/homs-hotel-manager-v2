@@ -231,7 +231,7 @@ function sauvegarderThemeUtilisateur(userId, sombre) {
   try { localStorage.setItem(`homs_theme_${userId}`, sombre ? 'sombre' : 'clair') } catch {}
 }
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange }) {
+export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange, devise='FCFA' }) {
   const [ecranActif, setEcranActif] = useState(null)
   const [identite, setIdentite] = useState(() => {
     try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
@@ -408,7 +408,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
       {ecranActif==='directeur'    && <EcranDirecteur      onClose={()=>setEcranActif(null)} onDeviseChange={onDeviseChange}/>}
       {ecranActif==='identite'     && <EcranIdentite       onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite}/>}
       {ecranActif==='utilisateurs' && <EcranUtilisateurs   onClose={()=>setEcranActif(null)}/>}
-      {ecranActif==='statistiques' && <EcranStatistiques   onClose={()=>setEcranActif(null)} historique={historique}/>}
+      {ecranActif==='statistiques' && <EcranStatistiques   onClose={()=>setEcranActif(null)} historique={historique} devise={devise}/>}
       {ecranActif==='profil'       && <EcranProfil         onClose={()=>setEcranActif(null)} utilisateur={utilisateur} onProfilChange={setProfilUtilisateur}/>}
       {ecranActif==='journal'      && <EcranJournal        onClose={()=>setEcranActif(null)} journal={journal} utilisateur={utilisateur}/>}
     </>
