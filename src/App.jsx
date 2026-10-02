@@ -696,6 +696,7 @@ export default function App() {
             journal={journal}
             onThemeChange={setThemeSombre}
             onDeviseChange={setCodeDevise}
+            devise={trouverDevise(codeDevise).symbole}
           />
         )}
       </div>
