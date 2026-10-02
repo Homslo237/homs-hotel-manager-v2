@@ -21,7 +21,7 @@ const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
 
 // ─── Modal détail chambre ─────────────────────────────────────────────────────
-function ModalChambre({ chambre, onClose, onChangerStatut }) {
+function ModalChambre({ chambre, onClose, onChangerStatut, devise }) {
   const [nouveauStatut, setNouveauStatut] = useState(chambre.statut)
   const [noteProblem,   setNoteProblem]   = useState(chambre.probleme || '')
   const s = statuts[chambre.statut] || statuts.libre
@@ -85,12 +85,12 @@ function ModalChambre({ chambre, onClose, onChangerStatut }) {
           <div style={{ background:'#F8F9FA', borderRadius:'10px', padding:'12px', textAlign:'center' }}>
             <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>Nuit</div>
             <div style={{ fontSize:'16px', fontWeight:'800', color:'#C9A84C' }}>{(chambre.tarifNuit||0).toLocaleString('fr-FR')}</div>
-            <div style={{ fontSize:'10px', color:'#888' }}>FCFA</div>
+            <div style={{ fontSize:'10px', color:'#888' }}>{devise}</div>
           </div>
           <div style={{ background:'#F8F9FA', borderRadius:'10px', padding:'12px', textAlign:'center' }}>
             <div style={{ fontSize:'11px', color:'#888', marginBottom:'4px' }}>Heure</div>
             <div style={{ fontSize:'16px', fontWeight:'800', color:'#C9A84C' }}>{(chambre.tarifHeure||0).toLocaleString('fr-FR')}</div>
-            <div style={{ fontSize:'10px', color:'#888' }}>FCFA</div>
+            <div style={{ fontSize:'10px', color:'#888' }}>{devise}</div>
           </div>
         </div>
 
@@ -129,7 +129,7 @@ function ModalChambre({ chambre, onClose, onChangerStatut }) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Chambres({ chambres:chambresProps=[], chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, onMajStats, onMajChambre, sombre=false }) {
+export default function Chambres({ chambres:chambresProps=[], chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, onMajStats, onMajChambre, sombre=false, devise='FCFA' }) {
   const [chambres,         setChambres]         = useState([])
   const [recherche,        setRecherche]        = useState('')
   const [filtre,           setFiltre]           = useState('tous')
@@ -273,7 +273,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
                   {c.client && <div style={{ fontSize:'12px', color:texteTitre, fontWeight:'600', marginBottom:'2px' }}>👤 {c.client.split(' ').pop()}</div>}
                   {c.probleme && <div style={{ fontSize:'11px', color:'#E74C3C' }}>⚠️ {c.probleme.substring(0,20)}</div>}
                   <div style={{ fontSize:'11px', color:'#C9A84C', fontWeight:'700', marginTop:'6px' }}>
-                    {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit
+                    {(c.tarifNuit||0).toLocaleString('fr-FR')} {devise}/nuit
                   </div>
                 </div>
               )
@@ -297,7 +297,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
                       <span style={{ fontWeight:'700', fontSize:'14px', color:texteTitre }}>Ch. {c.num}</span>
                       <span style={{ background:s.couleur, color:'white', fontSize:'10px', fontWeight:'600', padding:'2px 8px', borderRadius:'10px' }}>{s.label}</span>
                     </div>
-                    <div style={{ fontSize:'12px', color:texteSecond, marginTop:'2px' }}>{c.cat} · {(c.tarifNuit||0).toLocaleString('fr-FR')} F/nuit</div>
+                    <div style={{ fontSize:'12px', color:texteSecond, marginTop:'2px' }}>{c.cat} · {(c.tarifNuit||0).toLocaleString('fr-FR')} {devise}/nuit</div>
                     {c.client && <div style={{ fontSize:'12px', color:texteTitre, fontWeight:'600', marginTop:'2px' }}>👤 {c.client}</div>}
                   </div>
                 </div>
@@ -319,6 +319,7 @@ export default function Chambres({ chambres:chambresProps=[], chambresStats={tot
           chambre={chambreSelectee}
           onClose={()=>setChambreSelectee(null)}
           onChangerStatut={handleChangerStatut}
+          devise={devise}
         />
       )}
     </div>
