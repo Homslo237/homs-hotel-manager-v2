@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '../firebase'
 
 // ─── Styles d'animation ───────────────────────────────────────────────────────
 const styleAnim = `
@@ -74,6 +76,11 @@ const ROLES = [
   { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
+// ─── Email Firebase par rôle (compte directeur par défaut) ───────────────────
+const EMAIL_PAR_ROLE = {
+  directeur: 'admin@homs.com',
+}
+
 // ─── Lire les utilisateurs depuis localStorage ────────────────────────────────
 function lireUtilisateurs() {
   try {
@@ -134,25 +141,41 @@ export default function Connexion({ onConnexion }) {
     setTimeout(() => setEtape(2), 300)
   }
 
-  const handleConnexion = () => {
+  const handleConnexion = async () => {
     if (!mdp) { setErreur('Veuillez entrer votre mot de passe.'); return }
     setErreur('')
     setLoading(true)
 
+    const now = new Date()
+    const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+
+    // ── Cas 1 : Directeur → Firebase Auth ────────────────────────────────────
+    if (role.id === 'directeur') {
+      const email = EMAIL_PAR_ROLE.directeur
+
+      // Essai Firebase Auth
+      try {
+        await signInWithEmailAndPassword(auth, email, mdp)
+        setLoading(false)
+        onConnexion({ nom:'Directeur', role:'directeur', email, derniereConnexion: horodatage })
+        return
+      } catch (firebaseErr) {
+        // Firebase a échoué → on tente le fallback localStorage (admin1234)
+        if (mdp === 'admin1234') {
+          setLoading(false)
+          onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', derniereConnexion: horodatage })
+          return
+        }
+        setLoading(false)
+        setErreur('Mot de passe incorrect.')
+        return
+      }
+    }
+
+    // ── Cas 2 : Réceptionniste / Caissier → localStorage ─────────────────────
     setTimeout(() => {
       setLoading(false)
       const utilisateurs = lireUtilisateurs()
-
-      // Compte directeur par défaut (toujours disponible)
-      if (role.id === 'directeur' && mdp === 'admin1234') {
-        // Enregistrer dernière connexion
-        const now = new Date()
-        const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-        onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', derniereConnexion: horodatage })
-        return
-      }
-
-      // Chercher dans les comptes créés
       const user = utilisateurs.find(u =>
         u.role === role.id &&
         u.motDePasse === mdp &&
@@ -160,16 +183,13 @@ export default function Connexion({ onConnexion }) {
       )
 
       if (user) {
-        // Mettre à jour la dernière connexion
-        const now = new Date()
-        const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
         const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
         localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
         onConnexion({ nom:user.nom, role:user.role, email:user.email || '', derniereConnexion:horodatage })
       } else {
         setErreur('Mot de passe incorrect ou compte désactivé.')
       }
-    }, 1200)
+    }, 1000)
   }
 
   // ── Recherche utilisateur pour reset mdp ──
@@ -393,7 +413,6 @@ export default function Connexion({ onConnexion }) {
             <span style={{ color:'#C9A84C', fontWeight:'700', fontSize:'15px' }}>Mot de passe oublié</span>
           </div>
 
-          {/* Étape 1 : chercher le nom */}
           {!userTrouve && (
             <>
               <div style={{ marginBottom:'14px' }}>
@@ -415,7 +434,6 @@ export default function Connexion({ onConnexion }) {
             </>
           )}
 
-          {/* Étape 2 : question secrète */}
           {userTrouve && !mdpReset && (
             <>
               <div style={{ background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#2ECC71' }}>
@@ -440,7 +458,6 @@ export default function Connexion({ onConnexion }) {
             </>
           )}
 
-          {/* Étape 3 : nouveau mot de passe */}
           {userTrouve && mdpReset && (
             <>
               <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#C9A84C' }}>
