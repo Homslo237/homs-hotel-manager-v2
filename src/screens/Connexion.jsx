@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '../firebase'
 
-// ─── Styles d'animation ───────────────────────────────────────────────────────
 const styleAnim = `
   @keyframes fadeDown {
     from { opacity: 0; transform: translateY(-40px); }
@@ -76,12 +75,10 @@ const ROLES = [
   { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
-// ─── Email Firebase par rôle (compte directeur par défaut) ───────────────────
 const EMAIL_PAR_ROLE = {
   directeur: 'admin@homs.com',
 }
 
-// ─── Lire les utilisateurs depuis localStorage ────────────────────────────────
 function lireUtilisateurs() {
   try {
     const s = localStorage.getItem('homs_utilisateurs')
@@ -119,7 +116,6 @@ export default function Connexion({ onConnexion }) {
   const [erreur, setErreur]   = useState('')
   const [etape, setEtape] = useState(1)
 
-  // ── Mot de passe oublié ──
   const [showOublie, setShowOublie]   = useState(false)
   const [nomOublie, setNomOublie]     = useState('')
   const [reponse, setReponse]         = useState('')
@@ -149,18 +145,15 @@ export default function Connexion({ onConnexion }) {
     const now = new Date()
     const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 
-    // ── Cas 1 : Directeur → Firebase Auth ────────────────────────────────────
+    // ── Cas 1 : Directeur → Firebase Auth ──
     if (role.id === 'directeur') {
       const email = EMAIL_PAR_ROLE.directeur
-
-      // Essai Firebase Auth
       try {
         await signInWithEmailAndPassword(auth, email, mdp)
         setLoading(false)
         onConnexion({ nom:'Directeur', role:'directeur', email, derniereConnexion: horodatage })
         return
       } catch (firebaseErr) {
-        // Firebase a échoué → on tente le fallback localStorage (admin1234)
         if (mdp === 'admin1234') {
           setLoading(false)
           onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', derniereConnexion: horodatage })
@@ -172,27 +165,25 @@ export default function Connexion({ onConnexion }) {
       }
     }
 
-    // ── Cas 2 : Réceptionniste / Caissier → localStorage ─────────────────────
-    setTimeout(() => {
-      setLoading(false)
-      const utilisateurs = lireUtilisateurs()
-      const user = utilisateurs.find(u =>
-        u.role === role.id &&
-        u.motDePasse === mdp &&
-        u.actif !== false
-      )
+    // ── Cas 2 : Réceptionniste / Caissier → localStorage ──
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setLoading(false)
+    const utilisateurs = lireUtilisateurs()
+    const user = utilisateurs.find(u =>
+      u.role === role.id &&
+      u.motDePasse === mdp &&
+      u.actif !== false
+    )
 
-      if (user) {
-        const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
-        localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
-        onConnexion({ nom:user.nom, role:user.role, email:user.email || '', derniereConnexion:horodatage })
-      } else {
-        setErreur('Mot de passe incorrect ou compte désactivé.')
-      }
-    }, 1000)
+    if (user) {
+      const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
+      localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
+      onConnexion({ nom:user.nom, role:user.role, email:user.email || '', derniereConnexion:horodatage })
+    } else {
+      setErreur('Mot de passe incorrect ou compte désactivé.')
+    }
   }
 
-  // ── Recherche utilisateur pour reset mdp ──
   const handleChercherUser = () => {
     const utilisateurs = lireUtilisateurs()
     const u = utilisateurs.find(u => u.nom.toLowerCase() === nomOublie.trim().toLowerCase() && u.role === role.id)
@@ -222,7 +213,6 @@ export default function Connexion({ onConnexion }) {
     alert('✅ Mot de passe mis à jour ! Vous pouvez vous connecter.')
   }
 
-  // ── Styles champ ──
   const champStyle = (couleur) => ({
     width:'100%', padding:'14px 16px',
     background:'rgba(255,255,255,0.08)',
@@ -240,7 +230,6 @@ export default function Connexion({ onConnexion }) {
       position:'relative', paddingBottom:'40px'
     }}>
 
-      {/* Particules */}
       {PARTICULES.map(p => (
         <div key={p.id} style={{
           position:'absolute', left:`${p.x}%`, top:`${p.y}%`,
@@ -254,7 +243,6 @@ export default function Connexion({ onConnexion }) {
         }}/>
       ))}
 
-      {/* Logo + titre */}
       <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'8px' }}>
         <div className="fade-down" style={{ animationDelay:'0.1s' }}>
           <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
@@ -286,7 +274,6 @@ export default function Connexion({ onConnexion }) {
         </div>
       </div>
 
-      {/* ÉTAPE 1 : Choix du rôle */}
       {etape === 1 && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'28px', animationDelay:'0.8s' }}>
           <p style={{ textAlign:'center', color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'20px', letterSpacing:'1px' }}>
@@ -336,7 +323,6 @@ export default function Connexion({ onConnexion }) {
         </div>
       )}
 
-      {/* ÉTAPE 2 : Mot de passe */}
       {etape === 2 && role && !showOublie && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'24px' }}>
@@ -402,7 +388,6 @@ export default function Connexion({ onConnexion }) {
         </div>
       )}
 
-      {/* ÉTAPE 2 : Mot de passe oublié */}
       {etape === 2 && role && showOublie && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px' }}>
@@ -484,7 +469,6 @@ export default function Connexion({ onConnexion }) {
         </div>
       )}
 
-      {/* Footer */}
       <div style={{ zIndex:1, width:'100%', paddingTop:'32px', paddingBottom:'20px', textAlign:'center' }}>
         <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>Propulsé par</p>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
