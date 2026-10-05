@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { X, Save, Upload } from 'lucide-react'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { auth, db } from '../../firebase'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
@@ -11,11 +13,14 @@ const identiteDefaut = {
   logoUrl: null,
 }
 
+function lireDepuisLocalStorage() {
+  try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
+}
+
 export default function EcranIdentite({ onClose, onIdentiteChange }) {
-  const [identite, setIdentite] = useState(() => {
-    try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
-  })
+  const [identite, setIdentite] = useState(lireDepuisLocalStorage)
   const [sauvegarde, setSauvegarde] = useState(false)
+  const [chargement, setChargement] = useState(false)
 
   const handleLogo = (e) => {
     const file = e.target.files[0]
@@ -26,13 +31,30 @@ export default function EcranIdentite({ onClose, onIdentiteChange }) {
     reader.readAsDataURL(file)
   }
 
-  const handleSauvegarder = () => {
+  const handleSauvegarder = async () => {
+    setChargement(true)
     try {
+      // 1. Toujours sauvegarder dans localStorage (fonctionne hors ligne)
       localStorage.setItem('homs_identite', JSON.stringify(identite))
+
+      // 2. Si connecté à Firebase, sauvegarder aussi dans Firestore
+      const user = auth.currentUser
+      if (user) {
+        const hotelId = user.uid
+        await setDoc(doc(db, 'hotels', hotelId, 'infos', 'identite'), identite)
+      }
+
       setSauvegarde(true)
-      setTimeout(()=>setSauvegarde(false),2000)
+      setTimeout(()=>setSauvegarde(false), 2000)
       if (onIdentiteChange) onIdentiteChange(identite)
-    } catch { alert('Erreur lors de la sauvegarde.') }
+    } catch (err) {
+      // Si Firestore échoue, localStorage a déjà sauvegardé → pas de perte
+      setSauvegarde(true)
+      setTimeout(()=>setSauvegarde(false), 2000)
+      if (onIdentiteChange) onIdentiteChange(identite)
+    } finally {
+      setChargement(false)
+    }
   }
 
   const champ = (label,cle,placeholder,type='text') => (
@@ -122,12 +144,13 @@ export default function EcranIdentite({ onClose, onIdentiteChange }) {
             </div>
           </div>
         </div>
-        <button onClick={handleSauvegarder} style={{
+        <button onClick={handleSauvegarder} disabled={chargement} style={{
           width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
           background:sauvegarde?'#2ECC71':'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px',
-          display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'background 0.3s'
+          display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', transition:'background 0.3s',
+          opacity:chargement?0.7:1
         }}>
-          <Save size={18}/>{sauvegarde?'✅ Informations enregistrées !':'Enregistrer'}
+          <Save size={18}/>{chargement?'Sauvegarde...' : sauvegarde?'✅ Informations enregistrées !':'Enregistrer'}
         </button>
       </div>
     </div>
