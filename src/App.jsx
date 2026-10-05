@@ -8,6 +8,8 @@ import Caisse from './screens/Caisse'
 import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
 import { DEVISES, detecterDevise, lireDevise, sauvegarderDevise, trouverDevise } from './devises'
+import { auth, db } from './firebase'
+import { doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -77,14 +79,45 @@ export function genererChambres(sejours = []) {
   return chambres
 }
 
+// ─── localStorage (fallback hors ligne) ──────────────────────────────────────
 const STORAGE_KEY = 'homs_data_v1'
-function sauvegarder(data) {
+function sauvegarderLocal(data) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
 }
-function charger() {
+function chargerLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
+  } catch (e) { return null }
+}
+
+// ─── Firestore helpers ────────────────────────────────────────────────────────
+function getHotelId() {
+  const user = auth.currentUser
+  return user ? user.uid : null
+}
+
+async function sauvegarderFirestore(sejours, entreesDiverses, sortiesDiverses, historique) {
+  const hotelId = getHotelId()
+  if (!hotelId) return
+  try {
+    await setDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'), {
+      sejours,
+      entreesDiverses,
+      sortiesDiverses,
+      historique,
+      updatedAt: new Date().toISOString(),
+    })
+  } catch (e) {}
+}
+
+async function chargerFirestore() {
+  const hotelId = getHotelId()
+  if (!hotelId) return null
+  try {
+    const snap = await getDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'))
+    if (snap.exists()) return snap.data()
+    return null
   } catch (e) { return null }
 }
 
@@ -287,6 +320,7 @@ export default function App() {
   const [themeSombre,      setThemeSombre]      = useState(false)
   const [codeDevise,       setCodeDevise]       = useState(() => lireDevise())
   const [showChoixDevise,  setShowChoixDevise]  = useState(false)
+  const [chargementDonnees, setChargementDonnees] = useState(false)
 
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
@@ -299,6 +333,7 @@ export default function App() {
   const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
   const intervalRef = useRef(null)
+  const saveTimeoutRef = useRef(null)
 
   // ── Ajouter une entrée au journal ──
   const ajouterAuJournal = (entree) => {
@@ -309,26 +344,65 @@ export default function App() {
     })
   }
 
+  // ── Sauvegarde combinée localStorage + Firestore (avec debounce) ──
+  const sauvegarderTout = (sejours, entreesDiverses, sortiesDiverses, historique) => {
+    sauvegarderLocal({ sejours, entreesDiverses, sortiesDiverses, historique })
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => {
+      sauvegarderFirestore(sejours, entreesDiverses, sortiesDiverses, historique)
+    }, 2000)
+  }
+
+  // ── Chargement initial ──
   useEffect(() => {
     const el = document.createElement('style')
     el.textContent = styleTransition
     document.head.appendChild(el)
-    const sauvegarde = charger()
-    if (sauvegarde) {
-      setSejours(sauvegarde.sejours || SEJOURS_DEMO)
-      setEntreesDiverses(sauvegarde.entreesDiverses || [])
-      setSortiesDiverses(sauvegarde.sortiesDiverses || [])
-      setHistorique(sauvegarde.historique || [])
+
+    // Charger localStorage immédiatement (instantané)
+    const local = chargerLocal()
+    if (local) {
+      setSejours(local.sejours || SEJOURS_DEMO)
+      setEntreesDiverses(local.entreesDiverses || [])
+      setSortiesDiverses(local.sortiesDiverses || [])
+      setHistorique(local.historique || [])
     } else {
       setSejours(SEJOURS_DEMO)
     }
     setJournal(chargerJournal())
+
     return () => document.head.removeChild(el)
   }, [])
 
+  // ── Chargement Firestore après connexion ──
+  useEffect(() => {
+    if (!utilisateur) return
+    const hotelId = getHotelId()
+    if (!hotelId) return
+
+    setChargementDonnees(true)
+    chargerFirestore().then(data => {
+      if (data) {
+        setSejours(data.sejours || [])
+        setEntreesDiverses(data.entreesDiverses || [])
+        setSortiesDiverses(data.sortiesDiverses || [])
+        setHistorique(data.historique || [])
+        // Mettre à jour localStorage avec les données Firestore
+        sauvegarderLocal({
+          sejours: data.sejours || [],
+          entreesDiverses: data.entreesDiverses || [],
+          sortiesDiverses: data.sortiesDiverses || [],
+          historique: data.historique || [],
+        })
+      }
+      setChargementDonnees(false)
+    })
+  }, [utilisateur])
+
+  // ── Sauvegarde automatique à chaque changement ──
   useEffect(() => {
     if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0 || historique.length > 0) {
-      sauvegarder({ sejours, entreesDiverses, sortiesDiverses, historique })
+      sauvegarderTout(sejours, entreesDiverses, sortiesDiverses, historique)
     }
   }, [sejours, entreesDiverses, sortiesDiverses, historique])
 
@@ -337,7 +411,6 @@ export default function App() {
       const now = new Date()
       const idsALiberer = []
 
-      // Sonneries et libération automatique
       sejours.filter(s => s.statut === 'en_cours').forEach(s => {
         const [, fin] = periodeDuSejour(s)
         if (!fin) return
@@ -368,7 +441,6 @@ export default function App() {
         ))
       }
 
-      // Détection No-Show
       const noShows = sejours.filter(s => {
         if (s.statut !== 'a_venir') return false
         if (noShowIgnores[s.id]) return false
@@ -388,7 +460,6 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [sejours, alertesSonnees, noShowIgnores])
 
-  // Confirmer No-Show → statut no_show
   const confirmerNoShow = (id) => {
     setSejours(prev => prev.map(s =>
       s.id === id ? { ...s, statut:'no_show' } : s
@@ -397,7 +468,6 @@ export default function App() {
     jouerSonnerie('alerte')
   }
 
-  // Patienter
   const ignorerNoShow = (id) => {
     setNoShowIgnores(prev => ({ ...prev, [id]: true }))
     setNoShowASignaler(prev => prev.filter(s => s.id !== id))
@@ -413,7 +483,6 @@ export default function App() {
     aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
-  // ── sejoursEncaisses inclut les no_show (montant conservé) ──
   const sejoursEncaisses = sejours.filter(s =>
     s.statut === 'en_cours' ||
     s.statut === 'a_venir'  ||
@@ -549,7 +618,6 @@ export default function App() {
     setThemeSombre(lireThemeUtilisateur(user.nom))
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
-    // Premier lancement : aucune devise enregistrée → on demande à choisir
     if (!lireDevise()) setShowChoixDevise(true)
   }
 
@@ -572,13 +640,10 @@ export default function App() {
     setShowChoixDevise(false)
   }
 
-  // ── Clôture de caisse : archive tout + vide la caisse active ──
-  // Les no_show sont archivés ET retirés de la liste après clôture
   const cloturerCaisse = () => {
     const maintenant = new Date()
     const horodatage = `${String(maintenant.getDate()).padStart(2,'0')}/${String(maintenant.getMonth()+1).padStart(2,'0')}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2,'0')}:${String(maintenant.getMinutes()).padStart(2,'0')}`
 
-    // Archiver séjours + no_show dans l'historique permanent
     const entreesSejours = sejours
       .filter(s => s.statut === 'en_cours' || s.statut === 'a_venir' || s.statut === 'termine' || s.statut === 'no_show')
       .map(s => ({
@@ -603,8 +668,6 @@ export default function App() {
     }))
 
     setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
-
-    // Vider la caisse : retirer terminés ET no_show
     setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
     setEntreesDiverses([])
     setSortiesDiverses([])
@@ -632,6 +695,17 @@ export default function App() {
   if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion}/>
 
   const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
+
+  // ── Indicateur de chargement Firestore ──
+  if (chargementDonnees) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#F5F7FA', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'16px' }}>
+        <div style={{ width:'40px', height:'40px', border:'4px solid #E0E0E0', borderTopColor:'#1B3A6B', borderRadius:'50%', animation:'spin 0.8s linear infinite' }}/>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ color:'#1B3A6B', fontWeight:'700', fontSize:'14px' }}>Synchronisation des données...</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
@@ -711,7 +785,6 @@ export default function App() {
         }}
       />
 
-      {/* Alerte No-Show */}
       {noShowASignaler.length > 0 && ecran === 'app' && (
         <AlerteNoShow
           sejours={noShowASignaler}
@@ -720,7 +793,6 @@ export default function App() {
         />
       )}
 
-      {/* Choix de la devise au premier lancement */}
       {showChoixDevise && ecran === 'app' && (
         <ModalChoixDevise
           codeDetecte={detecterDevise()}
