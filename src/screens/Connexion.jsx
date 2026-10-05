@@ -149,14 +149,27 @@ export default function Connexion({ onConnexion }) {
     if (role.id === 'directeur') {
       const email = EMAIL_PAR_ROLE.directeur
       try {
-        await signInWithEmailAndPassword(auth, email, mdp)
+        const resultat = await signInWithEmailAndPassword(auth, email, mdp)
         setLoading(false)
-        onConnexion({ nom:'Directeur', role:'directeur', email, derniereConnexion: horodatage })
+        onConnexion({
+          nom: 'Directeur',
+          role: 'directeur',
+          email,
+          uid: resultat.user.uid,
+          derniereConnexion: horodatage
+        })
         return
       } catch (firebaseErr) {
+        // Fallback localStorage si pas de connexion internet
         if (mdp === 'admin1234') {
           setLoading(false)
-          onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', derniereConnexion: horodatage })
+          onConnexion({
+            nom: 'Directeur',
+            role: 'directeur',
+            email: 'admin@homs.com',
+            uid: 'admin_local',
+            derniereConnexion: horodatage
+          })
           return
         }
         setLoading(false)
@@ -178,7 +191,13 @@ export default function Connexion({ onConnexion }) {
     if (user) {
       const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
       localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
-      onConnexion({ nom:user.nom, role:user.role, email:user.email || '', derniereConnexion:horodatage })
+      onConnexion({
+        nom: user.nom,
+        role: user.role,
+        email: user.email || '',
+        uid: null,
+        derniereConnexion: horodatage
+      })
     } else {
       setErreur('Mot de passe incorrect ou compte désactivé.')
     }
