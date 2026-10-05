@@ -51,7 +51,6 @@ function periodesSeChevauchent(debutA, finA, debutB, finB) {
 export function genererChambres(sejours = []) {
   const chambres = []
   const maintenant = new Date()
-
   CONFIG_CHAMBRES.categories.forEach(cat => {
     for (let i = 1; i <= cat.nombre; i++) {
       const num = String(cat.debut + i)
@@ -79,7 +78,6 @@ export function genererChambres(sejours = []) {
   return chambres
 }
 
-// ─── localStorage (fallback hors ligne) ──────────────────────────────────────
 const STORAGE_KEY = 'homs_data_v1'
 function sauvegarderLocal(data) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
@@ -91,9 +89,8 @@ function chargerLocal() {
   } catch (e) { return null }
 }
 
-// ─── Firestore helpers ────────────────────────────────────────────────────────
 async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses, historique) {
-  if (!hotelId) return
+  if (!hotelId || hotelId === 'admin_local') return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'), {
       sejours,
@@ -106,7 +103,7 @@ async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDi
 }
 
 async function chargerFirestore(hotelId) {
-  if (!hotelId) return null
+  if (!hotelId || hotelId === 'admin_local') return null
   try {
     const snap = await getDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'))
     if (snap.exists()) return snap.data()
@@ -114,7 +111,6 @@ async function chargerFirestore(hotelId) {
   } catch (e) { return null }
 }
 
-// ─── Journal des opérations ───────────────────────────────────────────────────
 const JOURNAL_KEY = 'homs_journal'
 function chargerJournal() {
   try {
@@ -230,15 +226,15 @@ function ModalChoixDevise({ codeDetecte, onValider }) {
 }
 
 export default function App() {
-  const [ecran,            setEcran]            = useState('splash')
-  const [onglet,           setOnglet]           = useState('dashboard')
-  const [utilisateur,      setUtilisateur]      = useState(null)
-  const [hotelId,          setHotelId]          = useState(null)
-  const [cle,              setCle]              = useState(0)
-  const [ouvrirFormulaire, setOuvrirFormulaire] = useState(false)
-  const [themeSombre,      setThemeSombre]      = useState(false)
-  const [codeDevise,       setCodeDevise]       = useState(() => lireDevise())
-  const [showChoixDevise,  setShowChoixDevise]  = useState(false)
+  const [ecran,             setEcran]             = useState('splash')
+  const [onglet,            setOnglet]            = useState('dashboard')
+  const [utilisateur,       setUtilisateur]       = useState(null)
+  const [hotelId,           setHotelId]           = useState(null)
+  const [cle,               setCle]               = useState(0)
+  const [ouvrirFormulaire,  setOuvrirFormulaire]  = useState(false)
+  const [themeSombre,       setThemeSombre]       = useState(false)
+  const [codeDevise,        setCodeDevise]        = useState(() => lireDevise())
+  const [showChoixDevise,   setShowChoixDevise]   = useState(false)
   const [chargementDonnees, setChargementDonnees] = useState(false)
 
   const [sejours,         setSejours]         = useState([])
@@ -247,11 +243,10 @@ export default function App() {
   const [historique,      setHistorique]      = useState([])
   const [journal,         setJournal]         = useState([])
   const [alertesSonnees,  setAlertesSonnees]  = useState({})
-
   const [noShowASignaler, setNoShowASignaler] = useState([])
   const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
-  const intervalRef   = useRef(null)
+  const intervalRef    = useRef(null)
   const saveTimeoutRef = useRef(null)
 
   const ajouterAuJournal = (entree) => {
@@ -262,12 +257,11 @@ export default function App() {
     })
   }
 
-  // ── Sauvegarde combinée localStorage + Firestore ──
-  const sauvegarderTout = (hId, sejours, entreesDiverses, sortiesDiverses, historique) => {
-    sauvegarderLocal({ sejours, entreesDiverses, sortiesDiverses, historique })
+  const sauvegarderTout = (hId, s, ed, sd, h) => {
+    sauvegarderLocal({ sejours:s, entreesDiverses:ed, sortiesDiverses:sd, historique:h })
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
-      sauvegarderFirestore(hId, sejours, entreesDiverses, sortiesDiverses, historique)
+      sauvegarderFirestore(hId, s, ed, sd, h)
     }, 2000)
   }
 
@@ -291,10 +285,11 @@ export default function App() {
 
   // ── Chargement Firestore après connexion ──
   useEffect(() => {
-    if (!hotelId) return
+    if (!hotelId || hotelId === 'admin_local') return
     setChargementDonnees(true)
     chargerFirestore(hotelId).then(data => {
-      if (data) {
+      if (data && data.sejours !== undefined) {
+        // Firestore a des données → on les utilise
         setSejours(data.sejours || [])
         setEntreesDiverses(data.entreesDiverses || [])
         setSortiesDiverses(data.sortiesDiverses || [])
@@ -305,6 +300,18 @@ export default function App() {
           sortiesDiverses: data.sortiesDiverses || [],
           historique: data.historique || [],
         })
+      } else {
+        // Pas encore de données Firestore → on envoie le localStorage vers Firestore
+        const local = chargerLocal()
+        const s  = local?.sejours         || []
+        const ed = local?.entreesDiverses || []
+        const sd = local?.sortiesDiverses || []
+        const h  = local?.historique      || []
+        setSejours(s)
+        setEntreesDiverses(ed)
+        setSortiesDiverses(sd)
+        setHistorique(h)
+        sauvegarderFirestore(hotelId, s, ed, sd, h)
       }
       setChargementDonnees(false)
     })
@@ -313,9 +320,7 @@ export default function App() {
   // ── Sauvegarde automatique à chaque changement ──
   useEffect(() => {
     if (!hotelId) return
-    if (sejours.length > 0 || entreesDiverses.length > 0 || sortiesDiverses.length > 0 || historique.length > 0) {
-      sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
-    }
+    sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
   }, [sejours, entreesDiverses, sortiesDiverses, historique])
 
   useEffect(() => {
@@ -447,8 +452,7 @@ export default function App() {
   }
 
   const handleConnexion = (user) => {
-    // L'UID Firebase est passé depuis Connexion.jsx si dispo, sinon on utilise l'email comme ID
-    const hId = user.uid || user.email?.replace(/[^a-zA-Z0-9]/g, '_') || 'default'
+    const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
     setHotelId(hId)
     setUtilisateur(user)
     setThemeSombre(lireThemeUtilisateur(user.nom))
