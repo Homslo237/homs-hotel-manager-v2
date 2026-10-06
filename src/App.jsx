@@ -93,10 +93,7 @@ async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDi
   if (!hotelId || hotelId === 'admin_local') return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'), {
-      sejours,
-      entreesDiverses,
-      sortiesDiverses,
-      historique,
+      sejours, entreesDiverses, sortiesDiverses, historique,
       updatedAt: new Date().toISOString(),
     })
   } catch (e) {}
@@ -248,11 +245,23 @@ export default function App() {
 
   const intervalRef    = useRef(null)
   const saveTimeoutRef = useRef(null)
+  const hotelIdRef     = useRef(null)
+
+  // ── Garder hotelId dans un ref pour y accéder dans les callbacks ──
+  useEffect(() => { hotelIdRef.current = hotelId }, [hotelId])
 
   const ajouterAuJournal = (entree) => {
     setJournal(prev => {
       const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
       sauvegarderJournal(maj)
+      // Sauvegarde Firestore du journal
+      const hId = hotelIdRef.current
+      if (hId && hId !== 'admin_local') {
+        setDoc(doc(db, 'hotels', hId, 'data', 'journal'), {
+          entrees: maj,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => {})
+      }
       return maj
     })
   }
@@ -289,7 +298,6 @@ export default function App() {
     setChargementDonnees(true)
     chargerFirestore(hotelId).then(data => {
       if (data && data.sejours !== undefined) {
-        // Firestore a des données → on les utilise
         setSejours(data.sejours || [])
         setEntreesDiverses(data.entreesDiverses || [])
         setSortiesDiverses(data.sortiesDiverses || [])
@@ -301,7 +309,6 @@ export default function App() {
           historique: data.historique || [],
         })
       } else {
-        // Pas encore de données Firestore → on envoie le localStorage vers Firestore
         const local = chargerLocal()
         const s  = local?.sejours         || []
         const ed = local?.entreesDiverses || []
