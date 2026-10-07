@@ -108,6 +108,17 @@ async function chargerFirestore(hotelId) {
   } catch (e) { return null }
 }
 
+// ─── Journal Firestore ────────────────────────────────────────────────────────
+async function sauvegarderJournalFirestore(hotelId, entrees) {
+  if (!hotelId || hotelId === 'admin_local') return
+  try {
+    await setDoc(doc(db, 'hotels', hotelId, 'data', 'journal'), {
+      entrees,
+      updatedAt: new Date().toISOString(),
+    })
+  } catch (e) {}
+}
+
 const JOURNAL_KEY = 'homs_journal'
 function chargerJournal() {
   try {
@@ -247,20 +258,19 @@ export default function App() {
   const saveTimeoutRef = useRef(null)
   const hotelIdRef     = useRef(null)
 
-  // ── Garder hotelId dans un ref pour y accéder dans les callbacks ──
-  useEffect(() => { hotelIdRef.current = hotelId }, [hotelId])
+  // ── Synchroniser hotelIdRef avec hotelId ──
+  useEffect(() => {
+    hotelIdRef.current = hotelId
+  }, [hotelId])
 
-  const ajouterAuJournal = (entree) => {
+  // ── Journal : sauvegarde locale + Firestore ──
+  const ajouterAuJournal = (entree, hId) => {
     setJournal(prev => {
       const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
       sauvegarderJournal(maj)
-      // Sauvegarde Firestore du journal
-      const hId = hotelIdRef.current
-      if (hId && hId !== 'admin_local') {
-        setDoc(doc(db, 'hotels', hId, 'data', 'journal'), {
-          entrees: maj,
-          updatedAt: new Date().toISOString(),
-        }).catch(() => {})
+      const idHotel = hId || hotelIdRef.current
+      if (idHotel && idHotel !== 'admin_local') {
+        sauvegarderJournalFirestore(idHotel, maj)
       }
       return maj
     })
@@ -466,6 +476,18 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
     if (!lireDevise()) setShowChoixDevise(true)
+    // Journaliser la connexion avec hId directement (pas encore dans le state)
+    if (hId) {
+      const now = new Date()
+      const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+      const entree = { type:'connexion', utilisateur:user.nom||'Inconnu', role:user.role||'', details:`${user.nom||'Utilisateur'} s'est connecté`, date:horodatage, id:Date.now() }
+      setJournal(prev => {
+        const maj = [entree, ...prev].slice(0, 500)
+        sauvegarderJournal(maj)
+        sauvegarderJournalFirestore(hId, maj)
+        return maj
+      })
+    }
   }
 
   const handleDeconnexion = () => {
