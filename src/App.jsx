@@ -9,7 +9,7 @@ import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
 import { DEVISES, detecterDevise, lireDevise, sauvegarderDevise, trouverDevise } from './devises'
 import { db } from './firebase'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -99,16 +99,6 @@ async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDi
   } catch (e) {}
 }
 
-async function chargerFirestore(hotelId) {
-  if (!hotelId || hotelId === 'admin_local') return null
-  try {
-    const snap = await getDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'))
-    if (snap.exists()) return snap.data()
-    return null
-  } catch (e) { return null }
-}
-
-// ─── Journal Firestore ────────────────────────────────────────────────────────
 async function sauvegarderJournalFirestore(hotelId, entrees) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
@@ -254,16 +244,14 @@ export default function App() {
   const [noShowASignaler, setNoShowASignaler] = useState([])
   const [noShowIgnores,   setNoShowIgnores]   = useState({})
 
-  const intervalRef    = useRef(null)
-  const saveTimeoutRef = useRef(null)
-  const hotelIdRef     = useRef(null)
+  const intervalRef      = useRef(null)
+  const saveTimeoutRef   = useRef(null)
+  const hotelIdRef       = useRef(null)
+  const snapshotUnsubRef = useRef(null)
+  const localWriteRef    = useRef(false)
 
-  // ── Synchroniser hotelIdRef avec hotelId ──
-  useEffect(() => {
-    hotelIdRef.current = hotelId
-  }, [hotelId])
+  useEffect(() => { hotelIdRef.current = hotelId }, [hotelId])
 
-  // ── Journal : sauvegarde locale + Firestore ──
   const ajouterAuJournal = (entree, hId) => {
     setJournal(prev => {
       const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
@@ -280,7 +268,11 @@ export default function App() {
     sauvegarderLocal({ sejours:s, entreesDiverses:ed, sortiesDiverses:sd, historique:h })
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
-      sauvegarderFirestore(hId, s, ed, sd, h)
+      // On marque qu'on est nous qui écrivons pour ignorer notre propre snapshot
+      localWriteRef.current = true
+      sauvegarderFirestore(hId, s, ed, sd, h).then(() => {
+        setTimeout(() => { localWriteRef.current = false }, 1000)
+      })
     }, 2000)
   }
 
@@ -302,36 +294,58 @@ export default function App() {
     return () => document.head.removeChild(el)
   }, [])
 
-  // ── Chargement Firestore après connexion ──
+  // ── Écoute temps réel Firestore après connexion ──
   useEffect(() => {
     if (!hotelId || hotelId === 'admin_local') return
+
     setChargementDonnees(true)
-    chargerFirestore(hotelId).then(data => {
-      if (data && data.sejours !== undefined) {
-        setSejours(data.sejours || [])
-        setEntreesDiverses(data.entreesDiverses || [])
-        setSortiesDiverses(data.sortiesDiverses || [])
-        setHistorique(data.historique || [])
-        sauvegarderLocal({
-          sejours: data.sejours || [],
-          entreesDiverses: data.entreesDiverses || [],
-          sortiesDiverses: data.sortiesDiverses || [],
-          historique: data.historique || [],
-        })
-      } else {
-        const local = chargerLocal()
-        const s  = local?.sejours         || []
-        const ed = local?.entreesDiverses || []
-        const sd = local?.sortiesDiverses || []
-        const h  = local?.historique      || []
-        setSejours(s)
-        setEntreesDiverses(ed)
-        setSortiesDiverses(sd)
-        setHistorique(h)
-        sauvegarderFirestore(hotelId, s, ed, sd, h)
+
+    // Désabonner l'ancien listener si existant
+    if (snapshotUnsubRef.current) snapshotUnsubRef.current()
+
+    // Écouter en temps réel le document caisse
+    snapshotUnsubRef.current = onSnapshot(
+      doc(db, 'hotels', hotelId, 'data', 'caisse'),
+      (snap) => {
+        setChargementDonnees(false)
+
+        // Ignorer notre propre écriture
+        if (localWriteRef.current) return
+
+        if (snap.exists()) {
+          const data = snap.data()
+          setSejours(data.sejours || [])
+          setEntreesDiverses(data.entreesDiverses || [])
+          setSortiesDiverses(data.sortiesDiverses || [])
+          setHistorique(data.historique || [])
+          sauvegarderLocal({
+            sejours: data.sejours || [],
+            entreesDiverses: data.entreesDiverses || [],
+            sortiesDiverses: data.sortiesDiverses || [],
+            historique: data.historique || [],
+          })
+        } else {
+          // Pas encore de données Firestore → envoyer localStorage
+          const local = chargerLocal()
+          const s  = local?.sejours         || []
+          const ed = local?.entreesDiverses || []
+          const sd = local?.sortiesDiverses || []
+          const h  = local?.historique      || []
+          setSejours(s)
+          setEntreesDiverses(ed)
+          setSortiesDiverses(sd)
+          setHistorique(h)
+          sauvegarderFirestore(hotelId, s, ed, sd, h)
+        }
+      },
+      (error) => {
+        setChargementDonnees(false)
       }
-      setChargementDonnees(false)
-    })
+    )
+
+    return () => {
+      if (snapshotUnsubRef.current) snapshotUnsubRef.current()
+    }
   }, [hotelId])
 
   // ── Sauvegarde automatique à chaque changement ──
@@ -476,7 +490,6 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
     if (!lireDevise()) setShowChoixDevise(true)
-    // Journaliser la connexion avec hId directement (pas encore dans le state)
     if (hId) {
       const now = new Date()
       const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
@@ -492,6 +505,7 @@ export default function App() {
 
   const handleDeconnexion = () => {
     ajouterAuJournal({ type:'deconnexion', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`${utilisateur?.nom||'Utilisateur'} s'est déconnecté` })
+    if (snapshotUnsubRef.current) snapshotUnsubRef.current()
     setUtilisateur(null)
     setHotelId(null)
     setThemeSombre(false)
