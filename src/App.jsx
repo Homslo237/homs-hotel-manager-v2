@@ -8,8 +8,9 @@ import Caisse from './screens/Caisse'
 import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
 import { DEVISES, detecterDevise, lireDevise, sauvegarderDevise, trouverDevise } from './devises'
-import { db } from './firebase'
+import { db, auth } from './firebase'
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore'
+import { signOut } from 'firebase/auth'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -78,17 +79,46 @@ export function genererChambres(sejours = []) {
   return chambres
 }
 
-const STORAGE_KEY = 'homs_data_v1'
-function sauvegarderLocal(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch (e) {}
+// ─── localStorage — clés préfixées par UID ───────────────────────────────────
+function storageKey(uid, key) {
+  return uid ? `homs_${uid}_${key}` : `homs_${key}`
 }
-function chargerLocal() {
+
+function sauvegarderLocal(uid, data) {
+  try { localStorage.setItem(storageKey(uid, 'data_v1'), JSON.stringify(data)) } catch (e) {}
+}
+
+function chargerLocal(uid) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKey(uid, 'data_v1'))
     return raw ? JSON.parse(raw) : null
   } catch (e) { return null }
 }
 
+function sauvegarderJournalLocal(uid, journal) {
+  try { localStorage.setItem(storageKey(uid, 'journal'), JSON.stringify(journal)) } catch (e) {}
+}
+
+function chargerJournalLocal(uid) {
+  try {
+    const raw = localStorage.getItem(storageKey(uid, 'journal'))
+    return raw ? JSON.parse(raw) : []
+  } catch (e) { return [] }
+}
+
+function lireDeviseLocal(uid) {
+  try { return localStorage.getItem(storageKey(uid, 'devise')) || null } catch { return null }
+}
+
+function sauvegarderDeviseLocal(uid, code) {
+  try { localStorage.setItem(storageKey(uid, 'devise'), code) } catch {}
+}
+
+function lireThemeLocal(uid, userId) {
+  try { return localStorage.getItem(`homs_${uid}_theme_${userId}`) === 'sombre' } catch { return false }
+}
+
+// ─── Firestore helpers ────────────────────────────────────────────────────────
 async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses, historique) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
@@ -103,36 +133,17 @@ async function sauvegarderJournalFirestore(hotelId, entrees) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'journal'), {
-      entrees,
-      updatedAt: new Date().toISOString(),
+      entrees, updatedAt: new Date().toISOString(),
     })
   } catch (e) {}
 }
 
-const JOURNAL_KEY = 'homs_journal'
-function chargerJournal() {
-  try {
-    const raw = localStorage.getItem(JOURNAL_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch (e) { return [] }
-}
-function sauvegarderJournal(journal) {
-  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)) } catch (e) {}
-}
 function horodatageActuel() {
   const now = new Date()
   return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 }
 
-function lireThemeUtilisateur(userId) {
-  try { return localStorage.getItem(`homs_theme_${userId}`) === 'sombre' } catch { return false }
-}
-
-const SEJOURS_DEMO = [
-  { id:1, client:'M. Kouassi Ama',   telephone:'+225 07 11 22 33', chambre:'205', categorie:'Confort',  dateArrivee:'18/08/2026', heureArrivee:'14:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'3 nuits',  type:'nuit',  statut:'en_cours', montant:'105 000', montantNum:105000, modePaiement:'Orange Money' },
-  { id:2, client:'Mme Diallo Fatou', telephone:'+225 05 44 55 66', chambre:'101', categorie:'Standard', dateArrivee:'17/08/2026', heureArrivee:'10:00', dateDepart:'28/08/2026', heureDepart:'12:00', duree:'2 nuits',  type:'nuit',  statut:'en_cours', montant:'50 000',  montantNum:50000,  modePaiement:'Especes' },
-  { id:3, client:'M. Bamba Seydou',  telephone:'+225 01 77 88 99', chambre:'302', categorie:'Suite',    dateArrivee:'25/08/2026', heureArrivee:'09:30', dateDepart:'25/08/2026', heureDepart:'22:30', duree:'3 heures', type:'heure', statut:'en_cours', montant:'19 500',  montantNum:19500,  modePaiement:'MTN Mobile Money' },
-]
+const SEJOURS_DEMO = []
 
 function jouerSonnerie(type = 'alerte') {
   try {
@@ -142,14 +153,11 @@ function jouerSonnerie(type = 'alerte') {
     freqs.forEach(freq => {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.value = freq
-      osc.type = 'sine'
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.value = freq; osc.type = 'sine'
       gain.gain.setValueAtTime(0.3, temps)
       gain.gain.exponentialRampToValueAtTime(0.001, temps + 0.4)
-      osc.start(temps)
-      osc.stop(temps + 0.4)
+      osc.start(temps); osc.stop(temps + 0.4)
       temps += 0.45
     })
   } catch (e) {}
@@ -231,7 +239,7 @@ export default function App() {
   const [cle,               setCle]               = useState(0)
   const [ouvrirFormulaire,  setOuvrirFormulaire]  = useState(false)
   const [themeSombre,       setThemeSombre]       = useState(false)
-  const [codeDevise,        setCodeDevise]        = useState(() => lireDevise())
+  const [codeDevise,        setCodeDevise]        = useState('XOF')
   const [showChoixDevise,   setShowChoixDevise]   = useState(false)
   const [chargementDonnees, setChargementDonnees] = useState(false)
 
@@ -255,8 +263,8 @@ export default function App() {
   const ajouterAuJournal = (entree, hId) => {
     setJournal(prev => {
       const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
-      sauvegarderJournal(maj)
       const idHotel = hId || hotelIdRef.current
+      sauvegarderJournalLocal(idHotel, maj)
       if (idHotel && idHotel !== 'admin_local') {
         sauvegarderJournalFirestore(idHotel, maj)
       }
@@ -265,10 +273,9 @@ export default function App() {
   }
 
   const sauvegarderTout = (hId, s, ed, sd, h) => {
-    sauvegarderLocal({ sejours:s, entreesDiverses:ed, sortiesDiverses:sd, historique:h })
+    sauvegarderLocal(hId, { sejours:s, entreesDiverses:ed, sortiesDiverses:sd, historique:h })
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
-      // On marque qu'on est nous qui écrivons pour ignorer notre propre snapshot
       localWriteRef.current = true
       sauvegarderFirestore(hId, s, ed, sd, h).then(() => {
         setTimeout(() => { localWriteRef.current = false }, 1000)
@@ -276,79 +283,53 @@ export default function App() {
     }, 2000)
   }
 
-  // ── Chargement initial localStorage ──
+  // ── Chargement initial ──
   useEffect(() => {
     const el = document.createElement('style')
     el.textContent = styleTransition
     document.head.appendChild(el)
-    const local = chargerLocal()
-    if (local) {
-      setSejours(local.sejours || SEJOURS_DEMO)
-      setEntreesDiverses(local.entreesDiverses || [])
-      setSortiesDiverses(local.sortiesDiverses || [])
-      setHistorique(local.historique || [])
-    } else {
-      setSejours(SEJOURS_DEMO)
-    }
-    setJournal(chargerJournal())
     return () => document.head.removeChild(el)
   }, [])
 
-  // ── Écoute temps réel Firestore après connexion ──
+  // ── Écoute temps réel après connexion ──
   useEffect(() => {
     if (!hotelId || hotelId === 'admin_local') return
 
     setChargementDonnees(true)
-
-    // Désabonner l'ancien listener si existant
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
 
-    // Écouter en temps réel le document caisse
     snapshotUnsubRef.current = onSnapshot(
       doc(db, 'hotels', hotelId, 'data', 'caisse'),
       (snap) => {
         setChargementDonnees(false)
-
-        // Ignorer notre propre écriture
         if (localWriteRef.current) return
-
         if (snap.exists()) {
           const data = snap.data()
           setSejours(data.sejours || [])
           setEntreesDiverses(data.entreesDiverses || [])
           setSortiesDiverses(data.sortiesDiverses || [])
           setHistorique(data.historique || [])
-          sauvegarderLocal({
+          sauvegarderLocal(hotelId, {
             sejours: data.sejours || [],
             entreesDiverses: data.entreesDiverses || [],
             sortiesDiverses: data.sortiesDiverses || [],
             historique: data.historique || [],
           })
         } else {
-          // Pas encore de données Firestore → envoyer localStorage
-          const local = chargerLocal()
-          const s  = local?.sejours         || []
-          const ed = local?.entreesDiverses || []
-          const sd = local?.sortiesDiverses || []
-          const h  = local?.historique      || []
-          setSejours(s)
-          setEntreesDiverses(ed)
-          setSortiesDiverses(sd)
-          setHistorique(h)
-          sauvegarderFirestore(hotelId, s, ed, sd, h)
+          // Nouveau compte — partir de zéro
+          setSejours([])
+          setEntreesDiverses([])
+          setSortiesDiverses([])
+          setHistorique([])
         }
       },
-      (error) => {
-        setChargementDonnees(false)
-      }
+      () => { setChargementDonnees(false) }
     )
 
-    return () => {
-      if (snapshotUnsubRef.current) snapshotUnsubRef.current()
-    }
+    return () => { if (snapshotUnsubRef.current) snapshotUnsubRef.current() }
   }, [hotelId])
 
-  // ── Sauvegarde automatique à chaque changement ──
+  // ── Sauvegarde automatique ──
   useEffect(() => {
     if (!hotelId) return
     sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
@@ -484,37 +465,72 @@ export default function App() {
 
   const handleConnexion = (user) => {
     const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
+
+    // ── Réinitialiser complètement l'état avant de charger le nouvel hôtel ──
+    setSejours([])
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+    setHistorique([])
+    setJournal([])
+    setAlertesSonnees({})
+    setNoShowASignaler([])
+    setNoShowIgnores({})
+
+    // ── Charger les données propres à cet hôtel ──
+    const deviseHotel = hId ? (lireDeviseLocal(hId) || detecterDevise() || 'XOF') : 'XOF'
+    setCodeDevise(deviseHotel)
+    setJournal(hId ? chargerJournalLocal(hId) : [])
+
     setHotelId(hId)
     setUtilisateur(user)
-    setThemeSombre(lireThemeUtilisateur(user.nom))
+    setThemeSombre(hId ? lireThemeLocal(hId, user.nom) : false)
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
-    if (!lireDevise()) setShowChoixDevise(true)
+
+    if (!lireDeviseLocal(hId)) setShowChoixDevise(true)
+
+    // Journal connexion
     if (hId) {
       const now = new Date()
       const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
       const entree = { type:'connexion', utilisateur:user.nom||'Inconnu', role:user.role||'', details:`${user.nom||'Utilisateur'} s'est connecté`, date:horodatage, id:Date.now() }
       setJournal(prev => {
         const maj = [entree, ...prev].slice(0, 500)
-        sauvegarderJournal(maj)
+        sauvegarderJournalLocal(hId, maj)
         sauvegarderJournalFirestore(hId, maj)
         return maj
       })
     }
   }
 
-  const handleDeconnexion = () => {
+  const handleDeconnexion = async () => {
     ajouterAuJournal({ type:'deconnexion', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`${utilisateur?.nom||'Utilisateur'} s'est déconnecté` })
+
+    // ── Arrêter le listener Firestore ──
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
+
+    // ── Déconnecter Firebase Auth ──
+    try { await signOut(auth) } catch (e) {}
+
+    // ── Réinitialiser tout l'état ──
     setUtilisateur(null)
     setHotelId(null)
     setThemeSombre(false)
     setOnglet('dashboard')
+    setSejours([])
+    setEntreesDiverses([])
+    setSortiesDiverses([])
+    setHistorique([])
+    setJournal([])
+    setAlertesSonnees({})
+    setNoShowASignaler([])
+    setNoShowIgnores({})
     setEcran('connexion')
   }
 
   const handleValiderDevise = (code) => {
-    sauvegarderDevise(code)
+    if (hotelId) sauvegarderDeviseLocal(hotelId, code)
+    else sauvegarderDevise(code)
     setCodeDevise(code)
     setShowChoixDevise(false)
   }
@@ -534,8 +550,10 @@ export default function App() {
   }
 
   const handleReinitialiser = () => {
-    try { localStorage.removeItem(STORAGE_KEY) } catch (e) {}
-    setSejours(SEJOURS_DEMO)
+    if (hotelId) {
+      try { localStorage.removeItem(storageKey(hotelId, 'data_v1')) } catch (e) {}
+    }
+    setSejours([])
     setEntreesDiverses([])
     setSortiesDiverses([])
     setAlertesSonnees({})
@@ -565,7 +583,7 @@ export default function App() {
         {onglet === 'chambres' && accesRole.includes('chambres') && <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'sejours' && accesRole.includes('sejours') && <Sejours sejours={sejours} chambresGenerees={chambresGenerees} onAjouter={ajouterSejour} onTerminer={terminerSejour} onProlonger={prolongerSejour} onActiverReservation={activerReservation} ouvrirFormulaire={ouvrirFormulaire} onFormulaireOuvert={() => setOuvrirFormulaire(false)} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'caisse' && accesRole.includes('caisse') && <Caisse sejours={sejoursEncaisses} entreesDiverses={entreesDiverses} sortiesDiverses={sortiesDiverses} onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])} onAjouterSortie={s => setSortiesDiverses(prev => [s, ...prev])} caisse={caisse} onCloturerCaisse={cloturerCaisse} chambres={chambresGenerees} devise={trouverDevise(codeDevise).symbole}/>}
-        {onglet === 'menu' && <Menu utilisateur={utilisateur} onDeconnexion={handleDeconnexion} onReinitialiser={handleReinitialiser} historique={historique} journal={journal} onThemeChange={setThemeSombre} onDeviseChange={setCodeDevise} devise={trouverDevise(codeDevise).symbole}/>}
+        {onglet === 'menu' && <Menu utilisateur={utilisateur} onDeconnexion={handleDeconnexion} onReinitialiser={handleReinitialiser} historique={historique} journal={journal} onThemeChange={setThemeSombre} onDeviseChange={(code) => { setCodeDevise(code); if(hotelId) sauvegarderDeviseLocal(hotelId, code) }} devise={trouverDevise(codeDevise).symbole}/>}
       </div>
 
       <NavBar onglet={onglet} setOnglet={changerOnglet} role={utilisateur?.role} onAjouterSejour={() => { setOuvrirFormulaire(true); if (onglet !== 'sejours') changerOnglet('sejours') }}/>
