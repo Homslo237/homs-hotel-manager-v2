@@ -82,12 +82,10 @@ function lireUtilisateurs() {
 function Typewriter({ text, delay = 0, style }) {
   const [displayed, setDisplayed] = useState('')
   const [started, setStarted] = useState(false)
-
   useEffect(() => {
     const t0 = setTimeout(() => setStarted(true), delay)
     return () => clearTimeout(t0)
   }, [delay])
-
   useEffect(() => {
     if (!started) return
     let i = 0
@@ -98,11 +96,40 @@ function Typewriter({ text, delay = 0, style }) {
     }, 80)
     return () => clearInterval(interval)
   }, [started, text])
-
   return <span style={style}>{displayed}<span style={{ opacity: displayed.length < text.length ? 1 : 0, color:'#C9A84C' }}>|</span></span>
 }
 
-// ─── Écran d'inscription ──────────────────────────────────────────────────────
+function Footer() {
+  return (
+    <div style={{ zIndex:1, width:'100%', paddingTop:'32px', paddingBottom:'20px', textAlign:'center' }}>
+      <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>Propulsé par</p>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+        <div style={{ animation:'rotateSlow 8s linear infinite', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <img src="/logo-homslovision-blanc.png" alt="Homslovision" style={{ height:'28px', opacity:0.6 }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+          <div style={{ display:'none', width:'28px', height:'28px', borderRadius:'8px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:'900', color:'#1B3A6B' }}>HV</div>
+        </div>
+        <span style={{ color:'rgba(201,168,76,0.6)', fontSize:'13px', fontWeight:'700', letterSpacing:'2px' }}>HOMSLOVISION</span>
+      </div>
+      <p style={{ color:'rgba(255,255,255,0.2)', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>Le futur maintenant · v1.0</p>
+    </div>
+  )
+}
+
+function BgParticules() {
+  return PARTICULES.map(p => (
+    <div key={p.id} style={{
+      position:'absolute', left:`${p.x}%`, top:`${p.y}%`,
+      width:`${p.size}px`, height:`${p.size}px`,
+      borderRadius: p.type===2?'50%':p.type===0?'2px':'0',
+      background: p.type===1?'transparent':'#C9A84C',
+      border: p.type===1?'1.5px solid #C9A84C':'none',
+      transform: p.type===1?'rotate(45deg)':'none',
+      animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`,
+      pointerEvents:'none', zIndex:0, opacity:0.6,
+    }}/>
+  ))
+}
+
 function EcranInscription({ onRetour, onInscriptionReussie }) {
   const [form, setForm] = useState({ nomHotel:'', nomDirecteur:'', email:'', motDePasse:'', confirmer:'' })
   const [loading, setLoading] = useState(false)
@@ -122,25 +149,18 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
     if (!form.email.trim())         { setErreur("Entrez votre email."); return }
     if (form.motDePasse.length < 6) { setErreur("Mot de passe : minimum 6 caractères."); return }
     if (form.motDePasse !== form.confirmer) { setErreur("Les mots de passe ne correspondent pas."); return }
-
-    setErreur('')
-    setLoading(true)
-
+    setErreur(''); setLoading(true)
     try {
-      // 1. Créer le compte Firebase Auth
       const resultat = await createUserWithEmailAndPassword(auth, form.email.trim(), form.motDePasse)
       const uid = resultat.user.uid
-
-      // 2. Créer le profil de l'hôtel dans Firestore
       await setDoc(doc(db, 'hotels', uid, 'infos', 'identite'), {
         nom: form.nomHotel.trim(),
         nomDirecteur: form.nomDirecteur.trim(),
         email: form.email.trim(),
         dateCreation: new Date().toISOString(),
-        slogan: '', adresse: '', telephone1: '', telephone2: '',
-        rccm: '', contribuable: '', mentionLegale: '', logoUrl: null,
+        slogan:'', adresse:'', telephone1:'', telephone2:'',
+        rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
-
       setLoading(false)
       onInscriptionReussie({
         nom: form.nomDirecteur.trim(),
@@ -148,117 +168,49 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         email: form.email.trim(),
         uid,
         nomHotel: form.nomHotel.trim(),
+        isNewUser: true,
         derniereConnexion: new Date().toLocaleDateString('fr-FR'),
       })
-
     } catch (err) {
       setLoading(false)
-      if (err.code === 'auth/email-already-in-use') {
-        setErreur('Cet email est déjà utilisé. Connectez-vous à la place.')
-      } else if (err.code === 'auth/invalid-email') {
-        setErreur('Adresse email invalide.')
-      } else {
-        setErreur('Erreur lors de la création du compte. Réessayez.')
-      }
+      if (err.code === 'auth/email-already-in-use') setErreur('Cet email est déjà utilisé. Connectez-vous à la place.')
+      else if (err.code === 'auth/invalid-email') setErreur('Adresse email invalide.')
+      else setErreur('Erreur lors de la création du compte. Réessayez.')
     }
   }
 
   return (
     <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'24px' }}>
-        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>
-          ‹ Retour
-        </button>
+        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
         <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Créer un compte</span>
       </div>
-
       <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
         🏨 Bienvenue ! Créez votre compte directeur pour commencer à gérer votre hôtel.
       </div>
-
-      {/* Nom de l'hôtel */}
-      <div style={{ marginBottom:'12px' }}>
-        <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-          NOM DE L'HÔTEL *
-        </label>
-        <input value={form.nomHotel}
-          onChange={e => setForm({...form, nomHotel:e.target.value})}
-          placeholder="Ex. Hôtel Palace Dakar"
-          style={champStyle}
-          onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-          onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
-        />
-      </div>
-
-      {/* Nom du directeur */}
-      <div style={{ marginBottom:'12px' }}>
-        <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-          VOTRE NOM *
-        </label>
-        <input value={form.nomDirecteur}
-          onChange={e => setForm({...form, nomDirecteur:e.target.value})}
-          placeholder="Ex. Jean Dupont"
-          style={champStyle}
-          onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-          onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
-        />
-      </div>
-
-      {/* Email */}
-      <div style={{ marginBottom:'12px' }}>
-        <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-          EMAIL *
-        </label>
-        <input type="email" value={form.email}
-          onChange={e => setForm({...form, email:e.target.value})}
-          placeholder="directeur@monhotel.com"
-          style={champStyle}
-          onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-          onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
-        />
-      </div>
-
-      {/* Mot de passe */}
-      <div style={{ marginBottom:'12px' }}>
-        <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-          MOT DE PASSE * (min. 6 caractères)
-        </label>
-        <input type="password" value={form.motDePasse}
-          onChange={e => setForm({...form, motDePasse:e.target.value})}
-          placeholder="••••••••"
-          style={champStyle}
-          onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-          onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
-        />
-      </div>
-
-      {/* Confirmer mot de passe */}
-      <div style={{ marginBottom:'20px' }}>
-        <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-          CONFIRMER LE MOT DE PASSE *
-        </label>
-        <input type="password" value={form.confirmer}
-          onChange={e => setForm({...form, confirmer:e.target.value})}
-          onKeyDown={e => e.key==='Enter' && handleInscrire()}
-          placeholder="••••••••"
-          style={champStyle}
-          onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-          onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
-        />
-      </div>
-
-      {erreur && (
-        <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>
-          ⚠️ {erreur}
+      {[
+        { label:"NOM DE L'HÔTEL *", key:'nomHotel', placeholder:'Ex. Hôtel Palace Dakar', type:'text' },
+        { label:'VOTRE NOM *',       key:'nomDirecteur', placeholder:'Ex. Jean Dupont',     type:'text' },
+        { label:'EMAIL *',           key:'email',        placeholder:'directeur@monhotel.com', type:'email' },
+        { label:'MOT DE PASSE * (min. 6 caractères)', key:'motDePasse', placeholder:'••••••••', type:'password' },
+        { label:'CONFIRMER LE MOT DE PASSE *',        key:'confirmer',  placeholder:'••••••••', type:'password' },
+      ].map(f => (
+        <div key={f.key} style={{ marginBottom:'12px' }}>
+          <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>{f.label}</label>
+          <input type={f.type} value={form[f.key]}
+            onChange={e => setForm({...form, [f.key]:e.target.value})}
+            onKeyDown={e => f.key==='confirmer' && e.key==='Enter' && handleInscrire()}
+            placeholder={f.placeholder} style={champStyle}
+            onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
+            onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+          />
         </div>
-      )}
-
+      ))}
+      {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
       <button className="btn-shimmer" onClick={handleInscrire} disabled={loading} style={{
         width:'100%', padding:'16px', borderRadius:'14px', border:'none',
-        cursor:loading?'not-allowed':'pointer',
-        color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
-        opacity:loading?0.8:1,
-        boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+        cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+        opacity:loading?0.8:1, boxShadow:'0 4px 20px rgba(201,168,76,0.4)', marginTop:'8px',
       }}>
         {loading ? (
           <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
@@ -267,7 +219,6 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
           </span>
         ) : '🏨 Créer mon compte'}
       </button>
-
       <p style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'16px', lineHeight:'1.5' }}>
         En créant un compte, vous acceptez les conditions d'utilisation de HOMS-HÔTEL MANAGER par Homslovision.
       </p>
@@ -275,12 +226,11 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
   )
 }
 
-// ─── Écran mot de passe oublié (Firebase) ────────────────────────────────────
 function EcranMotDePasseOublie({ onRetour }) {
-  const [email, setEmail] = useState('')
+  const [email, setEmail]     = useState('')
   const [loading, setLoading] = useState(false)
-  const [erreur, setErreur] = useState('')
-  const [succes, setSucces] = useState(false)
+  const [erreur, setErreur]   = useState('')
+  const [succes, setSucces]   = useState(false)
 
   const champStyle = {
     width:'100%', padding:'14px 16px',
@@ -292,70 +242,48 @@ function EcranMotDePasseOublie({ onRetour }) {
 
   const handleReset = async () => {
     if (!email.trim()) { setErreur('Entrez votre adresse email.'); return }
-    setLoading(true)
-    setErreur('')
+    setLoading(true); setErreur('')
     try {
       await sendPasswordResetEmail(auth, email.trim())
       setSucces(true)
     } catch (err) {
-      if (err.code === 'auth/user-not-found') {
-        setErreur('Aucun compte trouvé avec cet email.')
-      } else {
-        setErreur('Erreur. Vérifiez votre email et réessayez.')
-      }
-    } finally {
-      setLoading(false)
-    }
+      if (err.code === 'auth/user-not-found') setErreur('Aucun compte trouvé avec cet email.')
+      else setErreur('Erreur. Vérifiez votre email et réessayez.')
+    } finally { setLoading(false) }
   }
 
   return (
     <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'24px' }}>
-        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>
-          ‹ Retour
-        </button>
+        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
         <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Mot de passe oublié</span>
       </div>
-
       {succes ? (
         <div style={{ background:'rgba(46,204,113,0.15)', border:'1px solid #2ECC71', borderRadius:'14px', padding:'24px 20px', textAlign:'center' }}>
           <div style={{ fontSize:'40px', marginBottom:'12px' }}>📧</div>
           <div style={{ color:'#2ECC71', fontWeight:'800', fontSize:'16px', marginBottom:'8px' }}>Email envoyé !</div>
-          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', lineHeight:'1.5' }}>
-            Vérifiez votre boîte email et suivez le lien pour réinitialiser votre mot de passe.
-          </div>
-          <button onClick={onRetour} style={{ marginTop:'20px', padding:'12px 24px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px' }}>
-            Retour à la connexion
-          </button>
+          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', lineHeight:'1.5' }}>Vérifiez votre boîte email et suivez le lien pour réinitialiser votre mot de passe.</div>
+          <button onClick={onRetour} style={{ marginTop:'20px', padding:'12px 24px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px' }}>Retour à la connexion</button>
         </div>
       ) : (
         <>
           <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
             💡 Entrez l'email de votre compte directeur. Vous recevrez un lien pour créer un nouveau mot de passe.
           </div>
-
           <div style={{ marginBottom:'16px' }}>
-            <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>
-              VOTRE EMAIL
-            </label>
-            <input type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key==='Enter' && handleReset()}
-              placeholder="directeur@monhotel.com"
+            <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>VOTRE EMAIL</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleReset()} placeholder="directeur@monhotel.com"
               style={champStyle}
-              onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
-              onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+              onFocus={e=>e.target.style.border='1.5px solid #C9A84C'}
+              onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
             />
           </div>
-
           {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
-
           <button className="btn-shimmer" onClick={handleReset} disabled={loading} style={{
             width:'100%', padding:'16px', borderRadius:'14px', border:'none',
-            cursor:loading?'not-allowed':'pointer',
-            color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
-            opacity:loading?0.8:1,
-            boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+            cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+            opacity:loading?0.8:1, boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
           }}>
             {loading ? (
               <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
@@ -370,10 +298,19 @@ function EcranMotDePasseOublie({ onRetour }) {
   )
 }
 
+const bgStyle = {
+  minHeight:'100vh', width:'100%',
+  background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)',
+  display:'flex', flexDirection:'column', alignItems:'center',
+  justifyContent:'flex-start', overflowX:'hidden',
+  position:'relative', paddingBottom:'40px',
+}
+
 export default function Connexion({ onConnexion }) {
-  const [mode, setMode] = useState('connexion') // 'connexion' | 'inscription' | 'reset'
+  const [mode, setMode]   = useState('connexion')
   const [role, setRole]   = useState(null)
   const [mdp, setMdp]     = useState('')
+  const [emailDirecteur, setEmailDirecteur] = useState('')
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
   const [etape, setEtape] = useState(1)
@@ -393,42 +330,28 @@ export default function Connexion({ onConnexion }) {
   }, [])
 
   const handleChoisirRole = (r) => {
-    setRole(r)
-    setMdp('')
-    setErreur('')
+    setRole(r); setMdp(''); setErreur('')
     setTimeout(() => setEtape(2), 300)
   }
 
   const handleConnexion = async () => {
     if (!mdp) { setErreur('Veuillez entrer votre mot de passe.'); return }
-    setErreur('')
-    setLoading(true)
-
+    setErreur(''); setLoading(true)
     const now = new Date()
     const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 
     if (role.id === 'directeur') {
+      const emailAUtiliser = emailDirecteur.trim() || 'admin@homs.com'
       try {
-        const resultat = await signInWithEmailAndPassword(auth, role.email || '', mdp)
+        const resultat = await signInWithEmailAndPassword(auth, emailAUtiliser, mdp)
         setLoading(false)
         onConnexion({ nom:'Directeur', role:'directeur', email:resultat.user.email, uid:resultat.user.uid, derniereConnexion:horodatage })
         return
       } catch {
-        // Fallback : chercher par email dans Firebase avec l'email saisi
-        // Si l'email est vide c'est l'ancien compte admin
-        if (!role.email) {
-          try {
-            const resultat = await signInWithEmailAndPassword(auth, 'admin@homs.com', mdp)
-            setLoading(false)
-            onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', uid:resultat.user.uid, derniereConnexion:horodatage })
-            return
-          } catch {
-            if (mdp === 'admin1234') {
-              setLoading(false)
-              onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', uid:'admin_local', derniereConnexion:horodatage })
-              return
-            }
-          }
+        if (mdp === 'admin1234' && emailAUtiliser === 'admin@homs.com') {
+          setLoading(false)
+          onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', uid:'admin_local', derniereConnexion:horodatage })
+          return
         }
         setLoading(false)
         setErreur('Email ou mot de passe incorrect.')
@@ -479,39 +402,30 @@ export default function Connexion({ onConnexion }) {
     outline:'none', boxSizing:'border-box', transition:'border 0.2s',
   })
 
-  // ── Écran inscription ──
   if (mode === 'inscription') {
     return (
-      <div style={{ minHeight:'100vh', width:'100%', background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', overflowX:'hidden', position:'relative', paddingBottom:'40px' }}>
-        {PARTICULES.map(p => (
-          <div key={p.id} style={{ position:'absolute', left:`${p.x}%`, top:`${p.y}%`, width:`${p.size}px`, height:`${p.size}px`, borderRadius:p.type===2?'50%':p.type===0?'2px':'0', background:p.type===1?'transparent':'#C9A84C', border:p.type===1?'1.5px solid #C9A84C':'none', transform:p.type===1?'rotate(45deg)':'none', animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`, pointerEvents:'none', zIndex:0, opacity:0.6 }}/>
-        ))}
+      <div style={bgStyle}>
+        <BgParticules/>
         <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'24px' }}>
           <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
-            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
             <div style={{ display:'none', width:'72px', height:'72px', borderRadius:'18px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'28px', fontWeight:'900', color:'#1B3A6B' }}>H</div>
           </div>
           <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'3px' }}>HOMS-HÔTEL MANAGER</div>
         </div>
-        <EcranInscription
-          onRetour={() => setMode('connexion')}
-          onInscriptionReussie={onConnexion}
-        />
+        <EcranInscription onRetour={() => setMode('connexion')} onInscriptionReussie={onConnexion}/>
         <Footer/>
       </div>
     )
   }
 
-  // ── Écran reset mot de passe directeur ──
   if (mode === 'reset') {
     return (
-      <div style={{ minHeight:'100vh', width:'100%', background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', overflowX:'hidden', position:'relative', paddingBottom:'40px' }}>
-        {PARTICULES.map(p => (
-          <div key={p.id} style={{ position:'absolute', left:`${p.x}%`, top:`${p.y}%`, width:`${p.size}px`, height:`${p.size}px`, borderRadius:p.type===2?'50%':p.type===0?'2px':'0', background:p.type===1?'transparent':'#C9A84C', border:p.type===1?'1.5px solid #C9A84C':'none', transform:p.type===1?'rotate(45deg)':'none', animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`, pointerEvents:'none', zIndex:0, opacity:0.6 }}/>
-        ))}
+      <div style={bgStyle}>
+        <BgParticules/>
         <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'24px' }}>
           <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
-            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
             <div style={{ display:'none', width:'72px', height:'72px', borderRadius:'18px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'28px', fontWeight:'900', color:'#1B3A6B' }}>H</div>
           </div>
           <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'3px' }}>HOMS-HÔTEL MANAGER</div>
@@ -523,16 +437,13 @@ export default function Connexion({ onConnexion }) {
   }
 
   return (
-    <div style={{ minHeight:'100vh', width:'100%', background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', overflowX:'hidden', position:'relative', paddingBottom:'40px' }}>
-
-      {PARTICULES.map(p => (
-        <div key={p.id} style={{ position:'absolute', left:`${p.x}%`, top:`${p.y}%`, width:`${p.size}px`, height:`${p.size}px`, borderRadius:p.type===2?'50%':p.type===0?'2px':'0', background:p.type===1?'transparent':'#C9A84C', border:p.type===1?'1.5px solid #C9A84C':'none', transform:p.type===1?'rotate(45deg)':'none', animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`, pointerEvents:'none', zIndex:0, opacity:0.6 }}/>
-      ))}
+    <div style={bgStyle}>
+      <BgParticules/>
 
       <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'8px' }}>
         <div className="fade-down" style={{ animationDelay:'0.1s' }}>
           <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
-            <img src="/logo-homs.png" alt="HOMS" style={{ height:'88px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'88px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
             <div style={{ display:'none', width:'88px', height:'88px', borderRadius:'22px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'32px', fontWeight:'900', color:'#1B3A6B', boxShadow:'0 0 30px rgba(201,168,76,0.5)' }}>H</div>
           </div>
         </div>
@@ -551,19 +462,22 @@ export default function Connexion({ onConnexion }) {
 
       {etape === 1 && (
         <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'28px', animationDelay:'0.8s' }}>
-          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'20px', letterSpacing:'1px' }}>
-            Sélectionnez votre profil
-          </p>
+          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'20px', letterSpacing:'1px' }}>Sélectionnez votre profil</p>
           <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
             {ROLES.map((r, i) => (
-              <button key={r.id} onClick={() => handleChoisirRole(r)} style={{ display:'flex', alignItems:'center', gap:'16px', padding:'18px 20px', borderRadius:'16px', background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.12)', cursor:'pointer', width:'100%', textAlign:'left', animation:`fadeUp 0.5s ease ${0.9+i*0.15}s both`, transition:'all 0.25s ease', backdropFilter:'blur(8px)' }}
-                onMouseEnter={e => { e.currentTarget.style.background=`${r.couleur}22`; e.currentTarget.style.border=`1.5px solid ${r.couleur}`; e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow=`0 8px 24px ${r.couleur}33` }}
-                onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.border='1.5px solid rgba(255,255,255,0.12)'; e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
+              <button key={r.id} onClick={() => handleChoisirRole(r)} style={{
+                display:'flex', alignItems:'center', gap:'16px', padding:'18px 20px', borderRadius:'16px',
+                background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.12)',
+                cursor:'pointer', width:'100%', textAlign:'left',
+                animation:`fadeUp 0.5s ease ${0.9+i*0.15}s both`, transition:'all 0.25s ease', backdropFilter:'blur(8px)',
+              }}
+              onMouseEnter={e=>{ e.currentTarget.style.background=`${r.couleur}22`; e.currentTarget.style.border=`1.5px solid ${r.couleur}`; e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow=`0 8px 24px ${r.couleur}33` }}
+              onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.border='1.5px solid rgba(255,255,255,0.12)'; e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
                 <div style={{ width:'52px', height:'52px', borderRadius:'14px', background:`${r.couleur}22`, border:`1.5px solid ${r.couleur}55`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'26px', flexShrink:0, animation:`cardHover 3s ease ${i*0.5}s infinite` }}>{r.emoji}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ color:'white', fontWeight:'800', fontSize:'16px' }}>{r.label}</div>
                   <div style={{ color:`${r.couleur}99`, fontSize:'12px', marginTop:'2px' }}>
-                    {r.id==='directeur' ? 'Accès complet · Paramètres · Rapports' : r.id==='receptionniste' ? 'Séjours · Chambres · Caisse' : 'Encaissements · Caisse du jour'}
+                    {r.id==='directeur'?'Accès complet · Paramètres · Rapports':r.id==='receptionniste'?'Séjours · Chambres · Caisse':'Encaissements · Caisse du jour'}
                   </div>
                 </div>
                 <div style={{ color:r.couleur, fontSize:'20px' }}>›</div>
@@ -571,12 +485,9 @@ export default function Connexion({ onConnexion }) {
             ))}
           </div>
 
-          {/* Bouton Créer un compte */}
           <div style={{ marginTop:'28px', textAlign:'center' }}>
             <div style={{ height:'1px', background:'rgba(255,255,255,0.1)', marginBottom:'20px' }}/>
-            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'12px', marginBottom:'12px' }}>
-              Vous n'avez pas encore de compte ?
-            </p>
+            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'12px', marginBottom:'12px' }}>Vous n'avez pas encore de compte ?</p>
             <button onClick={() => setMode('inscription')} style={{
               width:'100%', padding:'14px', borderRadius:'14px',
               border:'1.5px solid rgba(201,168,76,0.5)',
@@ -603,27 +514,32 @@ export default function Connexion({ onConnexion }) {
           {role.id === 'directeur' && (
             <div style={{ marginBottom:'14px' }}>
               <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>EMAIL</label>
-              <input type="email" value={role.email||''} onChange={e => setRole({...role, email:e.target.value})}
-                placeholder="votre@email.com"
-                style={champStyle(role.couleur)}
-                onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`}
-                onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+              <input type="email" value={emailDirecteur} onChange={e=>setEmailDirecteur(e.target.value)}
+                placeholder="votre@email.com" style={champStyle(role.couleur)}
+                onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`}
+                onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
               />
             </div>
           )}
 
           <div style={{ marginBottom:'14px', animation:'fadeUp 0.4s ease 0.1s both' }}>
             <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>MOT DE PASSE</label>
-            <input type="password" value={mdp} onChange={e => setMdp(e.target.value)} onKeyDown={e => e.key==='Enter' && handleConnexion()} placeholder="••••••••"
+            <input type="password" value={mdp} onChange={e=>setMdp(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleConnexion()} placeholder="••••••••"
               style={champStyle(role.couleur)}
-              onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`}
-              onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+              onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`}
+              onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
             />
           </div>
 
           {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
 
-          <button className="btn-shimmer" onClick={handleConnexion} disabled={loading} style={{ width:'100%', padding:'16px', borderRadius:'14px', border:'none', cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px', marginTop:'8px', letterSpacing:'1px', opacity:loading?0.8:1, boxShadow:'0 4px 20px rgba(201,168,76,0.4)' }}>
+          <button className="btn-shimmer" onClick={handleConnexion} disabled={loading} style={{
+            width:'100%', padding:'16px', borderRadius:'14px', border:'none',
+            cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+            marginTop:'8px', letterSpacing:'1px', opacity:loading?0.8:1,
+            boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+          }}>
             {loading ? (
               <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
                 <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
@@ -637,7 +553,6 @@ export default function Connexion({ onConnexion }) {
               Mot de passe oublié ?
             </p>
           )}
-
           {role.id !== 'directeur' && (
             <p onClick={() => { setShowOublie(true); setErreur('') }} style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'12px', marginTop:'16px', cursor:'pointer', textDecoration:'underline' }}>
               Mot de passe oublié ?
@@ -656,7 +571,7 @@ export default function Connexion({ onConnexion }) {
             <>
               <div style={{ marginBottom:'14px' }}>
                 <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>VOTRE NOM (tel qu'enregistré)</label>
-                <input value={nomOublie} onChange={e => setNomOublie(e.target.value)} placeholder="Ex. Jean Dupont" style={champStyle(role.couleur)} onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+                <input value={nomOublie} onChange={e=>setNomOublie(e.target.value)} placeholder="Ex. Jean Dupont" style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
               </div>
               {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
               <button onClick={handleChercherUser} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>Rechercher mon compte</button>
@@ -667,7 +582,7 @@ export default function Connexion({ onConnexion }) {
               <div style={{ background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#2ECC71' }}>✅ Compte trouvé : <strong>{userTrouve.nom}</strong></div>
               <div style={{ marginBottom:'14px' }}>
                 <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>QUESTION SECRÈTE : {userTrouve.questionSecrete || 'Quel est le nom de votre animal ?'}</label>
-                <input value={reponse} onChange={e => setReponse(e.target.value)} placeholder="Votre réponse..." style={champStyle(role.couleur)} onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+                <input value={reponse} onChange={e=>setReponse(e.target.value)} placeholder="Votre réponse..." style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
               </div>
               {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
               <button onClick={handleVerifierReponse} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>Vérifier</button>
@@ -678,7 +593,7 @@ export default function Connexion({ onConnexion }) {
               <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#C9A84C' }}>✅ Réponse correcte ! Choisissez un nouveau mot de passe.</div>
               <div style={{ marginBottom:'14px' }}>
                 <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>NOUVEAU MOT DE PASSE</label>
-                <input type="password" value={nouveauMdp} onChange={e => setNouveauMdp(e.target.value)} placeholder="Minimum 4 caractères" style={champStyle(role.couleur)} onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+                <input type="password" value={nouveauMdp} onChange={e=>setNouveauMdp(e.target.value)} placeholder="Minimum 4 caractères" style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
               </div>
               {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
               <button onClick={handleNouveauMdp} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px' }}>✅ Enregistrer le nouveau mot de passe</button>
@@ -688,22 +603,6 @@ export default function Connexion({ onConnexion }) {
       )}
 
       <Footer/>
-    </div>
-  )
-}
-
-function Footer() {
-  return (
-    <div style={{ zIndex:1, width:'100%', paddingTop:'32px', paddingBottom:'20px', textAlign:'center' }}>
-      <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>Propulsé par</p>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
-        <div style={{ animation:'rotateSlow 8s linear infinite', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <img src="/logo-homslovision-blanc.png" alt="Homslovision" style={{ height:'28px', opacity:0.6 }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
-          <div style={{ display:'none', width:'28px', height:'28px', borderRadius:'8px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:'900', color:'#1B3A6B' }}>HV</div>
-        </div>
-        <span style={{ color:'rgba(201,168,76,0.6)', fontSize:'13px', fontWeight:'700', letterSpacing:'2px' }}>HOMSLOVISION</span>
-      </div>
-      <p style={{ color:'rgba(255,255,255,0.2)', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>Le futur maintenant · v1.0</p>
     </div>
   )
 }
