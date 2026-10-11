@@ -1,401 +1,608 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
-import { db, auth } from '../firebase'
-import { DEVISES, trouverDevise, detecterDevise } from '../devises'
+import { auth, db } from '../firebase'
 
 const styleAnim = `
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-40px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(30px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeLeft {
+    from { opacity: 0; transform: translateX(-30px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse {
+    0%,100% { transform: scale(1);    filter: drop-shadow(0 0 8px rgba(201,168,76,0.4)); }
+    50%      { transform: scale(1.07); filter: drop-shadow(0 0 22px rgba(201,168,76,0.9)); }
   }
   @keyframes shimmer {
     0%   { background-position: -200% center; }
     100% { background-position:  200% center; }
   }
-  .fade-up { animation: fadeUp 0.5s ease both; }
+  @keyframes float {
+    0%,100% { transform: translateY(0px);   opacity: 0.6; }
+    50%      { transform: translateY(-18px); opacity: 1;   }
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0.2; transform: scale(0.8); }
+    50%      { opacity: 1;   transform: scale(1.3); }
+  }
+  @keyframes rotateSlow {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    40%      { transform: translateY(-6px); }
+    60%      { transform: translateY(-3px); }
+  }
+  @keyframes cardHover {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+  }
   .btn-shimmer {
     background: linear-gradient(90deg, #C9A84C 0%, #F5D98A 40%, #C9A84C 60%, #A07830 100%);
     background-size: 200% auto;
     animation: shimmer 2.5s linear infinite;
   }
+  .logo-pulse { animation: pulse 2.8s ease-in-out infinite; }
+  .fade-down  { animation: fadeDown 0.7s ease both; }
+  .fade-up    { animation: fadeUp  0.6s ease both; }
+  .fade-left  { animation: fadeLeft 0.7s ease both; }
 `
 
-const ETAPES = [
-  { num:1, titre:'Bienvenue 🎉',         sous:'Configurons votre hôtel en 3 minutes' },
-  { num:2, titre:'Votre établissement 🏨', sous:'Informations de base'               },
-  { num:3, titre:'Vos chambres 🛏️',       sous:'Catégories et tarifs'               },
-  { num:4, titre:'Votre devise 💱',        sous:'Monnaie locale'                     },
+const PARTICULES = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: Math.random() * 5 + 2,
+  delay: Math.random() * 4,
+  dur: Math.random() * 3 + 3,
+  type: i % 3,
+}))
+
+const ROLES = [
+  { id:'directeur',      label:'Directeur',      emoji:'👔', couleur:'#C9A84C' },
+  { id:'receptionniste', label:'Réceptionniste',  emoji:'🛎️', couleur:'#2ECC71' },
+  { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
-const inputStyle = {
-  width:'100%', padding:'13px 16px',
-  border:'2px solid #E0E0E0', borderRadius:'12px',
-  fontSize:'14px', outline:'none', boxSizing:'border-box',
-  fontFamily:'inherit',
+function lireUtilisateurs() {
+  try {
+    const s = localStorage.getItem('homs_utilisateurs')
+    return s ? JSON.parse(s) : []
+  } catch { return [] }
 }
 
-const labelStyle = {
-  display:'block', fontSize:'13px', fontWeight:'700',
-  color:'#1B3A6B', marginBottom:'6px',
+function Typewriter({ text, delay = 0, style }) {
+  const [displayed, setDisplayed] = useState('')
+  const [started, setStarted] = useState(false)
+  useEffect(() => {
+    const t0 = setTimeout(() => setStarted(true), delay)
+    return () => clearTimeout(t0)
+  }, [delay])
+  useEffect(() => {
+    if (!started) return
+    let i = 0
+    const interval = setInterval(() => {
+      setDisplayed(text.slice(0, i + 1))
+      i++
+      if (i >= text.length) clearInterval(interval)
+    }, 80)
+    return () => clearInterval(interval)
+  }, [started, text])
+  return <span style={style}>{displayed}<span style={{ opacity: displayed.length < text.length ? 1 : 0, color:'#C9A84C' }}>|</span></span>
 }
 
-export default function Onboarding({ utilisateur, hotelId, onTerminer }) {
-  const [etape, setEtape] = useState(1)
+function Footer() {
+  return (
+    <div style={{ zIndex:1, width:'100%', paddingTop:'32px', paddingBottom:'20px', textAlign:'center' }}>
+      <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'11px', letterSpacing:'1px', marginBottom:'10px' }}>Propulsé par</p>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+        <div style={{ animation:'rotateSlow 8s linear infinite', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <img src="/logo-homslovision-blanc.png" alt="Homslovision" style={{ height:'28px', opacity:0.6 }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+          <div style={{ display:'none', width:'28px', height:'28px', borderRadius:'8px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:'900', color:'#1B3A6B' }}>HV</div>
+        </div>
+        <span style={{ color:'rgba(201,168,76,0.6)', fontSize:'13px', fontWeight:'700', letterSpacing:'2px' }}>HOMSLOVISION</span>
+      </div>
+      <p style={{ color:'rgba(255,255,255,0.2)', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>Le futur maintenant · v1.0</p>
+    </div>
+  )
+}
+
+function BgParticules() {
+  return PARTICULES.map(p => (
+    <div key={p.id} style={{
+      position:'absolute', left:`${p.x}%`, top:`${p.y}%`,
+      width:`${p.size}px`, height:`${p.size}px`,
+      borderRadius: p.type===2?'50%':p.type===0?'2px':'0',
+      background: p.type===1?'transparent':'#C9A84C',
+      border: p.type===1?'1.5px solid #C9A84C':'none',
+      transform: p.type===1?'rotate(45deg)':'none',
+      animation:`${p.type===0?'twinkle':'float'} ${p.dur}s ease-in-out ${p.delay}s infinite`,
+      pointerEvents:'none', zIndex:0, opacity:0.6,
+    }}/>
+  ))
+}
+
+function EcranInscription({ onRetour, onInscriptionReussie }) {
+  const [form, setForm] = useState({ nomHotel:'', nomDirecteur:'', email:'', motDePasse:'', confirmer:'' })
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState('')
 
-  // Étape 2 — Infos hôtel
-  const [nomHotel,   setNomHotel]   = useState(utilisateur?.nomHotel || '')
-  const [adresse,    setAdresse]    = useState('')
-  const [telephone,  setTelephone]  = useState('')
-
-  // Étape 3 — Chambres
-  const [categories, setCategories] = useState([
-    { id:1, nom:'Standard', nombre:10, tarifNuit:25000, tarifHeure:2500 },
-  ])
-
-  // Étape 4 — Devise
-  const [codeDevise, setCodeDevise] = useState(detecterDevise() || 'XOF')
-
-  const ajouterCategorie = () => {
-    setCategories([...categories, {
-      id: Date.now(),
-      nom: 'Nouvelle catégorie',
-      nombre: 5,
-      tarifNuit: 30000,
-      tarifHeure: 3000,
-    }])
+  const champStyle = {
+    width:'100%', padding:'14px 16px',
+    background:'rgba(255,255,255,0.08)',
+    border:'1.5px solid rgba(255,255,255,0.15)',
+    borderRadius:'12px', color:'white', fontSize:'15px',
+    outline:'none', boxSizing:'border-box', transition:'border 0.2s',
   }
 
-  const modifierCategorie = (id, champ, valeur) => {
-    setCategories(categories.map(c => c.id === id ? { ...c, [champ]: valeur } : c))
-  }
-
-  const supprimerCategorie = (id) => {
-    if (categories.length === 1) return
-    setCategories(categories.filter(c => c.id !== id))
-  }
-
-  // Calculer les numéros de chambre automatiquement
-  const categoriesAvecNumeros = categories.map((cat, i) => {
-    const debut = (i + 1) * 100
-    return { ...cat, debut }
-  })
-
-  const totalChambres = categories.reduce((s, c) => s + (Number(c.nombre) || 0), 0)
-
-  const handleTerminer = async () => {
-    setLoading(true)
-    setErreur('')
-
+  const handleInscrire = async () => {
+    if (!form.nomHotel.trim())      { setErreur("Entrez le nom de votre hôtel."); return }
+    if (!form.nomDirecteur.trim())  { setErreur("Entrez votre nom."); return }
+    if (!form.email.trim())         { setErreur("Entrez votre email."); return }
+    if (form.motDePasse.length < 6) { setErreur("Mot de passe : minimum 6 caractères."); return }
+    if (form.motDePasse !== form.confirmer) { setErreur("Les mots de passe ne correspondent pas."); return }
+    setErreur(''); setLoading(true)
     try {
-      const uid = auth.currentUser?.uid || hotelId
-      if (!uid) throw new Error('Pas de compte connecté')
-
-      // Sauvegarder l'identité
+      const resultat = await createUserWithEmailAndPassword(auth, form.email.trim(), form.motDePasse)
+      const uid = resultat.user.uid
       await setDoc(doc(db, 'hotels', uid, 'infos', 'identite'), {
-        nom: nomHotel,
-        adresse,
-        telephone1: telephone,
-        slogan: '', telephone2: '', email: '',
-        rccm: '', contribuable: '', mentionLegale: '',
-        logoUrl: null,
+        nom: form.nomHotel.trim(),
+        nomDirecteur: form.nomDirecteur.trim(),
+        email: form.email.trim(),
         dateCreation: new Date().toISOString(),
+        slogan:'', adresse:'', telephone1:'', telephone2:'',
+        rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
-
-      // Sauvegarder les paramètres (chambres, devise)
-      const params = {
-        nomHotel,
-        toleranceMinutes: 20,
-        vacations: [
-          { id:1, nom:'Matin',      debut:'06:00', fin:'14:00' },
-          { id:2, nom:'Après-midi', debut:'14:00', fin:'22:00' },
-          { id:3, nom:'Nuit',       debut:'22:00', fin:'06:00' },
-        ],
-        categories: categoriesAvecNumeros,
-        updatedAt: new Date().toISOString(),
-      }
-
-      await setDoc(doc(db, 'hotels', uid, 'data', 'params'), params)
-
-      // Sauvegarder la devise en localStorage
-      localStorage.setItem(`homs_${uid}_devise`, codeDevise)
-
-      // Sauvegarder les params en localStorage
-      localStorage.setItem(`homs_${uid}_params`, JSON.stringify(params))
-
       setLoading(false)
-      onTerminer({ params, codeDevise })
-
+      onInscriptionReussie({
+        nom: form.nomDirecteur.trim(),
+        role: 'directeur',
+        email: form.email.trim(),
+        uid,
+        nomHotel: form.nomHotel.trim(),
+        isNewUser: true,
+        derniereConnexion: new Date().toLocaleDateString('fr-FR'),
+      })
     } catch (err) {
       setLoading(false)
-      setErreur('Erreur lors de la sauvegarde. Réessayez.')
+      if (err.code === 'auth/email-already-in-use') setErreur('Cet email est déjà utilisé. Connectez-vous à la place.')
+      else if (err.code === 'auth/invalid-email') setErreur('Adresse email invalide.')
+      else setErreur('Erreur lors de la création du compte. Réessayez.')
     }
   }
 
   return (
-    <div style={{
-      minHeight:'100vh', background:'linear-gradient(160deg, #F8FAFF 0%, #EEF2FF 100%)',
-      display:'flex', flexDirection:'column', alignItems:'center',
-      padding:'0 20px 40px',
-    }}>
-      <style>{styleAnim}</style>
+    <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'24px' }}>
+        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
+        <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Créer un compte</span>
+      </div>
+      <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
+        🏨 Bienvenue ! Créez votre compte directeur pour commencer à gérer votre hôtel.
+      </div>
+      {[
+        { label:"NOM DE L'HÔTEL *", key:'nomHotel', placeholder:'Ex. Hôtel Palace Dakar', type:'text' },
+        { label:'VOTRE NOM *',       key:'nomDirecteur', placeholder:'Ex. Jean Dupont',     type:'text' },
+        { label:'EMAIL *',           key:'email',        placeholder:'directeur@monhotel.com', type:'email' },
+        { label:'MOT DE PASSE * (min. 6 caractères)', key:'motDePasse', placeholder:'••••••••', type:'password' },
+        { label:'CONFIRMER LE MOT DE PASSE *',        key:'confirmer',  placeholder:'••••••••', type:'password' },
+      ].map(f => (
+        <div key={f.key} style={{ marginBottom:'12px' }}>
+          <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>{f.label}</label>
+          <input type={f.type} value={form[f.key]}
+            onChange={e => setForm({...form, [f.key]:e.target.value})}
+            onKeyDown={e => f.key==='confirmer' && e.key==='Enter' && handleInscrire()}
+            placeholder={f.placeholder} style={champStyle}
+            onFocus={e => e.target.style.border='1.5px solid #C9A84C'}
+            onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+          />
+        </div>
+      ))}
+      {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
+      <button className="btn-shimmer" onClick={handleInscrire} disabled={loading} style={{
+        width:'100%', padding:'16px', borderRadius:'14px', border:'none',
+        cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+        opacity:loading?0.8:1, boxShadow:'0 4px 20px rgba(201,168,76,0.4)', marginTop:'8px',
+      }}>
+        {loading ? (
+          <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+            <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
+            Création en cours...
+          </span>
+        ) : '🏨 Créer mon compte'}
+      </button>
+      <p style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'16px', lineHeight:'1.5' }}>
+        En créant un compte, vous acceptez les conditions d'utilisation de HOMS-HÔTEL MANAGER par Homslovision.
+      </p>
+    </div>
+  )
+}
 
-      {/* Header */}
-      <div style={{ width:'100%', maxWidth:'440px', paddingTop:'48px', paddingBottom:'32px', textAlign:'center' }}>
-        <div style={{ fontSize:'40px', marginBottom:'12px' }}>🏨</div>
-        <div style={{ fontSize:'22px', fontWeight:'900', color:'#1B3A6B', letterSpacing:'2px' }}>HOMS-HÔTEL MANAGER</div>
-        <div style={{ fontSize:'13px', color:'#888', marginTop:'6px' }}>Configuration initiale</div>
+function EcranMotDePasseOublie({ onRetour }) {
+  const [email, setEmail]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const [erreur, setErreur]   = useState('')
+  const [succes, setSucces]   = useState(false)
+
+  const champStyle = {
+    width:'100%', padding:'14px 16px',
+    background:'rgba(255,255,255,0.08)',
+    border:'1.5px solid rgba(255,255,255,0.15)',
+    borderRadius:'12px', color:'white', fontSize:'15px',
+    outline:'none', boxSizing:'border-box',
+  }
+
+  const handleReset = async () => {
+    if (!email.trim()) { setErreur('Entrez votre adresse email.'); return }
+    setLoading(true); setErreur('')
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      setSucces(true)
+    } catch (err) {
+      if (err.code === 'auth/user-not-found') setErreur('Aucun compte trouvé avec cet email.')
+      else setErreur('Erreur. Vérifiez votre email et réessayez.')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'24px' }}>
+        <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
+        <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Mot de passe oublié</span>
+      </div>
+      {succes ? (
+        <div style={{ background:'rgba(46,204,113,0.15)', border:'1px solid #2ECC71', borderRadius:'14px', padding:'24px 20px', textAlign:'center' }}>
+          <div style={{ fontSize:'40px', marginBottom:'12px' }}>📧</div>
+          <div style={{ color:'#2ECC71', fontWeight:'800', fontSize:'16px', marginBottom:'8px' }}>Email envoyé !</div>
+          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', lineHeight:'1.5' }}>Vérifiez votre boîte email et suivez le lien pour réinitialiser votre mot de passe.</div>
+          <button onClick={onRetour} style={{ marginTop:'20px', padding:'12px 24px', borderRadius:'10px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px' }}>Retour à la connexion</button>
+        </div>
+      ) : (
+        <>
+          <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
+            💡 Entrez l'email de votre compte directeur. Vous recevrez un lien pour créer un nouveau mot de passe.
+          </div>
+          <div style={{ marginBottom:'16px' }}>
+            <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>VOTRE EMAIL</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleReset()} placeholder="directeur@monhotel.com"
+              style={champStyle}
+              onFocus={e=>e.target.style.border='1.5px solid #C9A84C'}
+              onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+            />
+          </div>
+          {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
+          <button className="btn-shimmer" onClick={handleReset} disabled={loading} style={{
+            width:'100%', padding:'16px', borderRadius:'14px', border:'none',
+            cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+            opacity:loading?0.8:1, boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+          }}>
+            {loading ? (
+              <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+                <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
+                Envoi en cours...
+              </span>
+            ) : '📧 Envoyer le lien de réinitialisation'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+const bgStyle = {
+  minHeight:'100vh', width:'100%',
+  background:'linear-gradient(160deg, #0A1628 0%, #1B3A6B 50%, #0D2240 100%)',
+  display:'flex', flexDirection:'column', alignItems:'center',
+  justifyContent:'flex-start', overflowX:'hidden',
+  position:'relative', paddingBottom:'40px',
+}
+
+export default function Connexion({ onConnexion }) {
+  const [mode, setMode]   = useState('connexion')
+  const [role, setRole]   = useState(null)
+  const [mdp, setMdp]     = useState('')
+  const [emailDirecteur, setEmailDirecteur] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [erreur, setErreur]   = useState('')
+  const [etape, setEtape] = useState(1)
+
+  const [showOublie, setShowOublie]   = useState(false)
+  const [nomOublie, setNomOublie]     = useState('')
+  const [reponse, setReponse]         = useState('')
+  const [nouveauMdp, setNouveauMdp]   = useState('')
+  const [userTrouve, setUserTrouve]   = useState(null)
+  const [mdpReset, setMdpReset]       = useState(false)
+
+  useEffect(() => {
+    const el = document.createElement('style')
+    el.textContent = styleAnim
+    document.head.appendChild(el)
+    return () => document.head.removeChild(el)
+  }, [])
+
+  const handleChoisirRole = (r) => {
+    setRole(r); setMdp(''); setErreur('')
+    setTimeout(() => setEtape(2), 300)
+  }
+
+  const handleConnexion = async () => {
+    if (!mdp) { setErreur('Veuillez entrer votre mot de passe.'); return }
+    setErreur(''); setLoading(true)
+    const now = new Date()
+    const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+
+    if (role.id === 'directeur') {
+      const emailAUtiliser = emailDirecteur.trim() || 'admin@homs.com'
+      try {
+        const resultat = await signInWithEmailAndPassword(auth, emailAUtiliser, mdp)
+        setLoading(false)
+        onConnexion({ nom:'Directeur', role:'directeur', email:resultat.user.email, uid:resultat.user.uid, derniereConnexion:horodatage })
+        return
+      } catch {
+        if (mdp === 'admin1234' && emailAUtiliser === 'admin@homs.com') {
+          setLoading(false)
+          onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', uid:'admin_local', derniereConnexion:horodatage })
+          return
+        }
+        setLoading(false)
+        setErreur('Email ou mot de passe incorrect.')
+        return
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setLoading(false)
+    const utilisateurs = lireUtilisateurs()
+    const user = utilisateurs.find(u => u.role === role.id && u.motDePasse === mdp && u.actif !== false)
+    if (user) {
+      const maj = utilisateurs.map(u2 => u2.id === user.id ? { ...u2, derniereConnexion: horodatage } : u2)
+      localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
+      onConnexion({ nom:user.nom, role:user.role, email:user.email||'', uid:null, derniereConnexion:horodatage })
+    } else {
+      setErreur('Mot de passe incorrect ou compte désactivé.')
+    }
+  }
+
+  const handleChercherUser = () => {
+    const utilisateurs = lireUtilisateurs()
+    const u = utilisateurs.find(u => u.nom.toLowerCase() === nomOublie.trim().toLowerCase() && u.role === role.id)
+    if (!u) { setErreur('Aucun compte trouvé avec ce nom pour ce rôle.'); return }
+    setUserTrouve(u); setErreur('')
+  }
+
+  const handleVerifierReponse = () => {
+    if (!userTrouve) return
+    if (reponse.trim().toLowerCase() === userTrouve.reponseSecrete?.toLowerCase()) { setErreur(''); setMdpReset(true) }
+    else setErreur('Réponse incorrecte.')
+  }
+
+  const handleNouveauMdp = () => {
+    if (nouveauMdp.length < 4) { setErreur('Minimum 4 caractères.'); return }
+    const utilisateurs = lireUtilisateurs()
+    const maj = utilisateurs.map(u => u.id === userTrouve.id ? { ...u, motDePasse: nouveauMdp } : u)
+    localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
+    setShowOublie(false); setNomOublie(''); setReponse(''); setNouveauMdp(''); setUserTrouve(null); setMdpReset(false); setErreur('')
+    alert('✅ Mot de passe mis à jour ! Vous pouvez vous connecter.')
+  }
+
+  const champStyle = (couleur) => ({
+    width:'100%', padding:'14px 16px',
+    background:'rgba(255,255,255,0.08)',
+    border:'1.5px solid rgba(255,255,255,0.15)',
+    borderRadius:'12px', color:'white', fontSize:'15px',
+    outline:'none', boxSizing:'border-box', transition:'border 0.2s',
+  })
+
+  if (mode === 'inscription') {
+    return (
+      <div style={bgStyle}>
+        <BgParticules/>
+        <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'24px' }}>
+          <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <div style={{ display:'none', width:'72px', height:'72px', borderRadius:'18px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'28px', fontWeight:'900', color:'#1B3A6B' }}>H</div>
+          </div>
+          <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'3px' }}>HOMS-HÔTEL MANAGER</div>
+        </div>
+        <EcranInscription onRetour={() => setMode('connexion')} onInscriptionReussie={onConnexion}/>
+        <Footer/>
+      </div>
+    )
+  }
+
+  if (mode === 'reset') {
+    return (
+      <div style={bgStyle}>
+        <BgParticules/>
+        <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'24px' }}>
+          <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'72px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <div style={{ display:'none', width:'72px', height:'72px', borderRadius:'18px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'28px', fontWeight:'900', color:'#1B3A6B' }}>H</div>
+          </div>
+          <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'3px' }}>HOMS-HÔTEL MANAGER</div>
+        </div>
+        <EcranMotDePasseOublie onRetour={() => setMode('connexion')}/>
+        <Footer/>
+      </div>
+    )
+  }
+
+  return (
+    <div style={bgStyle}>
+      <BgParticules/>
+
+      <div style={{ zIndex:1, textAlign:'center', paddingTop:'52px', paddingBottom:'8px' }}>
+        <div className="fade-down" style={{ animationDelay:'0.1s' }}>
+          <div className="logo-pulse" style={{ display:'inline-block', marginBottom:'16px' }}>
+            <img src="/logo-homs.png" alt="HOMS" style={{ height:'88px', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.7))' }} onError={e=>{ e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
+            <div style={{ display:'none', width:'88px', height:'88px', borderRadius:'22px', background:'linear-gradient(135deg, #C9A84C, #F5D98A)', alignItems:'center', justifyContent:'center', fontSize:'32px', fontWeight:'900', color:'#1B3A6B', boxShadow:'0 0 30px rgba(201,168,76,0.5)' }}>H</div>
+          </div>
+        </div>
+        <div className="fade-down" style={{ animationDelay:'0.3s', minHeight:'36px' }}>
+          <Typewriter text="HOMS-HÔTEL MANAGER" delay={600} style={{ fontSize:'26px', fontWeight:'900', color:'#C9A84C', letterSpacing:'4px' }}/>
+        </div>
+        <div className="fade-left" style={{ animationDelay:'0.5s', marginTop:'6px', minHeight:'20px' }}>
+          <Typewriter text="UNE VISION D'ENSEMBLE" delay={1400} style={{ fontSize:'11px', color:'rgba(201,168,76,0.7)', letterSpacing:'3px', fontWeight:'600' }}/>
+        </div>
+        <div className="fade-up" style={{ animationDelay:'0.6s', marginTop:'16px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+          <div style={{ height:'1px', width:'50px', background:'linear-gradient(90deg, transparent, #C9A84C)' }}/>
+          <div style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#C9A84C', animation:'bounce 1.5s ease infinite' }}/>
+          <div style={{ height:'1px', width:'50px', background:'linear-gradient(90deg, #C9A84C, transparent)' }}/>
+        </div>
       </div>
 
-      {/* Barre de progression */}
-      <div style={{ width:'100%', maxWidth:'440px', marginBottom:'32px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'8px' }}>
-          {ETAPES.map(e => (
-            <div key={e.num} style={{ display:'flex', flexDirection:'column', alignItems:'center', flex:1 }}>
-              <div style={{
-                width:'32px', height:'32px', borderRadius:'50%',
-                background: e.num < etape ? '#2ECC71' : e.num === etape ? '#1B3A6B' : '#E0E0E0',
-                color:'white', display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:'13px', fontWeight:'800', transition:'all 0.3s',
-              }}>
-                {e.num < etape ? '✓' : e.num}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ height:'4px', background:'#E0E0E0', borderRadius:'2px', position:'relative' }}>
-          <div style={{
-            height:'100%', borderRadius:'2px',
-            background:'linear-gradient(90deg, #1B3A6B, #C9A84C)',
-            width:`${((etape - 1) / (ETAPES.length - 1)) * 100}%`,
-            transition:'width 0.4s ease',
-          }}/>
-        </div>
-        <div style={{ textAlign:'center', marginTop:'12px' }}>
-          <div style={{ fontWeight:'800', fontSize:'18px', color:'#1B3A6B' }}>{ETAPES[etape-1].titre}</div>
-          <div style={{ fontSize:'13px', color:'#888', marginTop:'4px' }}>{ETAPES[etape-1].sous}</div>
-        </div>
-      </div>
-
-      {/* Contenu de chaque étape */}
-      <div className="fade-up" key={etape} style={{ width:'100%', maxWidth:'440px' }}>
-
-        {/* ── Étape 1 : Bienvenue ── */}
-        {etape === 1 && (
-          <div style={{ background:'white', borderRadius:'20px', padding:'28px 24px', boxShadow:'0 4px 20px rgba(27,58,107,0.08)' }}>
-            <div style={{ textAlign:'center', marginBottom:'24px' }}>
-              <div style={{ fontSize:'56px', marginBottom:'16px' }}>👋</div>
-              <div style={{ fontSize:'20px', fontWeight:'800', color:'#1B3A6B', marginBottom:'8px' }}>
-                Bonjour {utilisateur?.nom || 'Directeur'} !
-              </div>
-              <div style={{ fontSize:'14px', color:'#666', lineHeight:'1.6' }}>
-                Votre compte a été créé avec succès. Prenons 3 minutes pour configurer votre hôtel afin que tout soit prêt à l'usage.
-              </div>
-            </div>
-
-            <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'24px' }}>
-              {[
-                { emoji:'🏨', titre:'Votre établissement', desc:'Nom, adresse, téléphone' },
-                { emoji:'🛏️', titre:'Vos chambres',        desc:'Catégories et tarifs' },
-                { emoji:'💱', titre:'Votre devise',         desc:'Monnaie locale' },
-              ].map((item, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:'14px', padding:'12px 16px', background:'#F8FAFF', borderRadius:'12px', border:'1px solid #E8EDFF' }}>
-                  <div style={{ fontSize:'24px' }}>{item.emoji}</div>
-                  <div>
-                    <div style={{ fontWeight:'700', fontSize:'14px', color:'#1B3A6B' }}>{item.titre}</div>
-                    <div style={{ fontSize:'12px', color:'#888', marginTop:'2px' }}>{item.desc}</div>
+      {etape === 1 && (
+        <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'28px', animationDelay:'0.8s' }}>
+          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.6)', fontSize:'13px', marginBottom:'20px', letterSpacing:'1px' }}>Sélectionnez votre profil</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+            {ROLES.map((r, i) => (
+              <button key={r.id} onClick={() => handleChoisirRole(r)} style={{
+                display:'flex', alignItems:'center', gap:'16px', padding:'18px 20px', borderRadius:'16px',
+                background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.12)',
+                cursor:'pointer', width:'100%', textAlign:'left',
+                animation:`fadeUp 0.5s ease ${0.9+i*0.15}s both`, transition:'all 0.25s ease', backdropFilter:'blur(8px)',
+              }}
+              onMouseEnter={e=>{ e.currentTarget.style.background=`${r.couleur}22`; e.currentTarget.style.border=`1.5px solid ${r.couleur}`; e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow=`0 8px 24px ${r.couleur}33` }}
+              onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.border='1.5px solid rgba(255,255,255,0.12)'; e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none' }}>
+                <div style={{ width:'52px', height:'52px', borderRadius:'14px', background:`${r.couleur}22`, border:`1.5px solid ${r.couleur}55`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'26px', flexShrink:0, animation:`cardHover 3s ease ${i*0.5}s infinite` }}>{r.emoji}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:'white', fontWeight:'800', fontSize:'16px' }}>{r.label}</div>
+                  <div style={{ color:`${r.couleur}99`, fontSize:'12px', marginTop:'2px' }}>
+                    {r.id==='directeur'?'Accès complet · Paramètres · Rapports':r.id==='receptionniste'?'Séjours · Chambres · Caisse':'Encaissements · Caisse du jour'}
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <button className="btn-shimmer" onClick={() => setEtape(2)} style={{
-              width:'100%', padding:'16px', borderRadius:'14px', border:'none',
-              cursor:'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
-              boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
-            }}>
-              Commencer la configuration →
-            </button>
-          </div>
-        )}
-
-        {/* ── Étape 2 : Établissement ── */}
-        {etape === 2 && (
-          <div style={{ background:'white', borderRadius:'20px', padding:'28px 24px', boxShadow:'0 4px 20px rgba(27,58,107,0.08)' }}>
-            <div style={{ display:'flex', flexDirection:'column', gap:'16px', marginBottom:'24px' }}>
-              <div>
-                <label style={labelStyle}>Nom de l'hôtel *</label>
-                <input value={nomHotel} onChange={e=>setNomHotel(e.target.value)}
-                  placeholder="Ex. Hôtel Palace Dakar"
-                  style={inputStyle}
-                  onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                  onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Adresse</label>
-                <input value={adresse} onChange={e=>setAdresse(e.target.value)}
-                  placeholder="Ex. Avenue de l'Indépendance, Dakar"
-                  style={inputStyle}
-                  onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                  onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Téléphone</label>
-                <input value={telephone} onChange={e=>setTelephone(e.target.value)}
-                  placeholder="Ex. +221 77 000 00 00"
-                  type="tel"
-                  style={inputStyle}
-                  onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                  onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                />
-              </div>
-            </div>
-
-            {erreur && <div style={{ color:'#E74C3C', fontSize:'13px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
-
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setEtape(1)} style={{ flex:1, padding:'14px', borderRadius:'12px', border:'2px solid #E0E0E0', background:'white', color:'#666', fontWeight:'700', fontSize:'14px', cursor:'pointer' }}>
-                ← Retour
+                <div style={{ color:r.couleur, fontSize:'20px' }}>›</div>
               </button>
-              <button onClick={() => {
-                if (!nomHotel.trim()) { setErreur('Le nom de l\'hôtel est obligatoire.'); return }
-                setErreur(''); setEtape(3)
-              }} style={{ flex:2, padding:'14px', borderRadius:'12px', border:'none', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'14px', cursor:'pointer' }}>
-                Suivant →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Étape 3 : Chambres ── */}
-        {etape === 3 && (
-          <div style={{ background:'white', borderRadius:'20px', padding:'28px 24px', boxShadow:'0 4px 20px rgba(27,58,107,0.08)' }}>
-            <div style={{ background:'#F0F4FF', borderRadius:'10px', padding:'10px 14px', marginBottom:'16px', fontSize:'12px', color:'#1B3A6B', fontWeight:'600' }}>
-              🏨 Total : <strong>{totalChambres} chambres</strong> configurées
-            </div>
-
-            {categories.map((cat, i) => (
-              <div key={cat.id} style={{ background:'#F8FAFF', borderRadius:'14px', padding:'16px', marginBottom:'12px', border:'1px solid #E8EDFF' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
-                  <div style={{ fontWeight:'800', fontSize:'14px', color:'#1B3A6B' }}>Catégorie {i+1}</div>
-                  {categories.length > 1 && (
-                    <button onClick={() => supprimerCategorie(cat.id)} style={{ background:'#FFF0F0', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'#E74C3C', fontSize:'12px', fontWeight:'700' }}>
-                      Supprimer
-                    </button>
-                  )}
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-                  <div>
-                    <label style={labelStyle}>Nom de la catégorie</label>
-                    <input value={cat.nom} onChange={e=>modifierCategorie(cat.id,'nom',e.target.value)}
-                      placeholder="Ex. Standard, Confort, Suite..."
-                      style={inputStyle}
-                      onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                      onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Nombre de chambres</label>
-                    <input type="number" value={cat.nombre} min="1"
-                      onChange={e=>modifierCategorie(cat.id,'nombre',Number(e.target.value))}
-                      style={inputStyle}
-                      onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                      onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                    />
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
-                    <div>
-                      <label style={labelStyle}>Tarif / nuit</label>
-                      <input type="number" value={cat.tarifNuit}
-                        onChange={e=>modifierCategorie(cat.id,'tarifNuit',Number(e.target.value))}
-                        style={inputStyle}
-                        onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                        onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Tarif / heure</label>
-                      <input type="number" value={cat.tarifHeure}
-                        onChange={e=>modifierCategorie(cat.id,'tarifHeure',Number(e.target.value))}
-                        style={inputStyle}
-                        onFocus={e=>e.target.style.border='2px solid #1B3A6B'}
-                        onBlur={e=>e.target.style.border='2px solid #E0E0E0'}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ background:'#EEF2FF', borderRadius:'8px', padding:'8px 12px', fontSize:'12px', color:'#1B3A6B', fontWeight:'600' }}>
-                    📊 Numéros : {(i+1)*100 + 1} → {(i+1)*100 + cat.nombre}
-                  </div>
-                </div>
-              </div>
             ))}
+          </div>
 
-            <button onClick={ajouterCategorie} style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'2px dashed #C9A84C', background:'transparent', color:'#C9A84C', fontWeight:'700', fontSize:'14px', cursor:'pointer', marginBottom:'16px' }}>
-              + Ajouter une catégorie
+          <div style={{ marginTop:'28px', textAlign:'center' }}>
+            <div style={{ height:'1px', background:'rgba(255,255,255,0.1)', marginBottom:'20px' }}/>
+            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'12px', marginBottom:'12px' }}>Vous n'avez pas encore de compte ?</p>
+            <button onClick={() => setMode('inscription')} style={{
+              width:'100%', padding:'14px', borderRadius:'14px',
+              border:'1.5px solid rgba(201,168,76,0.5)',
+              background:'rgba(201,168,76,0.08)',
+              color:'#C9A84C', fontWeight:'800', fontSize:'14px',
+              cursor:'pointer', letterSpacing:'1px',
+            }}>
+              🏨 Créer un compte hôtel
             </button>
+          </div>
+        </div>
+      )}
 
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setEtape(2)} style={{ flex:1, padding:'14px', borderRadius:'12px', border:'2px solid #E0E0E0', background:'white', color:'#666', fontWeight:'700', fontSize:'14px', cursor:'pointer' }}>
-                ← Retour
-              </button>
-              <button onClick={() => setEtape(4)} style={{ flex:2, padding:'14px', borderRadius:'12px', border:'none', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'14px', cursor:'pointer' }}>
-                Suivant →
-              </button>
+      {etape === 2 && role && !showOublie && (
+        <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'24px' }}>
+            <button onClick={() => setEtape(1)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
+            <div style={{ display:'flex', alignItems:'center', gap:'8px', background:`${role.couleur}22`, border:`1px solid ${role.couleur}55`, borderRadius:'20px', padding:'6px 16px' }}>
+              <span style={{ fontSize:'18px' }}>{role.emoji}</span>
+              <span style={{ color:role.couleur, fontWeight:'700', fontSize:'13px' }}>{role.label}</span>
             </div>
           </div>
-        )}
 
-        {/* ── Étape 4 : Devise ── */}
-        {etape === 4 && (
-          <div style={{ background:'white', borderRadius:'20px', padding:'28px 24px', boxShadow:'0 4px 20px rgba(27,58,107,0.08)' }}>
-            <div style={{ marginBottom:'20px' }}>
-              <label style={labelStyle}>Devise de votre établissement</label>
-              <p style={{ fontSize:'13px', color:'#888', marginBottom:'12px', lineHeight:'1.5' }}>
-                Choisissez la monnaie utilisée dans votre hôtel. Elle sera affichée sur tous les reçus et rapports.
-              </p>
-              <select value={codeDevise} onChange={e=>setCodeDevise(e.target.value)}
-                style={{ ...inputStyle, background:'white' }}>
-                {DEVISES.map(d => <option key={d.code} value={d.code}>{d.nom} ({d.code}) — {d.symbole}</option>)}
-              </select>
-              <div style={{ marginTop:'12px', background:'#F0F4FF', borderRadius:'10px', padding:'12px 14px', fontSize:'13px', color:'#1B3A6B', fontWeight:'700' }}>
-                💱 Sélectionné : <strong>{trouverDevise(codeDevise).nom}</strong> — {trouverDevise(codeDevise).symbole}
-              </div>
+          {role.id === 'directeur' && (
+            <div style={{ marginBottom:'14px' }}>
+              <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>EMAIL</label>
+              <input type="email" value={emailDirecteur} onChange={e=>setEmailDirecteur(e.target.value)}
+                placeholder="votre@email.com" style={champStyle(role.couleur)}
+                onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`}
+                onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+              />
             </div>
+          )}
 
-            {/* Résumé final */}
-            <div style={{ background:'#F8FAFF', borderRadius:'14px', padding:'16px', marginBottom:'20px', border:'1px solid #E8EDFF' }}>
-              <div style={{ fontWeight:'800', fontSize:'14px', color:'#1B3A6B', marginBottom:'12px' }}>📋 Résumé de votre configuration</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:'8px', fontSize:'13px', color:'#555' }}>
-                <div>🏨 <strong>{nomHotel}</strong></div>
-                {adresse && <div>📍 {adresse}</div>}
-                {telephone && <div>📞 {telephone}</div>}
-                <div>🛏️ {totalChambres} chambres · {categories.length} catégorie{categories.length > 1 ? 's' : ''}</div>
-                <div>💱 {trouverDevise(codeDevise).nom} ({trouverDevise(codeDevise).symbole})</div>
-              </div>
-            </div>
-
-            {erreur && <div style={{ color:'#E74C3C', fontSize:'13px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
-
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button onClick={() => setEtape(3)} style={{ flex:1, padding:'14px', borderRadius:'12px', border:'2px solid #E0E0E0', background:'white', color:'#666', fontWeight:'700', fontSize:'14px', cursor:'pointer' }}>
-                ← Retour
-              </button>
-              <button className="btn-shimmer" onClick={handleTerminer} disabled={loading} style={{
-                flex:2, padding:'14px', borderRadius:'12px', border:'none',
-                cursor:loading?'not-allowed':'pointer',
-                color:'#1B3A6B', fontWeight:'900', fontSize:'14px',
-                opacity:loading?0.8:1,
-                boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
-              }}>
-                {loading ? 'Enregistrement...' : '✅ Lancer mon hôtel !'}
-              </button>
-            </div>
+          <div style={{ marginBottom:'14px', animation:'fadeUp 0.4s ease 0.1s both' }}>
+            <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>MOT DE PASSE</label>
+            <input type="password" value={mdp} onChange={e=>setMdp(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleConnexion()} placeholder="••••••••"
+              style={champStyle(role.couleur)}
+              onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`}
+              onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+            />
           </div>
-        )}
-      </div>
+
+          {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+
+          <button className="btn-shimmer" onClick={handleConnexion} disabled={loading} style={{
+            width:'100%', padding:'16px', borderRadius:'14px', border:'none',
+            cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
+            marginTop:'8px', letterSpacing:'1px', opacity:loading?0.8:1,
+            boxShadow:'0 4px 20px rgba(201,168,76,0.4)',
+          }}>
+            {loading ? (
+              <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+                <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
+                Connexion en cours...
+              </span>
+            ) : `Se connecter · ${role.label}`}
+          </button>
+
+          {role.id === 'directeur' && (
+            <p onClick={() => setMode('reset')} style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'12px', marginTop:'16px', cursor:'pointer', textDecoration:'underline' }}>
+              Mot de passe oublié ?
+            </p>
+          )}
+          {role.id !== 'directeur' && (
+            <p onClick={() => { setShowOublie(true); setErreur('') }} style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'12px', marginTop:'16px', cursor:'pointer', textDecoration:'underline' }}>
+              Mot de passe oublié ?
+            </p>
+          )}
+        </div>
+      )}
+
+      {etape === 2 && role && showOublie && (
+        <div className="fade-up" style={{ zIndex:1, width:'100%', maxWidth:'400px', padding:'0 20px', marginTop:'20px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px' }}>
+            <button onClick={() => { setShowOublie(false); setErreur(''); setUserTrouve(null); setMdpReset(false) }} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
+            <span style={{ color:'#C9A84C', fontWeight:'700', fontSize:'15px' }}>Mot de passe oublié</span>
+          </div>
+          {!userTrouve && (
+            <>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>VOTRE NOM (tel qu'enregistré)</label>
+                <input value={nomOublie} onChange={e=>setNomOublie(e.target.value)} placeholder="Ex. Jean Dupont" style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleChercherUser} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>Rechercher mon compte</button>
+            </>
+          )}
+          {userTrouve && !mdpReset && (
+            <>
+              <div style={{ background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#2ECC71' }}>✅ Compte trouvé : <strong>{userTrouve.nom}</strong></div>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>QUESTION SECRÈTE : {userTrouve.questionSecrete || 'Quel est le nom de votre animal ?'}</label>
+                <input value={reponse} onChange={e=>setReponse(e.target.value)} placeholder="Votre réponse..." style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleVerifierReponse} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:role.couleur, color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>Vérifier</button>
+            </>
+          )}
+          {userTrouve && mdpReset && (
+            <>
+              <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'10px', padding:'10px 14px', marginBottom:'14px', fontSize:'12px', color:'#C9A84C' }}>✅ Réponse correcte ! Choisissez un nouveau mot de passe.</div>
+              <div style={{ marginBottom:'14px' }}>
+                <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>NOUVEAU MOT DE PASSE</label>
+                <input type="password" value={nouveauMdp} onChange={e=>setNouveauMdp(e.target.value)} placeholder="Minimum 4 caractères" style={champStyle(role.couleur)} onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`} onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}/>
+              </div>
+              {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'10px', textAlign:'center' }}>⚠️ {erreur}</div>}
+              <button onClick={handleNouveauMdp} style={{ width:'100%', padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'800', fontSize:'14px' }}>✅ Enregistrer le nouveau mot de passe</button>
+            </>
+          )}
+        </div>
+      )}
+
+      <Footer/>
     </div>
   )
 }
