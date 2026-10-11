@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Splash from './screens/Splash'
 import Connexion from './screens/Connexion'
+import Onboarding from './screens/Onboarding'
 import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
@@ -72,7 +73,6 @@ export function genererChambres(sejours = [], categories = PARAMS_DEFAUT.categor
   return chambres
 }
 
-// ─── localStorage — clés préfixées par UID ───────────────────────────────────
 function storageKey(uid, key) {
   return uid ? `homs_${uid}_${key}` : `homs_${key}`
 }
@@ -104,7 +104,6 @@ function lireThemeLocal(uid, userId) {
   try { return localStorage.getItem(`homs_${uid}_theme_${userId}`) === 'sombre' } catch { return false }
 }
 
-// ─── Firestore helpers ────────────────────────────────────────────────────────
 async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses, historique) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
@@ -220,6 +219,7 @@ export default function App() {
   const [onglet,            setOnglet]            = useState('dashboard')
   const [utilisateur,       setUtilisateur]       = useState(null)
   const [hotelId,           setHotelId]           = useState(null)
+  const [showOnboarding,    setShowOnboarding]    = useState(false)
   const [cle,               setCle]               = useState(0)
   const [ouvrirFormulaire,  setOuvrirFormulaire]  = useState(false)
   const [themeSombre,       setThemeSombre]       = useState(false)
@@ -273,7 +273,6 @@ export default function App() {
     return () => document.head.removeChild(el)
   }, [])
 
-  // ── Écoute temps réel après connexion ──
   useEffect(() => {
     if (!hotelId || hotelId === 'admin_local') return
     setChargementDonnees(true)
@@ -297,10 +296,8 @@ export default function App() {
             historique: data.historique || [],
           })
         } else {
-          setSejours([])
-          setEntreesDiverses([])
-          setSortiesDiverses([])
-          setHistorique([])
+          setSejours([]); setEntreesDiverses([])
+          setSortiesDiverses([]); setHistorique([])
         }
       },
       () => { setChargementDonnees(false) }
@@ -308,7 +305,6 @@ export default function App() {
     return () => { if (snapshotUnsubRef.current) snapshotUnsubRef.current() }
   }, [hotelId])
 
-  // ── Sauvegarde automatique ──
   useEffect(() => {
     if (!hotelId) return
     sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
@@ -445,25 +441,15 @@ export default function App() {
   const handleConnexion = (user) => {
     const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
 
-    // ── Réinitialiser complètement l'état ──
-    setSejours([])
-    setEntreesDiverses([])
-    setSortiesDiverses([])
-    setHistorique([])
-    setJournal([])
-    setAlertesSonnees({})
-    setNoShowASignaler([])
-    setNoShowIgnores([])
+    setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
+    setHistorique([]); setJournal([]); setAlertesSonnees({})
+    setNoShowASignaler([]); setNoShowIgnores({})
 
-    // ── Charger les paramètres propres à cet hôtel ──
     const params = lireParams(hId)
     setConfigChambres(params.categories)
 
-    // ── Charger la devise ──
     const deviseHotel = hId ? (lireDeviseLocal(hId) || detecterDevise() || 'XOF') : 'XOF'
     setCodeDevise(deviseHotel)
-
-    // ── Charger le journal local ──
     setJournal(hId ? chargerJournalLocal(hId) : [])
 
     setHotelId(hId)
@@ -472,9 +458,14 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
 
+    // Nouveau compte → onboarding
+    if (user.isNewUser) {
+      setShowOnboarding(true)
+      return
+    }
+
     if (!lireDeviseLocal(hId)) setShowChoixDevise(true)
 
-    // ── Journal connexion ──
     if (hId) {
       const now = new Date()
       const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
@@ -492,20 +483,14 @@ export default function App() {
     ajouterAuJournal({ type:'deconnexion', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`${utilisateur?.nom||'Utilisateur'} s'est déconnecté` })
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
     try { await signOut(auth) } catch (e) {}
-    setUtilisateur(null)
-    setHotelId(null)
-    setThemeSombre(false)
+    setUtilisateur(null); setHotelId(null); setThemeSombre(false)
     setOnglet('dashboard')
-    setSejours([])
-    setEntreesDiverses([])
-    setSortiesDiverses([])
-    setHistorique([])
-    setJournal([])
-    setAlertesSonnees({})
-    setNoShowASignaler([])
-    setNoShowIgnores({})
+    setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
+    setHistorique([]); setJournal([]); setAlertesSonnees({})
+    setNoShowASignaler([]); setNoShowIgnores({})
     setConfigChambres(PARAMS_DEFAUT.categories)
     setCodeDevise('XOF')
+    setShowOnboarding(false)
     setEcran('connexion')
   }
 
@@ -523,9 +508,7 @@ export default function App() {
     const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
     setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
     setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
-    setEntreesDiverses([])
-    setSortiesDiverses([])
-    setNoShowASignaler([])
+    setEntreesDiverses([]); setSortiesDiverses([]); setNoShowASignaler([])
     ajouterAuJournal({ type:'cloture_caisse', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`Clôture de caisse · Solde net : ${soldeNet.toLocaleString('fr-FR')} FCFA` })
   }
 
@@ -533,16 +516,39 @@ export default function App() {
     if (hotelId) {
       try { localStorage.removeItem(storageKey(hotelId, 'data_v1')) } catch (e) {}
     }
-    setSejours([])
-    setEntreesDiverses([])
-    setSortiesDiverses([])
-    setAlertesSonnees({})
-    setNoShowASignaler([])
-    setNoShowIgnores({})
+    setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
+    setAlertesSonnees({}); setNoShowASignaler([]); setNoShowIgnores({})
   }
 
   if (ecran === 'splash')    return <Splash onFin={() => setEcran('connexion')}/>
   if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion}/>
+
+  // ── Onboarding premier lancement ──
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        utilisateur={utilisateur}
+        hotelId={hotelId}
+        onTerminer={({ params, codeDevise }) => {
+          setConfigChambres(params.categories)
+          setCodeDevise(codeDevise)
+          setShowOnboarding(false)
+          // Journaliser la première connexion après onboarding
+          if (hotelId) {
+            const now = new Date()
+            const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+            const entree = { type:'connexion', utilisateur:utilisateur?.nom||'Directeur', role:'directeur', details:`${utilisateur?.nom||'Directeur'} s'est connecté`, date:horodatage, id:Date.now() }
+            setJournal(prev => {
+              const maj = [entree, ...prev].slice(0, 500)
+              sauvegarderJournalLocal(hotelId, maj)
+              sauvegarderJournalFirestore(hotelId, maj)
+              return maj
+            })
+          }
+        }}
+      />
+    )
+  }
 
   const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
 
