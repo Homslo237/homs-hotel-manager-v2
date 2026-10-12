@@ -79,6 +79,14 @@ function lireUtilisateurs() {
   } catch { return [] }
 }
 
+function lireDernierEmail() {
+  try { return localStorage.getItem('homs_last_email') || '' } catch { return '' }
+}
+
+function sauvegarderDernierEmail(email) {
+  try { localStorage.setItem('homs_last_email', email) } catch {}
+}
+
 function Typewriter({ text, delay = 0, style }) {
   const [displayed, setDisplayed] = useState('')
   const [started, setStarted] = useState(false)
@@ -161,6 +169,7 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         slogan:'', adresse:'', telephone1:'', telephone2:'',
         rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
+      sauvegarderDernierEmail(form.email.trim())
       setLoading(false)
       onInscriptionReussie({
         nom: form.nomDirecteur.trim(),
@@ -189,11 +198,11 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         🏨 Bienvenue ! Créez votre compte directeur pour commencer à gérer votre hôtel.
       </div>
       {[
-        { label:"NOM DE L'HÔTEL *", key:'nomHotel', placeholder:'Ex. Hôtel Palace Dakar', type:'text' },
-        { label:'VOTRE NOM *',       key:'nomDirecteur', placeholder:'Ex. Jean Dupont',     type:'text' },
-        { label:'EMAIL *',           key:'email',        placeholder:'directeur@monhotel.com', type:'email' },
-        { label:'MOT DE PASSE * (min. 6 caractères)', key:'motDePasse', placeholder:'••••••••', type:'password' },
-        { label:'CONFIRMER LE MOT DE PASSE *',        key:'confirmer',  placeholder:'••••••••', type:'password' },
+        { label:"NOM DE L'HÔTEL *",                    key:'nomHotel',    placeholder:'Ex. Hôtel Palace Dakar',    type:'text'     },
+        { label:'VOTRE NOM *',                          key:'nomDirecteur', placeholder:'Ex. Jean Dupont',          type:'text'     },
+        { label:'EMAIL *',                              key:'email',        placeholder:'directeur@monhotel.com',   type:'email'    },
+        { label:'MOT DE PASSE * (min. 6 caractères)',   key:'motDePasse',   placeholder:'••••••••',                 type:'password' },
+        { label:'CONFIRMER LE MOT DE PASSE *',          key:'confirmer',    placeholder:'••••••••',                 type:'password' },
       ].map(f => (
         <div key={f.key} style={{ marginBottom:'12px' }}>
           <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>{f.label}</label>
@@ -227,7 +236,7 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
 }
 
 function EcranMotDePasseOublie({ onRetour }) {
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]     = useState(lireDernierEmail)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
   const [succes, setSucces]   = useState(false)
@@ -310,7 +319,7 @@ export default function Connexion({ onConnexion }) {
   const [mode, setMode]   = useState('connexion')
   const [role, setRole]   = useState(null)
   const [mdp, setMdp]     = useState('')
-  const [emailDirecteur, setEmailDirecteur] = useState('')
+  const [emailDirecteur, setEmailDirecteur] = useState(lireDernierEmail)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
   const [etape, setEtape] = useState(1)
@@ -344,6 +353,7 @@ export default function Connexion({ onConnexion }) {
       const emailAUtiliser = emailDirecteur.trim() || 'admin@homs.com'
       try {
         const resultat = await signInWithEmailAndPassword(auth, emailAUtiliser, mdp)
+        sauvegarderDernierEmail(emailAUtiliser)
         setLoading(false)
         onConnexion({ nom:'Directeur', role:'directeur', email:resultat.user.email, uid:resultat.user.uid, derniereConnexion:horodatage })
         return
@@ -390,7 +400,8 @@ export default function Connexion({ onConnexion }) {
     const utilisateurs = lireUtilisateurs()
     const maj = utilisateurs.map(u => u.id === userTrouve.id ? { ...u, motDePasse: nouveauMdp } : u)
     localStorage.setItem('homs_utilisateurs', JSON.stringify(maj))
-    setShowOublie(false); setNomOublie(''); setReponse(''); setNouveauMdp(''); setUserTrouve(null); setMdpReset(false); setErreur('')
+    setShowOublie(false); setNomOublie(''); setReponse(''); setNouveauMdp('')
+    setUserTrouve(null); setMdpReset(false); setErreur('')
     alert('✅ Mot de passe mis à jour ! Vous pouvez vous connecter.')
   }
 
@@ -514,10 +525,12 @@ export default function Connexion({ onConnexion }) {
           {role.id === 'directeur' && (
             <div style={{ marginBottom:'14px' }}>
               <label style={{ display:'block', color:'rgba(255,255,255,0.7)', fontSize:'12px', fontWeight:'600', marginBottom:'8px', letterSpacing:'1px' }}>EMAIL</label>
-              <input type="email" value={emailDirecteur} onChange={e=>setEmailDirecteur(e.target.value)}
-                placeholder="votre@email.com" style={champStyle(role.couleur)}
-                onFocus={e=>e.target.style.border=`1.5px solid ${role.couleur}`}
-                onBlur={e=>e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
+              <input type="email" value={emailDirecteur}
+                onChange={e => setEmailDirecteur(e.target.value)}
+                placeholder="votre@email.com"
+                style={champStyle(role.couleur)}
+                onFocus={e => e.target.style.border=`1.5px solid ${role.couleur}`}
+                onBlur={e => e.target.style.border='1.5px solid rgba(255,255,255,0.15)'}
               />
             </div>
           )}
