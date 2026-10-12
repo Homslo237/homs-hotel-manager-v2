@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings,
-  AlertTriangle, Plus, Trash2, Save, Lock, Sun, Moon
+  Plus, Trash2, Save, Lock, Sun, Moon
 } from 'lucide-react'
 
 import EcranStatistiques from './EcranStatistiques'
@@ -11,7 +11,7 @@ import EcranUtilisateurs from './EcranUtilisateurs'
 import EcranProfil       from './EcranProfil'
 import EcranJournal      from './EcranJournal'
 import { DEVISES, trouverDevise } from '../../devises'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../../firebase'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
@@ -40,7 +40,6 @@ export const PARAMS_DEFAUT = {
   ]
 }
 
-// ── Lire/sauvegarder les paramètres ──
 function storageKeyParams(uid) {
   return uid ? `homs_${uid}_params` : 'homs_params'
 }
@@ -66,8 +65,25 @@ async function sauvegarderParamsFirestore(params) {
   } catch {}
 }
 
+export async function syncMetriquesHotel(uid, metriques) {
+  if (!uid) return
+  try {
+    await setDoc(doc(db, 'hotels', uid, 'infos', 'metriques'), {
+      ...metriques, syncAt: new Date().toISOString(),
+    }, { merge: true })
+  } catch {}
+}
+
 function lireProfil(userId) {
   try { const s=localStorage.getItem(`homs_profil_${userId}`); return s?JSON.parse(s):null } catch { return null }
+}
+
+function lireIdentiteLocale(uid) {
+  try {
+    const cle = uid ? `homs_${uid}_identite` : 'homs_identite'
+    const s = localStorage.getItem(cle)
+    return s ? JSON.parse(s) : identiteDefaut
+  } catch { return identiteDefaut }
 }
 
 function BanniereAccesReserve() {
@@ -80,7 +96,7 @@ function BanniereAccesReserve() {
   )
 }
 
-function EcranDirecteur({ onClose, onDeviseChange, onParamsChange, hotelId, codeDevise, setCodDevise }) {
+function EcranDirecteur({ onClose, onDeviseChange, onParamsChange, hotelId, codeDevise }) {
   const uid = auth.currentUser?.uid || hotelId
   const [params, setParams] = useState(() => lireParams(uid))
   const [sauvegarde, setSauvegarde] = useState(false)
@@ -88,11 +104,8 @@ function EcranDirecteur({ onClose, onDeviseChange, onParamsChange, hotelId, code
   const deviseActuelle = trouverDevise(codeDeviseLocal)
 
   const handleSauvegarder = async () => {
-    // Sauvegarder localStorage
     sauvegarderParamsLocal(uid, params)
-    // Sauvegarder Firestore
     await sauvegarderParamsFirestore(params)
-    // Notifier App.jsx
     if (onParamsChange) onParamsChange(params)
     setSauvegarde(true)
     setTimeout(() => setSauvegarde(false), 2000)
@@ -260,16 +273,16 @@ function sauvegarderThemeUtilisateur(uid, userId, sombre) {
   try { localStorage.setItem(`homs_${uid}_theme_${userId}`, sombre ? 'sombre' : 'clair') } catch {}
 }
 
-export default function Menu({ onDeconnexion, onReinitialiser, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange, onParamsChange, devise='FCFA', hotelId, codeDevise }) {
+export default function Menu({ onDeconnexion, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange, onParamsChange, devise='FCFA', hotelId, codeDevise }) {
   const [ecranActif, setEcranActif] = useState(null)
-  const [identite, setIdentite] = useState(() => {
-    try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s):identiteDefaut } catch { return identiteDefaut }
-  })
 
+  // ── uid déclaré EN PREMIER pour être utilisé dans identite ──
   const uid = hotelId || auth.currentUser?.uid
   const userId = utilisateur?.nom || 'directeur'
-  const [profilUtilisateur, setProfilUtilisateur] = useState(()=>lireProfil(userId))
-  const [themeSombre, setThemeSombre] = useState(()=>lireThemeUtilisateur(uid, userId))
+
+  const [identite, setIdentite] = useState(() => lireIdentiteLocale(uid))
+  const [profilUtilisateur, setProfilUtilisateur] = useState(() => lireProfil(userId))
+  const [themeSombre, setThemeSombre] = useState(() => lireThemeUtilisateur(uid, userId))
 
   const estDirecteur = utilisateur?.role === 'directeur'
   const roleInfo = ROLES_LABELS[utilisateur?.role] || ROLES_LABELS.receptionniste
@@ -299,15 +312,19 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
           )}
           <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>{nomAffiche}</div>
           <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', marginTop:'4px' }}>
-            {estDirecteur?(identite.nom||'HOMS-HÔTEL'):roleInfo.label}
+            {estDirecteur ? (identite.nom || 'HOMS-HÔTEL') : roleInfo.label}
           </div>
-          {identite.adresse&&estDirecteur&&<div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>📍 {identite.adresse}</div>}
+          {identite.adresse && estDirecteur && (
+            <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', marginTop:'4px' }}>📍 {identite.adresse}</div>
+          )}
           <div style={{ marginTop:'12px', background:`${roleInfo.couleur}33`, border:`1px solid ${roleInfo.couleur}`, borderRadius:'20px', padding:'4px 16px', fontSize:'12px', color:roleInfo.couleur }}>
             {roleInfo.emoji} {roleInfo.label}
           </div>
         </div>
 
         <div style={{ padding:'16px 20px' }}>
+
+          {/* ── Mode sombre ── */}
           <div style={{ marginBottom:'20px' }}>
             <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>Affichage</div>
             <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -326,21 +343,22 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
             </div>
           </div>
 
-          {estDirecteur && menuItemsDirecteur.map((section,si) => (
+          {/* ── Menu Directeur ── */}
+          {estDirecteur && menuItemsDirecteur.map((section, si) => (
             <div key={si} style={{ marginBottom:'20px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>{section.section}</div>
               <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
-                {section.items.map((item,ii) => {
+                {section.items.map((item, ii) => {
                   const Icone = item.icone
                   return (
-                    <div key={ii} onClick={()=>item.action&&setEcranActif(item.action)}
+                    <div key={ii} onClick={() => item.action && setEcranActif(item.action)}
                       style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', borderBottom:ii<section.items.length-1?'1px solid #F0F0F0':'none', cursor:item.action?'pointer':'default', background:item.action?'white':'#FAFAFA' }}>
                       <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:item.couleur+'15', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                         <Icone size={20} color={item.couleur}/>
                       </div>
                       <div style={{ flex:1 }}>
                         <div style={{ fontWeight:'600', fontSize:'14px', color:item.action?'#1F2937':'#AAA' }}>{item.label}</div>
-                        <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>{item.action?item.sous:item.sous+' — bientôt disponible'}</div>
+                        <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>{item.action ? item.sous : item.sous+' — bientôt disponible'}</div>
                       </div>
                       <ChevronRight size={16} color={item.action?'#D1D5DB':'#E0E0E0'}/>
                     </div>
@@ -350,13 +368,14 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
             </div>
           ))}
 
+          {/* ── Menu Réceptionniste / Caissier ── */}
           {!estDirecteur && (
             <>
               <BanniereAccesReserve/>
               <div style={{ marginBottom:'20px' }}>
                 <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'8px', paddingLeft:'4px' }}>Mon compte</div>
                 <div style={{ background:'white', borderRadius:'16px', overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
-                  <div onClick={()=>setEcranActif('profil')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
+                  <div onClick={() => setEcranActif('profil')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
                     <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#1B3A6B15', display:'flex', alignItems:'center', justifyContent:'center' }}><User size={20} color="#1B3A6B"/></div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>Mon profil</div>
@@ -364,7 +383,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
                     </div>
                     <ChevronRight size={16} color="#D1D5DB"/>
                   </div>
-                  <div onClick={()=>setEcranActif('journal')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
+                  <div onClick={() => setEcranActif('journal')} style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:'14px', cursor:'pointer', borderBottom:'1px solid #F0F0F0' }}>
                     <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#1B3A6B15', display:'flex', alignItems:'center', justifyContent:'center' }}><BookOpen size={20} color="#1B3A6B"/></div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontWeight:'600', fontSize:'14px', color:'#1F2937' }}>Journal des opérations</div>
@@ -385,18 +404,7 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
             </>
           )}
 
-          {estDirecteur && (
-            <div onClick={()=>{ if(window.confirm('Effacer toutes les données de test ?')){ if(onReinitialiser) onReinitialiser() } }}
-              style={{ background:'#FFFBEB', border:'1px dashed #C9A84C', borderRadius:'16px', padding:'14px 16px', marginBottom:'12px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer' }}>
-              <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF3C7', display:'flex', alignItems:'center', justifyContent:'center' }}><Trash2 size={20} color="#C9A84C"/></div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:'600', fontSize:'14px', color:'#C9A84C' }}>Réinitialiser les données</div>
-                <div style={{ fontSize:'12px', color:'#9CA3AF', marginTop:'2px' }}>Outil de test — efface séjours et caisse</div>
-              </div>
-              <ChevronRight size={16} color="#D1D5DB"/>
-            </div>
-          )}
-
+          {/* ── Déconnexion ── */}
           <div onClick={onDeconnexion} style={{ background:'white', borderRadius:'16px', padding:'14px 16px', marginBottom:'24px', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center' }}><LogOut size={20} color="#E74C3C"/></div>
             <div style={{ flex:1 }}>
@@ -406,14 +414,18 @@ export default function Menu({ onDeconnexion, onReinitialiser, historique=[], jo
             <ChevronRight size={16} color="#D1D5DB"/>
           </div>
 
-          <div style={{ textAlign:'center', paddingTop:'8px' }}>
+          {/* ── Footer ── */}
+          <div style={{ textAlign:'center', paddingTop:'8px', paddingBottom:'16px' }}>
             <img src="/logo-homslovision-blanc.png" alt="Homslovision" style={{ height:'32px', opacity:0.7 }} onError={e=>e.target.style.display='none'}/>
+            <div style={{ color:'#CCC', fontSize:'10px', marginTop:'6px', letterSpacing:'1px' }}>
+              HOMS-HÔTEL MANAGER · v1.0 · Homslovision
+            </div>
           </div>
         </div>
       </div>
 
       {ecranActif==='directeur'    && <EcranDirecteur onClose={()=>setEcranActif(null)} onDeviseChange={onDeviseChange} onParamsChange={onParamsChange} hotelId={hotelId} codeDevise={codeDevise}/>}
-      {ecranActif==='identite'     && <EcranIdentite onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite}/>}
+      {ecranActif==='identite'     && <EcranIdentite  onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite} hotelId={hotelId}/>}
       {ecranActif==='utilisateurs' && <EcranUtilisateurs onClose={()=>setEcranActif(null)}/>}
       {ecranActif==='statistiques' && <EcranStatistiques onClose={()=>setEcranActif(null)} historique={historique} devise={devise}/>}
       {ecranActif==='profil'       && <EcranProfil onClose={()=>setEcranActif(null)} utilisateur={utilisateur} onProfilChange={setProfilUtilisateur}/>}
