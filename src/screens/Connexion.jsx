@@ -72,6 +72,29 @@ const ROLES = [
   { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
+// ── Durée d'essai par défaut : 10 jours ──────────────────────────────────────
+// Cette valeur sera remplacée par celle de l'Écosystème HOMS une fois connecté
+const DUREE_ESSAI_JOURS = 10
+
+function creerAbonnementEssai() {
+  const maintenant = new Date()
+  const finEssai = new Date(maintenant)
+  finEssai.setDate(finEssai.getDate() + DUREE_ESSAI_JOURS)
+  return {
+    plan: 'essai',
+    statut: 'actif',
+    dateDebut: maintenant.toISOString(),
+    dateFinEssai: finEssai.toISOString(),
+    dateProchaineFacture: null,
+    dateFinGrace: null,
+    maxChambres: 999,
+    maxUtilisateurs: 999,
+    paiements: [],
+    createdAt: maintenant.toISOString(),
+    updatedAt: maintenant.toISOString(),
+  }
+}
+
 function lireUtilisateurs() {
   try {
     const s = localStorage.getItem('homs_utilisateurs')
@@ -159,8 +182,11 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
     if (form.motDePasse !== form.confirmer) { setErreur("Les mots de passe ne correspondent pas."); return }
     setErreur(''); setLoading(true)
     try {
+      // 1. Créer le compte Firebase Auth
       const resultat = await createUserWithEmailAndPassword(auth, form.email.trim(), form.motDePasse)
       const uid = resultat.user.uid
+
+      // 2. Créer l'identité de l'hôtel
       await setDoc(doc(db, 'hotels', uid, 'infos', 'identite'), {
         nom: form.nomHotel.trim(),
         nomDirecteur: form.nomDirecteur.trim(),
@@ -169,6 +195,11 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         slogan:'', adresse:'', telephone1:'', telephone2:'',
         rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
+
+      // 3. Créer l'abonnement essai automatiquement
+      const abonnement = creerAbonnementEssai()
+      await setDoc(doc(db, 'hotels', uid, 'infos', 'abonnement'), abonnement)
+
       sauvegarderDernierEmail(form.email.trim())
       setLoading(false)
       onInscriptionReussie({
@@ -194,11 +225,13 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         <button onClick={onRetour} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>‹ Retour</button>
         <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Créer un compte</span>
       </div>
+
       <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
-        🏨 Bienvenue ! Créez votre compte directeur pour commencer à gérer votre hôtel.
+        🎁 <strong>{DUREE_ESSAI_JOURS} jours d'essai gratuit</strong> — aucune carte bancaire requise.
       </div>
+
       {[
-        { label:"NOM DE L'HÔTEL *",                    key:'nomHotel',    placeholder:'Ex. Hôtel Palace Dakar',    type:'text'     },
+        { label:"NOM DE L'HÔTEL *",                    key:'nomHotel',     placeholder:'Ex. Hôtel Palace Dakar',   type:'text'     },
         { label:'VOTRE NOM *',                          key:'nomDirecteur', placeholder:'Ex. Jean Dupont',          type:'text'     },
         { label:'EMAIL *',                              key:'email',        placeholder:'directeur@monhotel.com',   type:'email'    },
         { label:'MOT DE PASSE * (min. 6 caractères)',   key:'motDePasse',   placeholder:'••••••••',                 type:'password' },
@@ -215,7 +248,9 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
           />
         </div>
       ))}
+
       {erreur && <div style={{ color:'#FF6B6B', fontSize:'12px', marginBottom:'12px', textAlign:'center' }}>⚠️ {erreur}</div>}
+
       <button className="btn-shimmer" onClick={handleInscrire} disabled={loading} style={{
         width:'100%', padding:'16px', borderRadius:'14px', border:'none',
         cursor:loading?'not-allowed':'pointer', color:'#1B3A6B', fontWeight:'900', fontSize:'16px',
@@ -226,8 +261,9 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
             <span style={{ display:'inline-block', width:'16px', height:'16px', border:'2.5px solid #1B3A6B', borderTopColor:'transparent', borderRadius:'50%', animation:'rotateSlow 0.8s linear infinite' }}/>
             Création en cours...
           </span>
-        ) : '🏨 Créer mon compte'}
+        ) : `🎁 Démarrer mon essai gratuit`}
       </button>
+
       <p style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'16px', lineHeight:'1.5' }}>
         En créant un compte, vous acceptez les conditions d'utilisation de HOMS-HÔTEL MANAGER par Homslovision.
       </p>
@@ -506,7 +542,7 @@ export default function Connexion({ onConnexion }) {
               color:'#C9A84C', fontWeight:'800', fontSize:'14px',
               cursor:'pointer', letterSpacing:'1px',
             }}>
-              🏨 Créer un compte hôtel
+              🎁 Essai gratuit {DUREE_ESSAI_JOURS} jours — Créer un compte
             </button>
           </div>
         </div>
