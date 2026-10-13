@@ -73,6 +73,7 @@ export function genererChambres(sejours = [], categories = PARAMS_DEFAUT.categor
   return chambres
 }
 
+// ─── localStorage — clés préfixées par UID ───────────────────────────────────
 function storageKey(uid, key) {
   return uid ? `homs_${uid}_${key}` : `homs_${key}`
 }
@@ -104,6 +105,59 @@ function lireThemeLocal(uid, userId) {
   try { return localStorage.getItem(`homs_${uid}_theme_${userId}`) === 'sombre' } catch { return false }
 }
 
+// ─── Migration : nettoyer les anciennes clés sans préfixe ────────────────────
+function migrerAncienLocalStorage(hId) {
+  if (!hId) return
+  try {
+    // Identité
+    const ancienneIdentite = localStorage.getItem('homs_identite')
+    if (ancienneIdentite) {
+      const cleNouvelle = `homs_${hId}_identite`
+      if (!localStorage.getItem(cleNouvelle)) {
+        localStorage.setItem(cleNouvelle, ancienneIdentite)
+      }
+      localStorage.removeItem('homs_identite')
+    }
+    // Données caisse/séjours
+    const anciennesData = localStorage.getItem('homs_data_v1')
+    if (anciennesData) {
+      const cleNouvelle = `homs_${hId}_data_v1`
+      if (!localStorage.getItem(cleNouvelle)) {
+        localStorage.setItem(cleNouvelle, anciennesData)
+      }
+      localStorage.removeItem('homs_data_v1')
+    }
+    // Journal
+    const ancienJournal = localStorage.getItem('homs_journal')
+    if (ancienJournal) {
+      const cleNouvelle = `homs_${hId}_journal`
+      if (!localStorage.getItem(cleNouvelle)) {
+        localStorage.setItem(cleNouvelle, ancienJournal)
+      }
+      localStorage.removeItem('homs_journal')
+    }
+    // Params
+    const anciensParams = localStorage.getItem('homs_params')
+    if (anciensParams) {
+      const cleNouvelle = `homs_${hId}_params`
+      if (!localStorage.getItem(cleNouvelle)) {
+        localStorage.setItem(cleNouvelle, anciensParams)
+      }
+      localStorage.removeItem('homs_params')
+    }
+    // Devise
+    const ancienneDevise = localStorage.getItem('homs_devise')
+    if (ancienneDevise) {
+      const cleNouvelle = `homs_${hId}_devise`
+      if (!localStorage.getItem(cleNouvelle)) {
+        localStorage.setItem(cleNouvelle, ancienneDevise)
+      }
+      localStorage.removeItem('homs_devise')
+    }
+  } catch (e) {}
+}
+
+// ─── Firestore helpers ────────────────────────────────────────────────────────
 async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses, historique) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
@@ -273,6 +327,7 @@ export default function App() {
     return () => document.head.removeChild(el)
   }, [])
 
+  // ── Écoute temps réel après connexion ──
   useEffect(() => {
     if (!hotelId || hotelId === 'admin_local') return
     setChargementDonnees(true)
@@ -305,6 +360,7 @@ export default function App() {
     return () => { if (snapshotUnsubRef.current) snapshotUnsubRef.current() }
   }, [hotelId])
 
+  // ── Sauvegarde automatique ──
   useEffect(() => {
     if (!hotelId) return
     sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
@@ -441,10 +497,15 @@ export default function App() {
   const handleConnexion = (user) => {
     const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
 
+    // ── Migration localStorage ancien → nouveau préfixé ──
+    if (hId) migrerAncienLocalStorage(hId)
+
+    // ── Réinitialiser l'état ──
     setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
     setHistorique([]); setJournal([]); setAlertesSonnees({})
     setNoShowASignaler([]); setNoShowIgnores({})
 
+    // ── Charger les paramètres propres à cet hôtel ──
     const params = lireParams(hId)
     setConfigChambres(params.categories)
 
@@ -467,8 +528,7 @@ export default function App() {
     if (!lireDeviseLocal(hId)) setShowChoixDevise(true)
 
     if (hId) {
-      const now = new Date()
-      const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+      const horodatage = horodatageActuel()
       const entree = { type:'connexion', utilisateur:user.nom||'Inconnu', role:user.role||'', details:`${user.nom||'Utilisateur'} s'est connecté`, date:horodatage, id:Date.now() }
       setJournal(prev => {
         const maj = [entree, ...prev].slice(0, 500)
@@ -501,8 +561,7 @@ export default function App() {
   }
 
   const cloturerCaisse = () => {
-    const maintenant = new Date()
-    const horodatage = `${String(maintenant.getDate()).padStart(2,'0')}/${String(maintenant.getMonth()+1).padStart(2,'0')}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2,'0')}:${String(maintenant.getMinutes()).padStart(2,'0')}`
+    const horodatage = horodatageActuel()
     const entreesSejours = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut)).map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show' }))
     const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage }))
     const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
@@ -533,10 +592,8 @@ export default function App() {
           setConfigChambres(params.categories)
           setCodeDevise(codeDevise)
           setShowOnboarding(false)
-          // Journaliser la première connexion après onboarding
           if (hotelId) {
-            const now = new Date()
-            const horodatage = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+            const horodatage = horodatageActuel()
             const entree = { type:'connexion', utilisateur:utilisateur?.nom||'Directeur', role:'directeur', details:`${utilisateur?.nom||'Directeur'} s'est connecté`, date:horodatage, id:Date.now() }
             setJournal(prev => {
               const maj = [entree, ...prev].slice(0, 500)
