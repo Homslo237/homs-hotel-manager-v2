@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Splash from './screens/Splash'
 import Connexion from './screens/Connexion'
 import Onboarding from './screens/Onboarding'
+import EcranAbonnement from './screens/EcranAbonnement'
 import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
@@ -13,6 +14,7 @@ import { db, auth } from './firebase'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { lireParams, PARAMS_DEFAUT } from './screens/menu/Menu'
+import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -80,12 +82,6 @@ function storageKey(uid, key) {
 function sauvegarderLocal(uid, data) {
   try { localStorage.setItem(storageKey(uid, 'data_v1'), JSON.stringify(data)) } catch (e) {}
 }
-function chargerLocal(uid) {
-  try {
-    const raw = localStorage.getItem(storageKey(uid, 'data_v1'))
-    return raw ? JSON.parse(raw) : null
-  } catch (e) { return null }
-}
 function sauvegarderJournalLocal(uid, journal) {
   try { localStorage.setItem(storageKey(uid, 'journal'), JSON.stringify(journal)) } catch (e) {}
 }
@@ -105,55 +101,24 @@ function lireThemeLocal(uid, userId) {
   try { return localStorage.getItem(`homs_${uid}_theme_${userId}`) === 'sombre' } catch { return false }
 }
 
-// ─── Migration : nettoyer les anciennes clés sans préfixe ────────────────────
+// ─── Migration localStorage ancien → préfixé ─────────────────────────────────
 function migrerAncienLocalStorage(hId) {
   if (!hId) return
   try {
-    // Identité
-    const ancienneIdentite = localStorage.getItem('homs_identite')
-    if (ancienneIdentite) {
-      const cleNouvelle = `homs_${hId}_identite`
-      if (!localStorage.getItem(cleNouvelle)) {
-        localStorage.setItem(cleNouvelle, ancienneIdentite)
+    const migrations = [
+      ['homs_identite',  `homs_${hId}_identite`],
+      ['homs_data_v1',   `homs_${hId}_data_v1`],
+      ['homs_journal',   `homs_${hId}_journal`],
+      ['homs_params',    `homs_${hId}_params`],
+      ['homs_devise',    `homs_${hId}_devise`],
+    ]
+    migrations.forEach(([ancienne, nouvelle]) => {
+      const val = localStorage.getItem(ancienne)
+      if (val) {
+        if (!localStorage.getItem(nouvelle)) localStorage.setItem(nouvelle, val)
+        localStorage.removeItem(ancienne)
       }
-      localStorage.removeItem('homs_identite')
-    }
-    // Données caisse/séjours
-    const anciennesData = localStorage.getItem('homs_data_v1')
-    if (anciennesData) {
-      const cleNouvelle = `homs_${hId}_data_v1`
-      if (!localStorage.getItem(cleNouvelle)) {
-        localStorage.setItem(cleNouvelle, anciennesData)
-      }
-      localStorage.removeItem('homs_data_v1')
-    }
-    // Journal
-    const ancienJournal = localStorage.getItem('homs_journal')
-    if (ancienJournal) {
-      const cleNouvelle = `homs_${hId}_journal`
-      if (!localStorage.getItem(cleNouvelle)) {
-        localStorage.setItem(cleNouvelle, ancienJournal)
-      }
-      localStorage.removeItem('homs_journal')
-    }
-    // Params
-    const anciensParams = localStorage.getItem('homs_params')
-    if (anciensParams) {
-      const cleNouvelle = `homs_${hId}_params`
-      if (!localStorage.getItem(cleNouvelle)) {
-        localStorage.setItem(cleNouvelle, anciensParams)
-      }
-      localStorage.removeItem('homs_params')
-    }
-    // Devise
-    const ancienneDevise = localStorage.getItem('homs_devise')
-    if (ancienneDevise) {
-      const cleNouvelle = `homs_${hId}_devise`
-      if (!localStorage.getItem(cleNouvelle)) {
-        localStorage.setItem(cleNouvelle, ancienneDevise)
-      }
-      localStorage.removeItem('homs_devise')
-    }
+    })
   } catch (e) {}
 }
 
@@ -274,6 +239,9 @@ export default function App() {
   const [utilisateur,       setUtilisateur]       = useState(null)
   const [hotelId,           setHotelId]           = useState(null)
   const [showOnboarding,    setShowOnboarding]    = useState(false)
+  const [showAbonnement,    setShowAbonnement]    = useState(false)
+  const [abonnement,        setAbonnement]        = useState(null)
+  const [statutAbonnement,  setStatutAbonnement]  = useState(null)
   const [cle,               setCle]               = useState(0)
   const [ouvrirFormulaire,  setOuvrirFormulaire]  = useState(false)
   const [themeSombre,       setThemeSombre]       = useState(false)
@@ -497,13 +465,14 @@ export default function App() {
   const handleConnexion = (user) => {
     const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
 
-    // ── Migration localStorage ancien → nouveau préfixé ──
+    // ── Migration localStorage ancien → préfixé ──
     if (hId) migrerAncienLocalStorage(hId)
 
     // ── Réinitialiser l'état ──
     setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
     setHistorique([]); setJournal([]); setAlertesSonnees({})
     setNoShowASignaler([]); setNoShowIgnores({})
+    setAbonnement(null); setStatutAbonnement(null); setShowAbonnement(false)
 
     // ── Charger les paramètres propres à cet hôtel ──
     const params = lireParams(hId)
@@ -519,7 +488,17 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
 
-    // Nouveau compte → onboarding
+    // ── Vérifier l'abonnement ──
+    if (hId) {
+      lireAbonnement(hId).then(abo => {
+        const statut = verifierStatutAbonnement(abo)
+        setAbonnement(abo)
+        setStatutAbonnement(statut)
+        if (statut.bloque) setShowAbonnement(true)
+      })
+    }
+
+    // ── Nouveau compte → onboarding ──
     if (user.isNewUser) {
       setShowOnboarding(true)
       return
@@ -551,6 +530,9 @@ export default function App() {
     setConfigChambres(PARAMS_DEFAUT.categories)
     setCodeDevise('XOF')
     setShowOnboarding(false)
+    setShowAbonnement(false)
+    setAbonnement(null)
+    setStatutAbonnement(null)
     setEcran('connexion')
   }
 
@@ -607,6 +589,18 @@ export default function App() {
     )
   }
 
+  // ── Écran abonnement si bloqué ──
+  if (showAbonnement) {
+    return (
+      <EcranAbonnement
+        utilisateur={utilisateur}
+        abonnement={abonnement}
+        onPaiementReussi={() => setShowAbonnement(false)}
+        onDeconnexion={handleDeconnexion}
+      />
+    )
+  }
+
   const accesRole = ACCES[utilisateur?.role] || ACCES.receptionniste
 
   if (chargementDonnees) {
@@ -621,7 +615,21 @@ export default function App() {
 
   return (
     <div style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
-      <div key={cle} className="screen-in">
+
+      {/* ── Bannière abonnement ── */}
+      {statutAbonnement?.alerte && !showAbonnement && (
+        <div onClick={() => setShowAbonnement(true)} style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:400,
+          background: statutAbonnement.statut === 'grace' ? '#E74C3C' : '#C9A84C',
+          color: statutAbonnement.statut === 'grace' ? 'white' : '#1B3A6B',
+          padding:'10px 16px', textAlign:'center', fontSize:'12px',
+          fontWeight:'700', cursor:'pointer', letterSpacing:'0.5px',
+        }}>
+          {statutAbonnement.message} — Appuyer pour s'abonner
+        </div>
+      )}
+
+      <div key={cle} className="screen-in" style={{ paddingTop: statutAbonnement?.alerte ? '40px' : '0' }}>
         {onglet === 'dashboard' && <Dashboard utilisateur={utilisateur} sejours={sejours} caisse={caisse} chambresStats={chambresStats} tauxOccupation={tauxOccupation} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'chambres' && accesRole.includes('chambres') && <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'sejours' && accesRole.includes('sejours') && <Sejours sejours={sejours} chambresGenerees={chambresGenerees} onAjouter={ajouterSejour} onTerminer={terminerSejour} onProlonger={prolongerSejour} onActiverReservation={activerReservation} ouvrirFormulaire={ouvrirFormulaire} onFormulaireOuvert={() => setOuvrirFormulaire(false)} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
