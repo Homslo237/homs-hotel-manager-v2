@@ -1,29 +1,34 @@
 // api/homslo-heartbeat-start.js
-// Point d'entrée Vercel pour déclencher le heartbeat
-// Appelé automatiquement par un cron Vercel (voir vercel.json)
+// Point d'entrée pour le signal de vie vers HOMSLO CONTROL
+// Appel manuel : https://homs-hotel-manager-v2.vercel.app/api/homslo-heartbeat-start?secret=VOTRE_SECRET
 
-import { demarrerLiaisonControl } from './homslo-heartbeat.js'
-
-// Lancer le signal immédiatement à chaque appel du cron
 const VERSION_SAAS = '1.0.0'
 const DELAI_MAX_MS = 5 * 1000
 
 export default async function handler(req, res) {
-  // Sécurité : uniquement les appels internes Vercel Cron
-  const authHeader = req.headers['authorization']
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+
+  // ── Protection légère ────────────────────────────────────────────────────
+  const secret = req.query.secret || req.headers['x-homslo-secret']
+  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ erreur: 'Non autorisé' })
   }
 
+  // ── Vérification des variables ───────────────────────────────────────────
   const url   = process.env.HOMSLO_CONTROL_URL
   const api   = process.env.HOMSLO_CONTROL_APIKEY
   const badge = process.env.HOMSLO_CONTROL_BADGE
 
   if (!url || !api || !badge) {
-    console.log('[HOMSLO] Liaison désactivée — variables manquantes')
-    return res.status(200).json({ statut: 'desactive' })
+    const manquantes = [
+      !url   && 'HOMSLO_CONTROL_URL',
+      !api   && 'HOMSLO_CONTROL_APIKEY',
+      !badge && 'HOMSLO_CONTROL_BADGE',
+    ].filter(Boolean).join(', ')
+    console.log(`[HOMSLO] Liaison désactivée — variables manquantes : ${manquantes}`)
+    return res.status(200).json({ statut: 'desactive', manquantes })
   }
 
+  // ── Envoi du signal ───────────────────────────────────────────────────────
   const controleur = new AbortController()
   const minuterie   = setTimeout(() => controleur.abort(), DELAI_MAX_MS)
 
@@ -34,7 +39,7 @@ export default async function handler(req, res) {
         'apikey':       api,
         'Content-Type': 'application/json',
       },
-      body:   JSON.stringify({
+      body: JSON.stringify({
         p_key:     badge,
         p_version: VERSION_SAAS,
       }),
@@ -45,13 +50,15 @@ export default async function handler(req, res) {
 
     if (corps === true) {
       console.log(`[HOMSLO] Signal envoyé — version ${VERSION_SAAS}`)
-      return res.status(200).json({ statut: 'ok' })
+      return res.status(200).json({ statut: 'ok', version: VERSION_SAAS })
+
     } else if (corps === false) {
       console.warn('[HOMSLO] Avertissement : badge refusé par HOMSLO CONTROL.')
       return res.status(200).json({ statut: 'badge_refuse' })
+
     } else {
       console.warn(`[HOMSLO] Réponse inattendue : ${JSON.stringify(corps)}`)
-      return res.status(200).json({ statut: 'reponse_inattendue' })
+      return res.status(200).json({ statut: 'reponse_inattendue', corps })
     }
 
   } catch (erreur) {
@@ -60,7 +67,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ statut: 'timeout' })
     }
     console.warn(`[HOMSLO] Erreur réseau : ${erreur.message}`)
-    return res.status(200).json({ statut: 'erreur_reseau' })
+    return res.status(200).json({ statut: 'erreur_reseau', message: erreur.message })
+
   } finally {
     clearTimeout(minuterie)
   }
