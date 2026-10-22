@@ -1,19 +1,12 @@
 // api/homslo-heartbeat-start.js
-// Point d'entrée pour le signal de vie vers HOMSLO CONTROL
-// Appel manuel : https://homs-hotel-manager-v2.vercel.app/api/homslo-heartbeat-start?secret=VOTRE_SECRET
+// Signal de vie vers HOMSLO CONTROL
+// URL : https://homs-hotel-manager-v2.vercel.app/api/homslo-heartbeat-start
 
 const VERSION_SAAS = '1.0.0'
 const DELAI_MAX_MS = 5 * 1000
 
 export default async function handler(req, res) {
 
-  // ── Protection légère ────────────────────────────────────────────────────
-  const secret = req.query.secret || req.headers['x-homslo-secret']
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ erreur: 'Non autorisé' })
-  }
-
-  // ── Vérification des variables ───────────────────────────────────────────
   const url   = process.env.HOMSLO_CONTROL_URL
   const api   = process.env.HOMSLO_CONTROL_APIKEY
   const badge = process.env.HOMSLO_CONTROL_BADGE
@@ -28,7 +21,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ statut: 'desactive', manquantes })
   }
 
-  // ── Envoi du signal ───────────────────────────────────────────────────────
   const controleur = new AbortController()
   const minuterie   = setTimeout(() => controleur.abort(), DELAI_MAX_MS)
 
@@ -51,11 +43,9 @@ export default async function handler(req, res) {
     if (corps === true) {
       console.log(`[HOMSLO] Signal envoyé — version ${VERSION_SAAS}`)
       return res.status(200).json({ statut: 'ok', version: VERSION_SAAS })
-
     } else if (corps === false) {
       console.warn('[HOMSLO] Avertissement : badge refusé par HOMSLO CONTROL.')
       return res.status(200).json({ statut: 'badge_refuse' })
-
     } else {
       console.warn(`[HOMSLO] Réponse inattendue : ${JSON.stringify(corps)}`)
       return res.status(200).json({ statut: 'reponse_inattendue', corps })
