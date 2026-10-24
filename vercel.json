@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/homslo-heartbeat-start",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
+{}
