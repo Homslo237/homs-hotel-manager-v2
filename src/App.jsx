@@ -15,6 +15,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { lireParams, PARAMS_DEFAUT } from './screens/menu/Menu'
 import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
+import { chargerHistorique, ajouterHistorique, migrerHistorique, viderAttente } from './historique'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -123,13 +124,15 @@ function migrerAncienLocalStorage(hId) {
 }
 
 // ─── Firestore helpers ────────────────────────────────────────────────────────
-async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses, historique) {
+// L'historique n'est plus ici : il est rangé par mois (voir historique.js).
+// merge:true garde intact l'ancien champ « historique » tant que la migration n'a pas eu lieu.
+async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses) {
   if (!hotelId || hotelId === 'admin_local') return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'), {
-      sejours, entreesDiverses, sortiesDiverses, historique,
+      sejours, entreesDiverses, sortiesDiverses,
       updatedAt: new Date().toISOString(),
-    })
+    }, { merge: true })
   } catch (e) {}
 }
 
@@ -277,12 +280,12 @@ export default function App() {
     })
   }
 
-  const sauvegarderTout = (hId, s, ed, sd, h) => {
-    sauvegarderLocal(hId, { sejours:s, entreesDiverses:ed, sortiesDiverses:sd, historique:h })
+  const sauvegarderTout = (hId, s, ed, sd) => {
+    sauvegarderLocal(hId, { sejours:s, entreesDiverses:ed, sortiesDiverses:sd })
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
       localWriteRef.current = true
-      sauvegarderFirestore(hId, s, ed, sd, h).then(() => {
+      sauvegarderFirestore(hId, s, ed, sd).then(() => {
         setTimeout(() => { localWriteRef.current = false }, 1000)
       })
     }, 2000)
@@ -311,16 +314,14 @@ export default function App() {
           setSejours(data.sejours || [])
           setEntreesDiverses(data.entreesDiverses || [])
           setSortiesDiverses(data.sortiesDiverses || [])
-          setHistorique(data.historique || [])
           sauvegarderLocal(hotelId, {
             sejours: data.sejours || [],
             entreesDiverses: data.entreesDiverses || [],
             sortiesDiverses: data.sortiesDiverses || [],
-            historique: data.historique || [],
           })
         } else {
           setSejours([]); setEntreesDiverses([])
-          setSortiesDiverses([]); setHistorique([])
+          setSortiesDiverses([])
         }
       },
       () => { setChargementDonnees(false) }
@@ -328,11 +329,11 @@ export default function App() {
     return () => { if (snapshotUnsubRef.current) snapshotUnsubRef.current() }
   }, [hotelId])
 
-  // ── Sauvegarde automatique ──
+  // ── Sauvegarde automatique (l'historique est enregistré à part, à la clôture) ──
   useEffect(() => {
     if (!hotelId) return
-    sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses, historique)
-  }, [sejours, entreesDiverses, sortiesDiverses, historique])
+    sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses)
+  }, [sejours, entreesDiverses, sortiesDiverses])
 
   useEffect(() => {
     const verifier = () => {
@@ -488,6 +489,15 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
 
+    // ── Historique : migration unique, envoi des lignes en attente, puis chargement ──
+    if (hId) {
+      migrerHistorique(hId)
+        .then(() => viderAttente(hId))
+        .then(() => chargerHistorique(hId))
+        .then(lignes => { if (hotelIdRef.current === hId) setHistorique(lignes) })
+        .catch(() => {})
+    }
+
     // ── Vérifier l'abonnement ──
     if (hId) {
       lireAbonnement(hId).then(abo => {
@@ -547,7 +557,9 @@ export default function App() {
     const entreesSejours = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut)).map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show' }))
     const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage }))
     const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
-    setHistorique(prev => [...prev, ...entreesSejours, ...entreesArchivees, ...sortiesArchivees])
+    const nouvellesLignes = [...entreesSejours, ...entreesArchivees, ...sortiesArchivees]
+    setHistorique(prev => [...prev, ...nouvellesLignes])
+    ajouterHistorique(hotelId, nouvellesLignes)
     setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
     setEntreesDiverses([]); setSortiesDiverses([]); setNoShowASignaler([])
     ajouterAuJournal({ type:'cloture_caisse', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`Clôture de caisse · Solde net : ${soldeNet.toLocaleString('fr-FR')} FCFA` })
