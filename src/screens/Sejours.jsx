@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { lireIdentite, nomEtablissement } from '../identite'
 
 // ─── Helpers date/heure ───────────────────────────────────────────────────────
 function versDateJS(dateFR, heure) {
@@ -15,14 +16,6 @@ function periodeDuSejourJS(s) {
 function periodesSeChevauchentJS(debutA, finA, debutB, finB) {
   if (!debutA || !finA || !debutB || !finB) return false
   return debutA < finB && debutB < finA
-}
-
-// ─── Lire l'identité de l'hôtel depuis localStorage ─────────────────────────
-function lireIdentiteHotel() {
-  try {
-    const s = localStorage.getItem('homs_identite')
-    return s ? JSON.parse(s) : {}
-  } catch { return {} }
 }
 
 // ─── Styles Confetti ──────────────────────────────────────────────────────────
@@ -89,26 +82,34 @@ import { Search, Clock, LogIn, X, RefreshCw, Printer, Share2, LogOut } from 'luc
 
 const CONFIG = {
   toleranceDepassementMinutes: 20,
-  nomHotel: 'HOMS-HÔTEL',
 }
 
-const chambresParCategorie = {
-  Standard: [
-    { numero:'101', statut:'libre' }, { numero:'102', statut:'libre' },
-    { numero:'103', statut:'occupee' }, { numero:'104', statut:'occupee' },
-  ],
-  Confort: [
-    { numero:'201', statut:'occupee' }, { numero:'202', statut:'occupee' },
-    { numero:'203', statut:'libre' },   { numero:'205', statut:'occupee' },
-  ],
-  Suite: [
-    { numero:'301', statut:'libre' }, { numero:'302', statut:'occupee' },
-    { numero:'303', statut:'libre' },
-  ],
+// ─── Catégories et tarifs : lus depuis les chambres configurées par l'hôtel ───
+const versNombre = (v) => {
+  const n = Number(String(v ?? '').replace(/[\s\u00a0]/g, '').replace(',', '.'))
+  return Number.isFinite(n) ? n : 0
 }
 
-const tarifsNuit  = { Standard:25000, Confort:35000, Suite:65000 }
-const tarifsHeure = { Standard:2500,  Confort:3500,  Suite:6500  }
+function construireTarifs(chambres = []) {
+  const categories = []
+  const nuit = {}
+  const heure = {}
+  chambres.forEach(c => {
+    if (!c.cat || categories.includes(c.cat)) return
+    categories.push(c.cat)
+    nuit[c.cat]  = versNombre(c.tarifNuit)
+    heure[c.cat] = versNombre(c.tarifHeure)
+  })
+  return { categories, nuit, heure }
+}
+
+// Tarif d'un séjour existant : celui appliqué à la création, sinon celui de sa catégorie
+function tarifUnitaire(tarifs, s) {
+  const fige = versNombre(s.tarifUnitaire)
+  if (fige > 0) return fige
+  const table = s.type === 'nuit' ? tarifs.nuit : tarifs.heure
+  return table[s.categorie] || 0
+}
 
 function maintenant() {
   const d = new Date()
@@ -147,9 +148,9 @@ function tempsRestant(s) {
   return { label:`${h}h${String(m).padStart(2,'0')}`, depasse:false }
 }
 
-// ─── En-tête du reçu ─────────────────────────────────────────────────────────
+// ─── En-tête du reçu (identité de l'hôtel connecté) ──────────────────────────
 function enteteRecu(identite) {
-  const nom     = identite.nom      || CONFIG.nomHotel
+  const nom     = nomEtablissement(identite)
   const slogan  = identite.slogan   || ''
   const adresse = identite.adresse  || ''
   const tel1    = identite.telephone1 || ''
@@ -182,11 +183,11 @@ function enteteRecu(identite) {
 
 function piedRecu(identite) {
   const mention = identite.mentionLegale || 'Merci de votre confiance !'
-  return `================================\n${mention}\n================================`
+  return `================================\n${mention}\n--------------------------------\n  Propulsé par HOMS-HÔTEL MANAGER\n================================`
 }
 
 function genererRecuEntree(s, devise) {
-  const identite = lireIdentiteHotel()
+  const identite = lireIdentite()
   return `${enteteRecu(identite)}
         REÇU D'ENTRÉE
 --------------------------------
@@ -204,7 +205,7 @@ ${piedRecu(identite)}`
 }
 
 function genererRecuSortie(s, supplement, depassage, devise) {
-  const identite = lireIdentiteHotel()
+  const identite = lireIdentite()
   const now = maintenant()
   const aSuppl = supplement > 0
   const historique = s.historiqueProlongations || []
@@ -240,10 +241,14 @@ ${piedRecu(identite)}`
 }
 
 // ─── Modal Reçu ───────────────────────────────────────────────────────────────
+const echapper = (t) => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+
 function ModalRecu({ texte, titre, onClose }) {
+  const logo = lireIdentite().logoUrl
+
   const handleImprimer = () => {
     const win = window.open('', '_blank')
-    win.document.write(`<pre style="font-family:monospace;font-size:13px;white-space:pre-wrap;">${texte}</pre>`)
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${echapper(titre)}</title></head><body>${logo ? `<div style="text-align:center;margin-bottom:8px"><img src="${logo}" alt="" style="max-height:70px;max-width:60%"></div>` : ''}<pre style="font-family:monospace;font-size:13px;white-space:pre-wrap;">${echapper(texte)}</pre></body></html>`)
     win.document.close()
     win.print()
   }
@@ -256,14 +261,19 @@ function ModalRecu({ texte, titre, onClose }) {
   }
   return (
     <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
-      <div style={{ background:'white', borderRadius:'16px', width:'100%', maxWidth:'380px', overflow:'hidden' }}>
+      <div style={{ background:'white', borderRadius:'16px', width:'100%', maxWidth:'380px', overflow:'hidden', maxHeight:'92vh', display:'flex', flexDirection:'column' }}>
         <div style={{ background:'#1B3A6B', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'15px' }}>{titre}</span>
           <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer' }}>
             <X size={20} color="white"/>
           </button>
         </div>
-        <div style={{ padding:'16px 20px' }}>
+        <div style={{ padding:'16px 20px', overflowY:'auto' }}>
+          {logo && (
+            <div style={{ textAlign:'center', marginBottom:'10px' }}>
+              <img src={logo} alt="Logo" style={{ maxHeight:'60px', maxWidth:'60%' }}/>
+            </div>
+          )}
           <pre style={{
             fontFamily:'monospace', fontSize:'12px', lineHeight:'1.6',
             background:'#F8F8F8', padding:'14px', borderRadius:'8px',
@@ -288,9 +298,9 @@ function ModalRecu({ texte, titre, onClose }) {
 }
 
 // ─── Modal Prolongation ───────────────────────────────────────────────────────
-function ModalProlongation({ sejour, onClose, onProlonger, devise }) {
+function ModalProlongation({ sejour, onClose, onProlonger, devise, tarifs }) {
   const [ajout, setAjout] = useState(1)
-  const tarif = sejour.type==='nuit' ? tarifsNuit[sejour.categorie] : tarifsHeure[sejour.categorie]
+  const tarif = tarifUnitaire(tarifs, sejour)
   const supplement = tarif * ajout
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
@@ -326,10 +336,10 @@ const inputStyle = { width:'100%', padding:'12px 14px', border:'2px solid #E0E0E
 const btnQtyStyle = { width:'40px', height:'40px', borderRadius:'10px', background:'#F0F0F0', fontWeight:'800', fontSize:'20px', color:'#1B3A6B', border:'none', cursor:'pointer' }
 
 // ─── Formulaire nouveau séjour ────────────────────────────────────────────────
-function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tousLesSejours=[], devise }) {
+function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tousLesSejours=[], devise, tarifs }) {
   const now = maintenant()
   const [form, setForm] = useState({
-    client:'', telephone:'', categorie:'Standard', chambre:'',
+    client:'', telephone:'', categorie:tarifs.categories[0] || '', chambre:'',
     statut:'en_cours', typeSejour:'nuit',
     dateArrivee: now.date, heureArrivee: now.heure,
     dateDepart: (() => { const d=new Date(); d.setDate(d.getDate()+1); return d.toLocaleDateString('fr-FR') })(),
@@ -373,14 +383,10 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
     return { valeur:h, label:`${h} heure${h>1?'s':''}` }
   }
 
-  const montantTotal = () => {
-    const d = dureeCalculee()
-    return form.typeSejour==='nuit'
-      ? (tarifsNuit[form.categorie]||0)*d.valeur
-      : (tarifsHeure[form.categorie]||0)*d.valeur
-  }
+  const tarifCategorie = () => (form.typeSejour==='nuit' ? tarifs.nuit : tarifs.heure)[form.categorie] || 0
+  const montantTotal = () => tarifCategorie() * dureeCalculee().valeur
 
-  const peutValider = form.client.trim() && form.telephone.trim() && form.chambre
+  const peutValider = form.client.trim() && form.telephone.trim() && form.chambre && tarifCategorie() > 0
 
   const handleValider = () => {
     if (!peutValider) return
@@ -395,6 +401,7 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
       type:form.typeSejour, statut:form.statut || 'en_cours',
       montant:mt.toLocaleString('fr-FR'), montantNum:mt,
       modePaiement:form.modePaiement,
+      tarifUnitaire:tarifCategorie(),
     }
     const succes = onAjouter(nouveau)
     if (succes === false) { alert('Cette chambre est deja occupee ou reservee !'); return }
@@ -444,8 +451,13 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
 
         <div style={{ marginBottom:'14px' }}>
           <label style={labelStyle}>Type de chambre</label>
-          <div style={{ display:'flex', gap:'8px' }}>
-            {Object.keys(chambresParCategorie).map(cat=>(
+          {tarifs.categories.length===0 && (
+            <div style={{ background:'#FFF8F0', borderRadius:'10px', padding:'10px 12px', border:'1px solid #C9A84C', fontSize:'12px', color:'#C9A84C', fontWeight:'600' }}>
+              Aucune chambre configurée. Ajoutez vos catégories et vos tarifs dans Menu → Paramètres.
+            </div>
+          )}
+          <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+            {tarifs.categories.map(cat=>(
               <button key={cat} onClick={()=>setForm({...form,categorie:cat,chambre:''})} style={{
                 flex:1, padding:'10px 6px', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer',
                 background:form.categorie===cat?'#1B3A6B':'#F0F0F0',
@@ -543,7 +555,12 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
           <div style={{ background:'#F0F7F0', borderRadius:'12px', padding:'14px', marginBottom:'16px', border:'1px solid #2ECC71' }}>
             <div style={{ fontSize:'12px', color:'#666', marginBottom:'4px' }}>Montant total calculé</div>
             <div style={{ fontSize:'26px', fontWeight:'800', color:'#1B3A6B' }}>{montantTotal().toLocaleString('fr-FR')} {devise}</div>
-            <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Ch. {form.chambre} · {form.categorie} · {dureeCalculee().label}</div>
+            <div style={{ fontSize:'11px', color:'#888', marginTop:'2px' }}>Ch. {form.chambre} · {form.categorie} · {dureeCalculee().label} · {tarifCategorie().toLocaleString('fr-FR')} {devise}/{form.typeSejour==='nuit'?'nuit':'heure'}</div>
+          </div>
+        )}
+        {form.chambre && tarifCategorie() === 0 && (
+          <div style={{ background:'#FFF0F0', borderRadius:'10px', padding:'10px 12px', marginBottom:'16px', border:'1px solid #E74C3C', fontSize:'12px', color:'#E74C3C', fontWeight:'600' }}>
+            Tarif non défini pour cette catégorie ({form.typeSejour==='nuit'?'nuit':'heure'}). Renseignez-le dans Menu → Paramètres.
           </div>
         )}
 
@@ -571,6 +588,7 @@ const statuts = {
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onAjouter, onTerminer, onProlonger, onActiverReservation, ouvrirFormulaire, onFormulaireOuvert, sombre=false, devise='FCFA' }) {
   const sejours = sejoursProps || []
+  const tarifs = construireTarifs(chambresGenerees)
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState('tous')
   const [typeFiltre, setTypeFiltre] = useState('tous')
@@ -611,7 +629,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
     const tr = tempsRestant(s)
     let supplement = 0, depassage = ''
     if (tr.depasse && tr.depasseMinutes > CONFIG.toleranceDepassementMinutes) {
-      const tarif = s.type==='nuit' ? tarifsNuit[s.categorie] : tarifsHeure[s.categorie]
+      const tarif = tarifUnitaire(tarifs, s)
       const unites = s.type==='nuit'
         ? Math.ceil(tr.depasseMinutes/(24*60))
         : Math.ceil(tr.depasseMinutes/60)
@@ -776,8 +794,8 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       </div>
 
       {showConfetti && <Confetti onFin={()=>setShowConfetti(false)}/>}
-      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours} devise={devise}/>}
-      {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger} devise={devise}/>}
+      {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours} devise={devise} tarifs={tarifs}/>}
+      {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger} devise={devise} tarifs={tarifs}/>}
       {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
     </div>
   )
