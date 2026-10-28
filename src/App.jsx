@@ -17,6 +17,7 @@ import { lireParams, PARAMS_DEFAUT } from './screens/menu/Menu'
 import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
 import { chargerHistorique, ajouterHistorique, migrerHistorique, viderAttente } from './historique'
 import { definirHotelCourant, chargerIdentite } from './identite'
+import { archiverJournal, archiverSejours, migrerJournalExistant, viderAttentes } from './archives'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -272,9 +273,11 @@ export default function App() {
   useEffect(() => { hotelIdRef.current = hotelId }, [hotelId])
 
   const ajouterAuJournal = (entree, hId) => {
+    const idHotel = hId || hotelIdRef.current
+    const nouvelle = { ...entree, date: horodatageActuel(), id: Date.now() }
+    if (idHotel && idHotel !== 'admin_local') archiverJournal(idHotel, [nouvelle])
     setJournal(prev => {
-      const maj = [{ ...entree, date: horodatageActuel(), id: Date.now() }, ...prev].slice(0, 500)
-      const idHotel = hId || hotelIdRef.current
+      const maj = [nouvelle, ...prev].slice(0, 500)
       sauvegarderJournalLocal(idHotel, maj)
       if (idHotel && idHotel !== 'admin_local') sauvegarderJournalFirestore(idHotel, maj)
       return maj
@@ -412,6 +415,7 @@ export default function App() {
       ...nouveau, id:Date.now(), heureArrivee:heureReelle,
       montantNum: parseInt((nouveau.montant || '0').replace(/\s/g, ''), 10) || 0,
       statut,
+      creePar: utilisateur?.nom || '', creeParRole: utilisateur?.role || '',
     }
     setSejours(prev => [ns, ...prev])
     ajouterAuJournal({ type:'sejour_cree', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`Séjour créé : ${ns.client} · Ch. ${ns.chambre} · ${ns.montant} FCFA` })
@@ -492,6 +496,12 @@ export default function App() {
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
     setEcran('app')
 
+    // ── Archives détaillées : journal existant (une fois) et éléments en attente ──
+    if (hId) {
+      migrerJournalExistant(hId, chargerJournalLocal(hId))
+      viderAttentes(hId)
+    }
+
     // ── Historique : migration unique, envoi des lignes en attente, puis chargement ──
     if (hId) {
       migrerHistorique(hId)
@@ -522,6 +532,7 @@ export default function App() {
     if (hId) {
       const horodatage = horodatageActuel()
       const entree = { type:'connexion', utilisateur:user.nom||'Inconnu', role:user.role||'', details:`${user.nom||'Utilisateur'} s'est connecté`, date:horodatage, id:Date.now() }
+      archiverJournal(hId, [entree])
       setJournal(prev => {
         const maj = [entree, ...prev].slice(0, 500)
         sauvegarderJournalLocal(hId, maj)
@@ -558,11 +569,13 @@ export default function App() {
 
   const cloturerCaisse = () => {
     const horodatage = horodatageActuel()
-    const entreesSejours = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut)).map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show' }))
-    const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage }))
-    const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage }))
+    const sejoursACloturer = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut))
+    const entreesSejours = sejoursACloturer.map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show', par:s.creePar||'' }))
+    const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage, par:e.par||'' }))
+    const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage, par:s.par||'' }))
     const nouvellesLignes = [...entreesSejours, ...entreesArchivees, ...sortiesArchivees]
     setHistorique(prev => [...prev, ...nouvellesLignes])
+    archiverSejours(hotelId, sejoursACloturer.map(s => ({ ...s, clotureLe: horodatage, clotureePar: utilisateur?.nom || '' })))
     ajouterHistorique(hotelId, nouvellesLignes)
     setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
     setEntreesDiverses([]); setSortiesDiverses([]); setNoShowASignaler([])
@@ -593,6 +606,7 @@ export default function App() {
           if (hotelId) {
             const horodatage = horodatageActuel()
             const entree = { type:'connexion', utilisateur:utilisateur?.nom||'Directeur', role:'directeur', details:`${utilisateur?.nom||'Directeur'} s'est connecté`, date:horodatage, id:Date.now() }
+            archiverJournal(hotelId, [entree])
             setJournal(prev => {
               const maj = [entree, ...prev].slice(0, 500)
               sauvegarderJournalLocal(hotelId, maj)
@@ -649,7 +663,7 @@ export default function App() {
         {onglet === 'dashboard' && <Dashboard utilisateur={utilisateur} sejours={sejours} caisse={caisse} chambresStats={chambresStats} tauxOccupation={tauxOccupation} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'chambres' && accesRole.includes('chambres') && <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'sejours' && accesRole.includes('sejours') && <Sejours sejours={sejours} chambresGenerees={chambresGenerees} onAjouter={ajouterSejour} onTerminer={terminerSejour} onProlonger={prolongerSejour} onActiverReservation={activerReservation} ouvrirFormulaire={ouvrirFormulaire} onFormulaireOuvert={() => setOuvrirFormulaire(false)} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
-        {onglet === 'caisse' && accesRole.includes('caisse') && <Caisse sejours={sejoursEncaisses} entreesDiverses={entreesDiverses} sortiesDiverses={sortiesDiverses} onAjouterEntree={e => setEntreesDiverses(prev => [e, ...prev])} onAjouterSortie={s => setSortiesDiverses(prev => [s, ...prev])} caisse={caisse} onCloturerCaisse={cloturerCaisse} chambres={chambresGenerees} devise={trouverDevise(codeDevise).symbole}/>}
+        {onglet === 'caisse' && accesRole.includes('caisse') && <Caisse sejours={sejoursEncaisses} entreesDiverses={entreesDiverses} sortiesDiverses={sortiesDiverses} onAjouterEntree={e => setEntreesDiverses(prev => [{ ...e, par: utilisateur?.nom || '' }, ...prev])} onAjouterSortie={s => setSortiesDiverses(prev => [{ ...s, par: utilisateur?.nom || '' }, ...prev])} caisse={caisse} onCloturerCaisse={cloturerCaisse} chambres={chambresGenerees} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'menu' && <Menu
           utilisateur={utilisateur}
           onDeconnexion={handleDeconnexion}
