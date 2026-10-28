@@ -16,6 +16,7 @@ import { signOut } from 'firebase/auth'
 import { lireParams, PARAMS_DEFAUT } from './screens/menu/Menu'
 import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
 import { chargerHistorique, ajouterHistorique, migrerHistorique, viderAttente } from './historique'
+import { definirHotelCourant, chargerIdentite } from './identite'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -484,6 +485,8 @@ export default function App() {
     setJournal(hId ? chargerJournalLocal(hId) : [])
 
     setHotelId(hId)
+    definirHotelCourant(hId)
+    if (hId) chargerIdentite(hId)
     setUtilisateur(user)
     setThemeSombre(hId ? lireThemeLocal(hId, user.nom) : false)
     setOnglet(user.role === 'caissier' ? 'caisse' : 'dashboard')
@@ -532,6 +535,7 @@ export default function App() {
     ajouterAuJournal({ type:'deconnexion', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`${utilisateur?.nom||'Utilisateur'} s'est déconnecté` })
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
     try { await signOut(auth) } catch (e) {}
+    definirHotelCourant(null)
     setUtilisateur(null); setHotelId(null); setThemeSombre(false)
     setOnglet('dashboard')
     setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
