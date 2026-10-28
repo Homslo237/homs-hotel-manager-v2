@@ -1,62 +1,44 @@
 import { useState } from 'react'
 import { X, Save, Upload } from 'lucide-react'
-import { doc, setDoc } from 'firebase/firestore'
-import { auth, db } from '../../firebase'
+import { auth } from '../../firebase'
+import { lireIdentite, sauvegarderIdentite, compresserLogo } from '../../identite'
 
 const labelStyle = { display:'block', fontSize:'13px', fontWeight:'700', color:'#333', marginBottom:'6px' }
 const inputStyle = { width:'100%', padding:'11px 14px', border:'2px solid #E0E0E0', borderRadius:'10px', fontSize:'14px', outline:'none', boxSizing:'border-box' }
 
-const identiteDefaut = {
-  nom:'', slogan:'', adresse:'',
-  telephone1:'', telephone2:'', email:'',
-  rccm:'', contribuable:'', mentionLegale:'',
-  logoUrl: null,
-}
-
-function lireDepuisLocalStorage(uid) {
-  try {
-    const cle = uid ? `homs_${uid}_identite` : 'homs_identite'
-    const s = localStorage.getItem(cle)
-    return s ? JSON.parse(s) : identiteDefaut
-  } catch { return identiteDefaut }
-}
-
 export default function EcranIdentite({ onClose, onIdentiteChange, hotelId }) {
   const uid = hotelId || auth.currentUser?.uid
-  const [identite, setIdentite] = useState(() => lireDepuisLocalStorage(uid))
+  const [identite, setIdentite] = useState(() => lireIdentite(uid))
   const [sauvegarde, setSauvegarde] = useState(false)
   const [chargement, setChargement] = useState(false)
 
-  const handleLogo = (e) => {
+  const handleLogo = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-    if (file.size > 2*1024*1024) { alert('Maximum 2 Mo.'); return }
-    const reader = new FileReader()
-    reader.onload = (ev) => setIdentite(prev => ({...prev, logoUrl: ev.target.result}))
-    reader.readAsDataURL(file)
+    if (file.size > 8*1024*1024) { alert('Image trop lourde (maximum 8 Mo).'); return }
+    try {
+      const logoUrl = await compresserLogo(file)
+      setIdentite(prev => ({ ...prev, logoUrl }))
+    } catch (err) {
+      alert("Impossible de lire cette image. Essayez un fichier PNG ou JPG.")
+    }
   }
 
   const handleSauvegarder = async () => {
+    if (!uid) { alert('Connectez-vous à un établissement pour enregistrer son identité.'); return }
     setChargement(true)
-    try {
-      const cle = uid ? `homs_${uid}_identite` : 'homs_identite'
-      localStorage.setItem(cle, JSON.stringify(identite))
-
-      const user = auth.currentUser
-      if (user) {
-        await setDoc(doc(db, 'hotels', user.uid, 'infos', 'identite'), identite)
-      }
-
-      setSauvegarde(true)
-      setTimeout(() => setSauvegarde(false), 2000)
-      if (onIdentiteChange) onIdentiteChange(identite)
-    } catch (err) {
-      setSauvegarde(true)
-      setTimeout(() => setSauvegarde(false), 2000)
-      if (onIdentiteChange) onIdentiteChange(identite)
-    } finally {
-      setChargement(false)
+    const { local, distant } = await sauvegarderIdentite(uid, identite)
+    setChargement(false)
+    if (!local && !distant) {
+      alert("L'enregistrement a échoué. Vérifiez la connexion puis réessayez.")
+      return
     }
+    if (!distant) {
+      alert("Enregistré sur ce téléphone seulement. La synchronisation avec les autres appareils a échoué : vérifiez la connexion puis enregistrez de nouveau.")
+    }
+    setSauvegarde(true)
+    setTimeout(() => setSauvegarde(false), 2000)
+    if (onIdentiteChange) onIdentiteChange(identite)
   }
 
   const champ = (label, cle, placeholder, type='text') => (
@@ -101,7 +83,7 @@ export default function EcranIdentite({ onClose, onIdentiteChange, hotelId }) {
                 <div style={{ border:'2px dashed #C9A84C', borderRadius:'10px', padding:'24px', textAlign:'center', background:'#FFFDF5' }}>
                   <Upload size={28} color="#C9A84C"/>
                   <div style={{ fontSize:'13px', color:'#888', marginTop:'8px', fontWeight:'600' }}>Appuyer pour choisir un logo</div>
-                  <div style={{ fontSize:'11px', color:'#BBB', marginTop:'4px' }}>PNG ou JPG · max 2 Mo</div>
+                  <div style={{ fontSize:'11px', color:'#BBB', marginTop:'4px' }}>PNG ou JPG · réduit automatiquement</div>
                 </div>
                 <input type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }}/>
               </label>
@@ -113,7 +95,7 @@ export default function EcranIdentite({ onClose, onIdentiteChange, hotelId }) {
         <div style={{ marginBottom:'20px' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'10px' }}>🏨 EN-TÊTE DES REÇUS</div>
           <div style={{ background:'white', borderRadius:'14px', padding:'16px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', gap:'14px' }}>
-            {champ("Nom de l'établissement", 'nom', 'Ex. HOMS-HÔTEL')}
+            {champ("Nom de l'établissement", 'nom', 'Ex. Hôtel Horizon')}
             {champ('Slogan / devise', 'slogan', 'Ex. Votre confort, notre priorité')}
             {champ('Adresse complète', 'adresse', 'Rue, quartier, ville...')}
           </div>
