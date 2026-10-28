@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, Plus, X, Share2, FileText, AlertTriangle } from 'lucide-react'
+import { lireIdentite, nomEtablissement } from '../identite'
 
 const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
 const maintenant = () => new Date().toTimeString().slice(0, 5)
 const aujourdhui = () => new Date().toLocaleDateString('fr-FR')
+const esc = (t) => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 
 const modesEntree = [
   { val:'Espèces',          icon:'💵' },
@@ -29,7 +31,7 @@ function ModalConfirmation({ onConfirmer, onAnnuler }) {
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #2C5282)', padding:'20px', textAlign:'center' }}>
           <div style={{ fontSize:'36px', marginBottom:'8px' }}>🔒</div>
           <div style={{ color:'#C9A84C', fontWeight:'800', fontSize:'17px' }}>Clôture de caisse</div>
-          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'12px', marginTop:'4px' }}>HOMS-HÔTEL MANAGER</div>
+          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'12px', marginTop:'4px' }}>{nomEtablissement(lireIdentite())}</div>
         </div>
         <div style={{ padding:'20px' }}>
           <div style={{ background:'#FFF8E1', border:'1px solid #C9A84C', borderRadius:'12px', padding:'14px', marginBottom:'16px', display:'flex', gap:'10px', alignItems:'flex-start' }}>
@@ -165,23 +167,18 @@ function ModalPassation({ sejours, entrees, sorties, caisse, chambres=[], onClos
   const nbTotal     = chambres.length
   const noShows     = sejours.filter(s=>s.statut==='no_show')
 
-  // Lire identité hôtel
-  const identite = (() => {
-    try { const s = localStorage.getItem('homs_identite'); return s ? JSON.parse(s) : {} } catch { return {} }
-  })()
-  const nomHotel = identite.nom || 'HOMS-HÔTEL'
-  const adresseHotel = identite.adresse || ''
-  const telHotel = identite.telephone1 || ''
-
   const handleImprimer = () => {
+    // Identité de l'hôtel connecté (logo, nom, contacts, infos légales)
+    const identite = lireIdentite()
+    const nomHotel = nomEtablissement(identite)
+    const logoHotel = identite.logoUrl || ''
+    const contactsHotel = [identite.telephone1, identite.telephone2].filter(Boolean).join(' / ')
+    const legalHotel = [identite.rccm && `RCCM : ${identite.rccm}`, identite.contribuable && `NIF : ${identite.contribuable}`].filter(Boolean).join(' · ')
+
     const lignesChambresOccupees = chambres
       .filter(c => c.statut === 'occupee')
-      .map(c => `<tr><td>${c.num}</td><td>${c.cat}</td><td style="color:#2ECC71;font-weight:700">Occupée</td><td>${c.client||'-'}</td><td>${c.dateDepart||'-'}</td></tr>`)
+      .map(c => `<tr><td>${c.num}</td><td>${esc(c.cat)}</td><td style="color:#2ECC71;font-weight:700">Occupée</td><td>${esc(c.client||'-')}</td><td>${esc(c.dateDepart||'-')}</td></tr>`)
       .join('')
-
-    const lignesNoShow = noShows.length === 0
-      ? '<tr><td colspan="4" style="text-align:center;color:#999">Aucun no-show</td></tr>'
-      : noShows.map(s => `<tr><td>${s.client}</td><td>Ch. ${s.chambre}</td><td>${s.dateArrivee} ${s.heureArrivee}</td><td style="color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} ${devise}</td></tr>`).join('')
 
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Passation</title>
 <style>
@@ -204,16 +201,21 @@ th{background:#1B3A6B;color:white;font-size:8pt}
 
 <!-- EN-TÊTE -->
 <div class="entete">
-  <div>
-    <h1>${nomHotel}</h1>
-    ${adresseHotel?`<div style="font-size:8pt;color:#666">${adresseHotel}</div>`:''}
-    ${telHotel?`<div style="font-size:8pt;color:#666">Tél: ${telHotel}</div>`:''}
-    <div style="font-weight:700;font-size:10pt;margin-top:4px">PROCÈS-VERBAL DE PASSATION DE SERVICE</div>
+  <div style="display:flex;gap:10px;align-items:center">
+    ${logoHotel ? `<img src="${logoHotel}" alt="" style="max-height:56px;max-width:90px">` : ''}
+    <div>
+      <h1>${esc(nomHotel)}</h1>
+      ${identite.slogan?`<div style="font-size:8pt;color:#666;font-style:italic">${esc(identite.slogan)}</div>`:''}
+      ${identite.adresse?`<div style="font-size:8pt;color:#666">${esc(identite.adresse)}</div>`:''}
+      ${contactsHotel?`<div style="font-size:8pt;color:#666">Tél: ${esc(contactsHotel)}${identite.email?` · ${esc(identite.email)}`:''}</div>`:(identite.email?`<div style="font-size:8pt;color:#666">${esc(identite.email)}</div>`:'')}
+      ${legalHotel?`<div style="font-size:8pt;color:#666">${esc(legalHotel)}</div>`:''}
+      <div style="font-weight:700;font-size:10pt;margin-top:4px">PROCÈS-VERBAL DE PASSATION DE SERVICE</div>
+    </div>
   </div>
   <div style="text-align:right">
-    <div><strong>N°:</strong> ${form.numeroPassation}</div>
+    <div><strong>N°:</strong> ${esc(form.numeroPassation)}</div>
     <div><strong>Date:</strong> ${aujourdhui()}</div>
-    <div><strong>Vacation:</strong> ${form.vacation}</div>
+    <div><strong>Vacation:</strong> ${esc(form.vacation)}</div>
     <div><strong>Heure:</strong> ${maintenant()}</div>
   </div>
 </div>
@@ -222,12 +224,12 @@ th{background:#1B3A6B;color:white;font-size:8pt}
 <div class="col2">
   <div class="box">
     <h2>RÉCEPTIONNISTE SORTANT</h2>
-    <div>Nom: ${form.recSortantNom||'_______________'}</div>
+    <div>Nom: ${esc(form.recSortantNom)||'_______________'}</div>
     <div style="margin-top:6px">Signature: _______________</div>
   </div>
   <div class="box">
     <h2>RÉCEPTIONNISTE ENTRANT</h2>
-    <div>Nom: ${form.recEntrantNom||'_______________'}</div>
+    <div>Nom: ${esc(form.recEntrantNom)||'_______________'}</div>
     <div style="margin-top:6px">Signature: _______________</div>
   </div>
 </div>
@@ -250,7 +252,7 @@ th{background:#1B3A6B;color:white;font-size:8pt}
       <tr><th colspan="2">No-Show cette vacation</th></tr>
       ${noShows.length===0
         ? '<tr><td colspan="2" style="text-align:center;color:#999">Aucun no-show</td></tr>'
-        : noShows.map(s=>`<tr><td>${s.client} (Ch.${s.chambre})</td><td style="text-align:right;color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} ${devise}</td></tr>`).join('')
+        : noShows.map(s=>`<tr><td>${esc(s.client)} (Ch.${esc(s.chambre)})</td><td style="text-align:right;color:#C9A84C;font-weight:700">${fmt(s.montantNum||0)} ${devise}</td></tr>`).join('')
       }
       ${noShows.length>0?`<tr class="total-row"><td>Total conservé</td><td style="text-align:right" class="gold">${fmt(noShows.reduce((sum,s)=>sum+(s.montantNum||0),0))} ${devise}</td></tr>`:''}
     </table>
@@ -284,7 +286,7 @@ ${nbOccupees > 0 ? `
     <table>
       ${sorties.length===0
         ? '<tr><td colspan="2" style="text-align:center;color:#999">Aucune</td></tr>'
-        : sorties.map(s=>`<tr><td>${s.libelle}</td><td style="text-align:right">${fmt(s.montant)} ${devise}</td></tr>`).join('')
+        : sorties.map(s=>`<tr><td>${esc(s.libelle)}</td><td style="text-align:right">${fmt(s.montant)} ${devise}</td></tr>`).join('')
       }
       <tr class="total-row"><td>TOTAL</td><td style="text-align:right;color:#E74C3C">${fmt(totalDepenses)} ${devise}</td></tr>
     </table>
@@ -316,15 +318,15 @@ ${nbOccupees > 0 ? `
 <div class="box">
   <h2>CLÉS ET CAISSE</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-    <div>Clés portes remises: <strong>${form.clePortesRemises||'__'}</strong> / disponibles: <strong>${form.clePortesTotal||'__'}</strong></div>
-    <div>Clés caisse remises: <strong>${form.cleCaisseRemises||'__'}</strong> / disponibles: <strong>${form.cleCaisseTotal||'__'}</strong></div>
+    <div>Clés portes remises: <strong>${esc(form.clePortesRemises)||'__'}</strong> / disponibles: <strong>${esc(form.clePortesTotal)||'__'}</strong></div>
+    <div>Clés caisse remises: <strong>${esc(form.cleCaisseRemises)||'__'}</strong> / disponibles: <strong>${esc(form.cleCaisseTotal)||'__'}</strong></div>
   </div>
 </div>
 
 <!-- INCIDENTS & OBSERVATIONS -->
 <div class="col2">
-  <div class="box"><h2>INCIDENTS</h2><div style="min-height:28px">${form.incidents||'Aucun incident'}</div></div>
-  <div class="box"><h2>OBSERVATIONS</h2><div style="min-height:28px">${form.observations||'RAS'}</div></div>
+  <div class="box"><h2>INCIDENTS</h2><div style="min-height:28px">${esc(form.incidents)||'Aucun incident'}</div></div>
+  <div class="box"><h2>OBSERVATIONS</h2><div style="min-height:28px">${esc(form.observations)||'RAS'}</div></div>
 </div>
 
 <!-- VALIDATION -->
@@ -333,7 +335,8 @@ ${nbOccupees > 0 ? `
   <div>Signature: _______________</div>
 </div>
 
-<div class="footer">Imprimé le ${aujourdhui()} à ${maintenant()} — ${nomHotel} by Homslovision</div>
+${identite.mentionLegale?`<div style="text-align:center;font-size:8pt;color:#444;margin-top:6px">${esc(identite.mentionLegale)}</div>`:''}
+<div class="footer">Imprimé le ${aujourdhui()} à ${maintenant()} — ${esc(nomHotel)} · Propulsé par HOMS-HÔTEL MANAGER</div>
 </body></html>`
 
     const win = window.open('', '_blank')
@@ -457,7 +460,7 @@ export default function Caisse({ sejours=[], entreesDiverses=[], sortiesDiverses
   const tCarte   = allIn.filter(p=>p.mode==='Carte bancaire').reduce((s,p)=>s+p.montant,0)
 
   const handlePartager = () => {
-    const texte = `${(() => { try { const s=localStorage.getItem('homs_identite'); return s?JSON.parse(s).nom:'HOMS-HOTEL' } catch{return 'HOMS-HOTEL'} })()} - CAISSE DU ${aujourdhui()}\nSolde net: ${fmt(totalGeneral)} ${devise}\nSejours: ${fmt(totalSejours)} | Entrees: ${fmt(totalEntrees)} | Sorties: -${fmt(totalSorties)}`
+    const texte = `${nomEtablissement(lireIdentite())} - CAISSE DU ${aujourdhui()}\nSolde net: ${fmt(totalGeneral)} ${devise}\nSejours: ${fmt(totalSejours)} | Entrees: ${fmt(totalEntrees)} | Sorties: -${fmt(totalSorties)}`
     if (navigator.share) navigator.share({ title:'Rapport caisse', text:texte })
     else window.open(`https://wa.me/?text=${encodeURIComponent(texte)}`, '_blank')
   }
