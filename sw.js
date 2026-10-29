@@ -1,7 +1,8 @@
 // ─── HOMS Hotel Manager — Service Worker PWA ─────────────────────────────────
-const CACHE_NAME = 'homs-v1.0'
+// Changer ce nom force le nettoyage des anciens fichiers en mémoire.
+const CACHE_NAME = 'homs-v2.0'
 
-// Fichiers à mettre en cache pour fonctionner hors ligne
+// Fichiers mis en cache pour fonctionner hors ligne
 const FICHIERS_CACHE = [
   '/',
   '/index.html',
@@ -13,77 +14,72 @@ const FICHIERS_CACHE = [
 
 // ─── Installation : mise en cache des fichiers essentiels ─────────────────────
 self.addEventListener('install', (event) => {
-  console.log('[HOMS SW] Installation...')
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[HOMS SW] Mise en cache des fichiers essentiels')
-      return cache.addAll(FICHIERS_CACHE).catch(err => {
-        console.log('[HOMS SW] Erreur cache (normal si fichiers absents) :', err)
-      })
-    })
+    caches.open(CACHE_NAME).then((cache) =>
+      // Un fichier absent n'empêche pas l'installation des autres
+      Promise.allSettled(FICHIERS_CACHE.map((url) => cache.add(url)))
+    )
   )
   self.skipWaiting()
 })
 
-// ─── Activation : nettoyage des anciens caches ────────────────────────────────
+// ─── Activation : suppression des anciens caches ──────────────────────────────
 self.addEventListener('activate', (event) => {
-  console.log('[HOMS SW] Activation...')
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => {
-            console.log('[HOMS SW] Suppression ancien cache :', key)
-            return caches.delete(key)
-          })
-      )
+    caches.keys().then((cles) =>
+      Promise.all(cles.filter((cle) => cle !== CACHE_NAME).map((cle) => caches.delete(cle)))
     )
   )
   self.clients.claim()
 })
 
-// ─── Interception des requêtes : Cache d'abord, réseau ensuite ────────────────
+// ─── Interception des requêtes ────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
-  // On ignore les requêtes non-GET et les APIs externes
-  if (event.request.method !== 'GET') return
-  if (event.request.url.includes('googleapis.com')) return
-  if (event.request.url.includes('firebaseio.com')) return
-  if (event.request.url.includes('anthropic.com')) return
+  const requete = event.request
+  if (requete.method !== 'GET') return
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        // Retourner le cache ET mettre à jour en arrière-plan
-        fetch(event.request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, response.clone())
-              })
-            }
-          })
-          .catch(() => {}) // Pas grave si hors ligne
-        return cached
-      }
+  const url = new URL(requete.url)
 
-      // Pas en cache → réseau
-      return fetch(event.request)
-        .then((response) => {
-          if (!response || response.status !== 200) return response
-          // Mettre en cache la nouvelle ressource
-          const responseClone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone)
-          })
-          return response
-        })
-        .catch(() => {
-          // Hors ligne et pas en cache → page de secours
-          if (event.request.destination === 'document') {
-            return caches.match('/index.html')
+  // Services externes : jamais interceptés
+  if (url.hostname.includes('googleapis.com')) return
+  if (url.hostname.includes('firebaseio.com')) return
+  if (url.hostname.includes('anthropic.com')) return
+
+  // Routes /api/ (paiement, abonnement, heartbeat…) : toujours le réseau, jamais le cache
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return
+
+  // Pages : réseau d'abord, pour toujours obtenir la dernière version déployée.
+  // Hors ligne, on retombe sur la dernière version gardée en mémoire.
+  if (requete.mode === 'navigate') {
+    event.respondWith(
+      fetch(requete)
+        .then((reponse) => {
+          if (reponse && reponse.status === 200) {
+            const copie = reponse.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copie))
           }
+          return reponse
         })
+        .catch(() => caches.match('/index.html').then((enCache) => enCache || caches.match('/')))
+    )
+    return
+  }
+
+  // Autres fichiers (scripts à empreinte, images…) : cache d'abord, mise à jour en arrière-plan
+  event.respondWith(
+    caches.match(requete).then((enCache) => {
+      const reseau = fetch(requete).then((reponse) => {
+        if (reponse && reponse.status === 200) {
+          const copie = reponse.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(requete, copie))
+        }
+        return reponse
+      })
+      if (enCache) {
+        reseau.catch(() => {}) // pas grave si hors ligne
+        return enCache
+      }
+      return reseau
     })
   )
 })
@@ -94,4 +90,3 @@ self.addEventListener('message', (event) => {
     self.skipWaiting()
   }
 })
-
