@@ -390,7 +390,12 @@ export default function App() {
     aVenir:      chambresGenerees.filter(c => c.statut === 'a_venir').length,
   }
 
-  const sejoursEncaisses = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut))
+  // Montant d'un séjour pas encore archivé : ce qui l'a été à une clôture précédente ne repèse plus sur la caisse
+  const montantRestant = (s) => Math.max(0, (s.montantNum || 0) - (s.montantCloture || 0))
+  const sejoursEncaisses = sejours
+    .filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut))
+    .map(s => ({ ...s, montantNum: montantRestant(s) }))
+    .filter(s => s.montantNum > 0)
   const totalSejours   = sejoursEncaisses.reduce((sum, s) => sum + (s.montantNum || 0), 0)
   const totalNuits     = sejoursEncaisses.filter(s => s.type === 'nuit').reduce((sum, s) => sum + (s.montantNum || 0), 0)
   const totalHeures    = sejoursEncaisses.filter(s => s.type === 'heure').reduce((sum, s) => sum + (s.montantNum || 0), 0)
@@ -416,6 +421,7 @@ export default function App() {
       montantNum: parseInt((nouveau.montant || '0').replace(/\s/g, ''), 10) || 0,
       statut,
       creePar: utilisateur?.nom || '', creeParRole: utilisateur?.role || '',
+      montantCloture: 0,
     }
     setSejours(prev => [ns, ...prev])
     ajouterAuJournal({ type:'sejour_cree', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`Séjour créé : ${ns.client} · Ch. ${ns.chambre} · ${ns.montant} FCFA` })
@@ -570,14 +576,16 @@ export default function App() {
   const cloturerCaisse = () => {
     const horodatage = horodatageActuel()
     const sejoursACloturer = sejours.filter(s => ['en_cours','a_venir','termine','no_show'].includes(s.statut))
-    const entreesSejours = sejoursACloturer.map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:s.montantNum||0, mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show', par:s.creePar||'' }))
+    const entreesSejours = sejoursACloturer.filter(s => montantRestant(s) > 0).map(s => ({ type:'sejour', client:s.client, chambre:s.chambre, montant:montantRestant(s), mode:s.modePaiement, date:s.dateArrivee, cloture:horodatage, noShow:s.statut==='no_show', par:s.creePar||'', suite:(s.montantCloture||0) > 0 }))
     const entreesArchivees = entreesDiverses.map(e => ({ type:'entree', libelle:e.libelle, montant:e.montant||0, mode:e.mode, date:e.heure, cloture:horodatage, par:e.par||'' }))
     const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage, par:s.par||'' }))
     const nouvellesLignes = [...entreesSejours, ...entreesArchivees, ...sortiesArchivees]
     setHistorique(prev => [...prev, ...nouvellesLignes])
-    archiverSejours(hotelId, sejoursACloturer.map(s => ({ ...s, clotureLe: horodatage, clotureePar: utilisateur?.nom || '' })))
+    archiverSejours(hotelId, sejoursACloturer.map(s => ({ ...s, montantArchive: montantRestant(s), clotureLe: horodatage, clotureePar: utilisateur?.nom || '' })))
     ajouterHistorique(hotelId, nouvellesLignes)
-    setSejours(prev => prev.filter(s => s.statut !== 'termine' && s.statut !== 'no_show'))
+    setSejours(prev => prev
+      .filter(s => s.statut !== 'termine' && s.statut !== 'no_show')
+      .map(s => ({ ...s, montantCloture: s.montantNum || 0 })))
     setEntreesDiverses([]); setSortiesDiverses([]); setNoShowASignaler([])
     ajouterAuJournal({ type:'cloture_caisse', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`Clôture de caisse · Solde net : ${soldeNet.toLocaleString('fr-FR')} FCFA` })
   }
