@@ -3,18 +3,19 @@ import { X, FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import { lireIdentite, nomEtablissement } from '../../identite'
 import { chargerArchive } from '../../archives'
 import { periodeDe, decalerPeriode, cleJour } from '../../periodes'
-import { fusionnerSejours, fusionnerJournal, htmlRapportSejours, htmlRapportJournal, ecrireEtImprimer } from '../../rapportsPdf'
+import { fusionnerSejours, fusionnerJournal, htmlRapportSejours, htmlRapportJournal, calculerStats, htmlRapportStatistiques, ecrireEtImprimer } from '../../rapportsPdf'
 
 const RAPPORTS = [
   { id:'sejours', icone:'🏨', titre:'Historique des séjours', detail:'Clients, contacts, heures d\'arrivée et de départ, paiement, qui a saisi' },
   { id:'journal', icone:'📋', titre:'Historique des actions', detail:'Connexions, séjours, prolongations, clôtures de caisse' },
+  { id:'statistiques', icone:'📊', titre:'Statistiques', detail:'Recettes, dépenses, modes de paiement, meilleurs clients' },
 ]
 const PERIODES = [{ id:'jour', label:'Jour' }, { id:'semaine', label:'Semaine' }, { id:'mois', label:'Mois' }]
 
 const versISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 // Rapports PDF A4 : réservés au directeur
-export default function EcranRapports({ onClose, hotelId, utilisateur, sejours = [], journal = [], historique = [], devise = 'FCFA' }) {
+export default function EcranRapports({ onClose, hotelId, utilisateur, sejours = [], journal = [], historique = [], devise = 'FCFA', nbChambres = 0 }) {
   const [rapport, setRapport] = useState('sejours')
   const [typePeriode, setTypePeriode] = useState('jour')
   const [dateRef, setDateRef] = useState(() => new Date())
@@ -66,6 +67,9 @@ export default function EcranRapports({ onClose, hotelId, utilisateur, sejours =
         const archive = await chargerArchive(hotelId, 'sejours', jours)
         const lignes = fusionnerSejours({ archive, vivants: sejours, historique, periode })
         html = htmlRapportSejours({ identite, nomHotel, periode, lignes, devise, par: utilisateur?.nom })
+      } else if (rapport === 'statistiques') {
+        const stats = calculerStats({ historique, periode, nbChambres })
+        html = htmlRapportStatistiques({ identite, nomHotel, periode, stats, devise, par: utilisateur?.nom })
       } else {
         const archive = await chargerArchive(hotelId, 'journal', jours)
         const lignes = fusionnerJournal({ archive, recent: journal, periode })
