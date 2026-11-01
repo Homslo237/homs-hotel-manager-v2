@@ -674,6 +674,7 @@ export default function App() {
         {onglet === 'caisse' && accesRole.includes('caisse') && <Caisse sejours={sejoursEncaisses} entreesDiverses={entreesDiverses} sortiesDiverses={sortiesDiverses} onAjouterEntree={e => setEntreesDiverses(prev => [{ ...e, par: utilisateur?.nom || '' }, ...prev])} onAjouterSortie={s => setSortiesDiverses(prev => [{ ...s, par: utilisateur?.nom || '' }, ...prev])} caisse={caisse} onCloturerCaisse={cloturerCaisse} chambres={chambresGenerees} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'menu' && <Menu
           utilisateur={utilisateur}
+          sejours={sejours}
           onDeconnexion={handleDeconnexion}
           onReinitialiser={handleReinitialiser}
           historique={historique}
