@@ -1,4 +1,4 @@
-import { parseDateFR, dansPeriode } from './periodes'
+import { parseDateFR, dansPeriode, formaterDateFR } from './periodes'
 
 // Rapports PDF A4 : historique des séjours et historique des actions
 
@@ -162,4 +162,95 @@ export function ecrireEtImprimer(fenetre, html) {
   fenetre.document.close()
   fenetre.focus()
   setTimeout(() => fenetre.print(), 300)
+}
+
+// ─── Statistiques (mêmes règles que l'écran Statistiques) ────────────────────
+// Les entrées et sorties diverses n'ont qu'une heure dans « date » : leur jour est celui de la clôture.
+export const dateDeLigne = (h) => (parseDateFR(h.date) ? h.date : h.cloture)
+
+export function calculerStats({ historique = [], periode, nbChambres = 0, aujourdhui = new Date() }) {
+  const lignes = historique.filter(h => h && dansPeriode(dateDeLigne(h), periode))
+  const somme = (liste) => liste.reduce((s, h) => s + (h.montant || 0), 0)
+  const estRecette = (h) => h.type === 'sejour' || h.type === 'entree'
+  const recettes = lignes.filter(estRecette)
+  const sejoursOk = lignes.filter(h => h.type === 'sejour' && !h.noShow)
+
+  const totalEntrees = somme(recettes)
+  const totalSorties = somme(lignes.filter(h => h.type === 'sortie'))
+  const totalSejours = somme(sejoursOk)
+  const totalNoShow = somme(lignes.filter(h => h.noShow))
+  // Un supplément (ligne « suite ») compte dans les montants mais pas comme un nouveau séjour
+  const nbSejours = sejoursOk.filter(h => !h.suite).length
+
+  const parMode = ['Espèces', 'Orange Money', 'MTN Mobile Money', 'Carte bancaire']
+    .map(mode => ({ mode, montant: somme(recettes.filter(h => h.mode === mode)) }))
+
+  const demain = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate() + 1)
+  const fin = periode.fin < demain ? periode.fin : demain
+  const nbJours = Math.max(1, Math.round((fin - periode.debut) / 86400000))
+  const revPAR = nbChambres > 0 ? Math.round(totalSejours / (nbChambres * nbJours)) : null
+
+  const parJourMap = {}
+  lignes.forEach(h => {
+    const d = parseDateFR(dateDeLigne(h))
+    if (!d) return
+    const cle = formaterDateFR(d)
+    parJourMap[cle] = parJourMap[cle] || { entrees: 0, sorties: 0 }
+    if (estRecette(h)) parJourMap[cle].entrees += h.montant || 0
+    if (h.type === 'sortie') parJourMap[cle].sorties += h.montant || 0
+  })
+  const parJour = periode.jours.map(d => {
+    const cle = formaterDateFR(d)
+    const v = parJourMap[cle] || { entrees: 0, sorties: 0 }
+    return { date: cle, entrees: v.entrees, sorties: v.sorties }
+  })
+
+  const clients = {}
+  sejoursOk.forEach(h => {
+    if (!h.client) return
+    clients[h.client] = clients[h.client] || { nom: h.client, total: 0, sejours: 0 }
+    clients[h.client].total += h.montant || 0
+    if (!h.suite) clients[h.client].sejours += 1
+  })
+  const topClients = Object.values(clients).sort((a, b) => b.total - a.total).slice(0, 5)
+
+  return {
+    nbLignes: lignes.length, totalEntrees, totalSorties, soldeNet: totalEntrees - totalSorties,
+    totalSejours, totalNoShow, nbSejours, panierMoyen: Math.round(totalSejours / Math.max(nbSejours, 1)),
+    parMode, revPAR, nbJours, parJour, topClients,
+  }
+}
+
+export function htmlRapportStatistiques({ identite, nomHotel, periode, stats, devise = 'FCFA', par }) {
+  const d = e(devise)
+  const kpi = (valeur, libelle) => `<div class="kpi"><b>${valeur}</b>${libelle}</div>`
+  const totalMode = stats.parMode.reduce((s, m) => s + m.montant, 0) || 1
+  const modes = stats.parMode.map(m => `<tr><td>${e(m.mode)}</td><td class="droite">${fmt(m.montant)} ${d}</td><td class="droite">${Math.round(m.montant / totalMode * 100)} %</td></tr>`).join('')
+  const maxJour = Math.max(...stats.parJour.map(j => Math.max(j.entrees, j.sorties)), 1)
+  const barres = stats.parJour.length > 1 ? (() => {
+    const L = 520, H = 110, n = stats.parJour.length, w = L / n
+    return `<svg viewBox="0 0 ${L} ${H + 14}" width="100%" style="margin:6px 0">${stats.parJour.map((j, i) => {
+      const hr = Math.round(j.entrees / maxJour * H), hs = Math.round(j.sorties / maxJour * H)
+      const bw = Math.max(2, w * 0.38)
+      return `<rect x="${i * w + w * 0.08}" y="${H - hr}" width="${bw}" height="${hr}" fill="#1B3A6B"/><rect x="${i * w + w * 0.08 + bw}" y="${H - hs}" width="${bw}" height="${hs}" fill="#E74C3C"/>`
+    }).join('')}<line x1="0" y1="${H}" x2="${L}" y2="${H}" stroke="#999"/><text x="0" y="${H + 12}" font-size="8" fill="#666">${e(stats.parJour[0].date.slice(0, 5))}</text><text x="${L}" y="${H + 12}" font-size="8" fill="#666" text-anchor="end">${e(stats.parJour[n - 1].date.slice(0, 5))}</text></svg>
+<div class="gris">■ <span style="color:#1B3A6B">Recettes</span> &nbsp; ■ <span style="color:#E74C3C">Dépenses</span></div>`
+  })() : ''
+  const jours = stats.parJour.map(j => `<tr><td>${e(j.date)}</td><td class="droite">${fmt(j.entrees)}</td><td class="droite">${fmt(j.sorties)}</td><td class="droite">${fmt(j.entrees - j.sorties)}</td></tr>`).join('')
+  const clients = stats.topClients.length === 0
+    ? '<tr><td colspan="3" style="text-align:center;color:#999">Aucun client sur cette période</td></tr>'
+    : stats.topClients.map((c, i) => `<tr><td>${i + 1}. ${e(c.nom)}</td><td class="droite">${c.sejours}</td><td class="droite">${fmt(c.total)} ${d}</td></tr>`).join('')
+  const corps = `
+<div class="kpis">${kpi(fmt(stats.totalEntrees) + ' ' + d, 'Total encaissé')}${kpi(fmt(stats.totalSorties) + ' ' + d, 'Total dépensé')}${kpi(fmt(stats.soldeNet) + ' ' + d, 'Solde net')}</div>
+<div class="kpis">${kpi(fmt(stats.totalSejours) + ' ' + d, 'Recettes des séjours')}${kpi(stats.nbSejours, 'Séjours')}${kpi(fmt(stats.panierMoyen) + ' ' + d, 'Panier moyen')}${kpi(stats.revPAR === null ? '—' : fmt(stats.revPAR) + ' ' + d, 'RevPAR (par chambre et par jour)')}${kpi(fmt(stats.totalNoShow) + ' ' + d, 'No-show conservés')}</div>
+${barres ? `<div class="sous-titre">Évolution des recettes et des dépenses</div>${barres}` : ''}
+<div class="sous-titre">Par mode de paiement</div>
+<table style="width:70%"><thead><tr><th>Mode</th><th class="droite">Montant</th><th class="droite">Part</th></tr></thead><tbody>${modes}</tbody></table>
+<div class="sous-titre">Détail par jour</div>
+<table><thead><tr><th>Jour</th><th class="droite">Recettes (${d})</th><th class="droite">Dépenses (${d})</th><th class="droite">Solde (${d})</th></tr></thead><tbody>${jours}</tbody>
+<tfoot><tr class="total"><td>TOTAL</td><td class="droite">${fmt(stats.totalEntrees)}</td><td class="droite">${fmt(stats.totalSorties)}</td><td class="droite">${fmt(stats.soldeNet)}</td></tr></tfoot></table>
+<div class="sous-titre">Meilleurs clients</div>
+<table><thead><tr><th>Client</th><th class="droite">Séjours</th><th class="droite">Montant</th></tr></thead><tbody>${clients}</tbody></table>
+<p class="gris" style="margin-top:8px">Chiffres issus des clôtures de caisse : les opérations du jour non encore clôturées n'y figurent pas.</p>`
+  return pageA4({ identite, nomHotel, titre: 'STATISTIQUES', periode, corps, paysage: false, par })
 }
