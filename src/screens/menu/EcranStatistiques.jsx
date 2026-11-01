@@ -10,6 +10,19 @@ function parseDateFR(dateFR) {
   return new Date(a, m-1, j)
 }
 
+// Les entrées et sorties diverses n'ont qu'une heure dans « date » : leur jour est celui de la clôture
+const dateDe = (h) => (parseDateFR(h.date) ? h.date : (h.cloture || '').slice(0, 10))
+
+// Nombre de jours écoulés depuis le début de la période (pour le RevPAR)
+function joursEcoules(periode) {
+  const now = new Date()
+  if (periode==='jour') return 1
+  if (periode==='semaine') return now.getDay()===0 ? 7 : now.getDay()
+  if (periode==='mois') return now.getDate()
+  if (periode==='annee') return Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 1)) / 86400000) + 1
+  return 1
+}
+
 function estDansLaPeriode(dateFR, periode) {
   const d = parseDateFR(dateFR)
   if (!d) return false
@@ -101,7 +114,7 @@ function GraphDonut({ data }) {
     const large = slice > Math.PI ? 1 : 0
     return { ...d, path:`M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${RI} ${RI} 0 ${large} 0 ${xi1} ${yi1} Z`, pct:Math.round(d.valeur/total*100) }
   })
-  const maxItem = data.reduce((a,b)=>a.valeur>b.valeur?a:b, data[0])
+  const maxItem = arcs.reduce((a,b)=>a.valeur>b.valeur?a:b, arcs[0])
   return (
     <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
       <svg width="160" height="160" viewBox="0 0 160 160" style={{ flexShrink:0 }}>
@@ -124,16 +137,18 @@ function GraphDonut({ data }) {
   )
 }
 
-export default function EcranStatistiques({ onClose, historique = [], devise='FCFA' }) {
+export default function EcranStatistiques({ onClose, historique = [], devise='FCFA', nbChambres = 0 }) {
   const [periode, setPeriode] = useState('mois')
   const [onglet, setOnglet] = useState('kpi')
 
-  const items = historique.filter(h => estDansLaPeriode(h.date, periode))
+  const items = historique.filter(h => estDansLaPeriode(dateDe(h), periode))
   const totalEntrees = items.filter(h=>h.type==='sejour'||h.type==='entree').reduce((s,h)=>s+(h.montant||0),0)
   const totalSorties = items.filter(h=>h.type==='sortie').reduce((s,h)=>s+(h.montant||0),0)
   const soldeNet     = totalEntrees - totalSorties
   const totalSejours = items.filter(h=>h.type==='sejour'&&!h.noShow).reduce((s,h)=>s+(h.montant||0),0)
   const totalNoShow  = items.filter(h=>h.noShow).reduce((s,h)=>s+(h.montant||0),0)
+  // Un supplément (ligne « suite ») compte dans les montants mais n'est pas un nouveau séjour
+  const nbSejours    = items.filter(h=>h.type==='sejour'&&!h.noShow&&!h.suite).length
   const especes = items.filter(h=>(h.type==='sejour'||h.type==='entree')&&h.mode==='Espèces').reduce((s,h)=>s+(h.montant||0),0)
   const om      = items.filter(h=>(h.type==='sejour'||h.type==='entree')&&h.mode==='Orange Money').reduce((s,h)=>s+(h.montant||0),0)
   const momo    = items.filter(h=>(h.type==='sejour'||h.type==='entree')&&h.mode==='MTN Mobile Money').reduce((s,h)=>s+(h.montant||0),0)
@@ -144,7 +159,7 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
     if (!h.client) return
     if (!clientsMap[h.client]) clientsMap[h.client] = { nom:h.client, total:0, sejours:0 }
     clientsMap[h.client].total += h.montant||0
-    clientsMap[h.client].sejours += 1
+    if (!h.suite) clientsMap[h.client].sejours += 1
   })
   const topClients = Object.values(clientsMap).sort((a,b)=>b.total-a.total).slice(0,5)
 
@@ -159,7 +174,7 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
       const jourCible = new Date(debutSemaine)
       jourCible.setDate(debutSemaine.getDate()+i)
       const itemsJour = historique.filter(h => {
-        const d = parseDateFR(h.date)
+        const d = parseDateFR(dateDe(h))
         return d && d.toDateString()===jourCible.toDateString()
       })
       return {
@@ -174,7 +189,7 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
     const moisLabels = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
     return moisLabels.map((label, i) => {
       const itemsMois = historique.filter(h => {
-        const d = parseDateFR(h.date)
+        const d = parseDateFR(dateDe(h))
         return d && d.getMonth()===i && d.getFullYear()===new Date().getFullYear()
       })
       return {
@@ -186,7 +201,8 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
   }
 
   const donneesCourbe = periode==='annee' ? donneesMois() : donneesCourbeSemaine()
-  const revPAR = Math.round(totalSejours / 50)
+  // RevPAR : recettes des séjours par chambre disponible et par jour
+  const revPAR = nbChambres > 0 ? Math.round(totalSejours / (nbChambres * joursEcoules(periode))) : null
   const periodes = [{id:'jour',label:'Jour'},{id:'semaine',label:'Semaine'},{id:'mois',label:'Mois'},{id:'annee',label:'Année'}]
   const onglets  = [{id:'kpi',label:'KPI'},{id:'revenus',label:'Revenus'},{id:'clients',label:'Clients'}]
 
@@ -251,7 +267,7 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
               {[
                 { label:'Recettes séjours', valeur:`${fmt(totalSejours)} ${devise}`, couleur:'#2ECC71', icon:'🏨' },
-                { label:'RevPAR',           valeur:`${fmt(revPAR)} ${devise}`,       couleur:'#C9A84C', icon:'📊' },
+                { label:'RevPAR',           valeur:revPAR===null ? '—' : `${fmt(revPAR)} ${devise}`, couleur:'#C9A84C', icon:'📊' },
                 { label:'Mouvements',       valeur:items.length,                couleur:'#1B3A6B', icon:'📋' },
                 { label:'No-show conservés',valeur:`${fmt(totalNoShow)} ${devise}`,  couleur:'#E8634A', icon:'🚫' },
               ].map(k => (
@@ -350,8 +366,8 @@ export default function EcranStatistiques({ onClose, historique = [], devise='FC
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#999', letterSpacing:'1px', textTransform:'uppercase', marginBottom:'12px' }}>📊 Chiffres clés</div>
               {[
                 { label:'Clients uniques',       valeur:Object.keys(clientsMap).length, icon:'👥' },
-                { label:'Séjours enregistrés',   valeur:items.filter(h=>h.type==='sejour'&&!h.noShow).length, icon:'🏨' },
-                { label:'Panier moyen / séjour', valeur:`${fmt(Math.round(totalSejours/Math.max(items.filter(h=>h.type==='sejour'&&!h.noShow).length,1)))} ${devise}`, icon:'💰' },
+                { label:'Séjours enregistrés',   valeur:nbSejours, icon:'🏨' },
+                { label:'Panier moyen / séjour', valeur:`${fmt(Math.round(totalSejours/Math.max(nbSejours,1)))} ${devise}`, icon:'💰' },
                 { label:'No-show conservés',     valeur:`${fmt(totalNoShow)} ${devise}`, icon:'🚫' },
               ].map(s => (
                 <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid #F0F0F0' }}>
