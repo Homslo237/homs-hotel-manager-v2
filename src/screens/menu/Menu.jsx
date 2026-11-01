@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   User, Hotel, Users, Wrench, BarChart2, BookOpen,
   Info, LogOut, ChevronRight, X, Settings,
-  Plus, Trash2, Save, Lock, Sun, Moon
+  Plus, Trash2, Save, Lock, Sun, Moon, FileText
 } from 'lucide-react'
 
 import EcranStatistiques from './EcranStatistiques'
@@ -10,6 +10,7 @@ import EcranIdentite     from './EcranIdentite'
 import EcranUtilisateurs from './EcranUtilisateurs'
 import EcranProfil       from './EcranProfil'
 import EcranJournal      from './EcranJournal'
+import EcranRapports     from './EcranRapports'
 import { DEVISES, trouverDevise } from '../../devises'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../../firebase'
@@ -242,6 +243,7 @@ const menuItemsDirecteur = [
       { icone:()=><span style={{fontSize:'18px'}}>🏨</span>, label:"Identité de l'établissement", sous:'Logo, en-tête, contacts, infos légales', couleur:'#2C5282', action:'identite' },
       { icone:Users,     label:'Utilisateurs & rôles',    sous:'Gérer le personnel et les accès',        couleur:'#1B3A6B', action:'utilisateurs' },
       { icone:BarChart2, label:'Rapports & statistiques', sous:'KPI, graphiques, top clients',           couleur:'#2ECC71', action:'statistiques' },
+      { icone:FileText,  label:'Rapports PDF A4',         sous:'Séjours, actions et statistiques par période', couleur:'#8B5CF6', action:'rapports' },
     ]
   },
   {
@@ -273,7 +275,7 @@ function sauvegarderThemeUtilisateur(uid, userId, sombre) {
   try { localStorage.setItem(`homs_${uid}_theme_${userId}`, sombre ? 'sombre' : 'clair') } catch {}
 }
 
-export default function Menu({ onDeconnexion, historique=[], journal=[], utilisateur, onThemeChange, onDeviseChange, onParamsChange, devise='FCFA', hotelId, codeDevise }) {
+export default function Menu({ onDeconnexion, historique=[], journal=[], sejours=[], utilisateur, onThemeChange, onDeviseChange, onParamsChange, devise='FCFA', hotelId, codeDevise }) {
   const [ecranActif, setEcranActif] = useState(null)
 
   // ── uid déclaré EN PREMIER pour être utilisé dans identite ──
@@ -289,6 +291,8 @@ export default function Menu({ onDeconnexion, historique=[], journal=[], utilisa
   const nomAffiche = profilUtilisateur?.nom || utilisateur?.nom || 'Utilisateur'
   const photoAffichee = profilUtilisateur?.photoUrl || null
   const premiereLettre = nomAffiche ? nomAffiche.charAt(0).toUpperCase() : 'H'
+  // Nombre de chambres configurées : sert au calcul du RevPAR (statistiques)
+  const nbChambres = (lireParams(uid).categories || []).reduce((s, c) => s + (Number(c.nombre) || 0), 0)
 
   const handleToggleTheme = () => {
     const nouveau = !themeSombre
@@ -427,7 +431,8 @@ export default function Menu({ onDeconnexion, historique=[], journal=[], utilisa
       {ecranActif==='directeur'    && <EcranDirecteur onClose={()=>setEcranActif(null)} onDeviseChange={onDeviseChange} onParamsChange={onParamsChange} hotelId={hotelId} codeDevise={codeDevise}/>}
       {ecranActif==='identite'     && <EcranIdentite  onClose={()=>setEcranActif(null)} onIdentiteChange={setIdentite} hotelId={hotelId}/>}
       {ecranActif==='utilisateurs' && <EcranUtilisateurs onClose={()=>setEcranActif(null)}/>}
-      {ecranActif==='statistiques' && <EcranStatistiques onClose={()=>setEcranActif(null)} historique={historique} devise={devise}/>}
+      {ecranActif==='statistiques' && <EcranStatistiques onClose={()=>setEcranActif(null)} historique={historique} devise={devise} nbChambres={nbChambres}/>}
+      {ecranActif==='rapports'     && estDirecteur && <EcranRapports onClose={()=>setEcranActif(null)} hotelId={hotelId} utilisateur={utilisateur} sejours={sejours} journal={journal} historique={historique} devise={devise} nbChambres={nbChambres}/>}
       {ecranActif==='profil'       && <EcranProfil onClose={()=>setEcranActif(null)} utilisateur={utilisateur} onProfilChange={setProfilUtilisateur}/>}
       {ecranActif==='journal'      && <EcranJournal onClose={()=>setEcranActif(null)} journal={journal} utilisateur={utilisateur}/>}
     </>
