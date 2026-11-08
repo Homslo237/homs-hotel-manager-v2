@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
+import { reportSignup, reportEvent, dureeEssaiActuelle, chargerDureeEssai } from '../homsloControl'
 
 const styleAnim = `
   @keyframes fadeDown {
@@ -72,14 +73,13 @@ const ROLES = [
   { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
-// ── Durée d'essai par défaut : 10 jours ──────────────────────────────────────
-// Cette valeur sera remplacée par celle de l'Écosystème HOMS une fois connecté
-const DUREE_ESSAI_JOURS = 10
-
-function creerAbonnementEssai() {
+// ── Abonnement d'essai ───────────────────────────────────────────────────────
+// La durée vient de HOMSLO CONTROL (voir homsloControl.js). Sans réponse : 10 jours.
+// La fin d'essai est calculée UNE FOIS, ici, à l'inscription : changer la durée plus tard ne touche pas les essais en cours.
+function creerAbonnementEssai(jours) {
   const maintenant = new Date()
   const finEssai = new Date(maintenant)
-  finEssai.setDate(finEssai.getDate() + DUREE_ESSAI_JOURS)
+  finEssai.setDate(finEssai.getDate() + jours)
   return {
     plan: 'essai',
     statut: 'actif',
@@ -161,7 +161,7 @@ function BgParticules() {
   ))
 }
 
-function EcranInscription({ onRetour, onInscriptionReussie }) {
+function EcranInscription({ onRetour, onInscriptionReussie, joursEssai }) {
   const [form, setForm] = useState({ nomHotel:'', nomDirecteur:'', email:'', motDePasse:'', confirmer:'' })
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState('')
@@ -196,9 +196,15 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
         rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
 
-      // 3. Créer l'abonnement essai automatiquement
-      const abonnement = creerAbonnementEssai()
+      // 3. Créer l'abonnement essai automatiquement (durée réglée dans HOMSLO CONTROL)
+      const abonnement = creerAbonnementEssai(dureeEssaiActuelle())
       await setDoc(doc(db, 'hotels', uid, 'infos', 'abonnement'), abonnement)
+
+      // 4. Prévenir HOMSLO CONTROL : « envoie et oublie », jamais bloquant
+      try {
+        reportSignup({ company: form.nomHotel.trim(), name: form.nomDirecteur.trim(), email: form.email.trim(), externalId: uid })
+        reportEvent('trial_started', uid)
+      } catch (e) {}
 
       sauvegarderDernierEmail(form.email.trim())
       setLoading(false)
@@ -227,7 +233,7 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
       </div>
 
       <div style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'20px', fontSize:'12px', color:'rgba(201,168,76,0.9)' }}>
-        🎁 <strong>{DUREE_ESSAI_JOURS} jours d'essai gratuit</strong> — aucune carte bancaire requise.
+        🎁 <strong>{joursEssai} jours d'essai gratuit</strong> — aucune carte bancaire requise.
       </div>
 
       {[
@@ -266,6 +272,9 @@ function EcranInscription({ onRetour, onInscriptionReussie }) {
 
       <p style={{ textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'11px', marginTop:'16px', lineHeight:'1.5' }}>
         En créant un compte, vous acceptez les conditions d'utilisation de HOMS-HÔTEL MANAGER par Homslovision.
+      </p>
+      <p style={{ textAlign:'center', color:'rgba(255,255,255,0.35)', fontSize:'11px', marginTop:'8px', lineHeight:'1.5' }}>
+        Pour gérer votre essai et votre abonnement, le nom de votre hôtel, votre nom et votre e-mail sont transmis à HOMSLO VISION.
       </p>
     </div>
   )
@@ -359,6 +368,8 @@ export default function Connexion({ onConnexion }) {
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
   const [etape, setEtape] = useState(1)
+  // Durée d'essai : dernière valeur connue tout de suite, puis mise à jour depuis HOMSLO CONTROL
+  const [joursEssai, setJoursEssai] = useState(dureeEssaiActuelle)
 
   const [showOublie, setShowOublie]   = useState(false)
   const [nomOublie, setNomOublie]     = useState('')
@@ -372,6 +383,12 @@ export default function Connexion({ onConnexion }) {
     el.textContent = styleAnim
     document.head.appendChild(el)
     return () => document.head.removeChild(el)
+  }, [])
+
+  useEffect(() => {
+    let actif = true
+    chargerDureeEssai().then(j => { if (actif) setJoursEssai(j) }).catch(() => {})
+    return () => { actif = false }
   }, [])
 
   const handleChoisirRole = (r) => {
@@ -460,7 +477,7 @@ export default function Connexion({ onConnexion }) {
           </div>
           <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', letterSpacing:'3px' }}>HOMS-HÔTEL MANAGER</div>
         </div>
-        <EcranInscription onRetour={() => setMode('connexion')} onInscriptionReussie={onConnexion}/>
+        <EcranInscription onRetour={() => setMode('connexion')} onInscriptionReussie={onConnexion} joursEssai={joursEssai}/>
         <Footer/>
       </div>
     )
@@ -542,7 +559,7 @@ export default function Connexion({ onConnexion }) {
               color:'#C9A84C', fontWeight:'800', fontSize:'14px',
               cursor:'pointer', letterSpacing:'1px',
             }}>
-              🎁 Essai gratuit {DUREE_ESSAI_JOURS} jours — Créer un compte
+              🎁 Essai gratuit {joursEssai} jours — Créer un compte
             </button>
           </div>
         </div>
