@@ -137,14 +137,22 @@ export function dureeEssaiActuelle() {
   return DUREE_ESSAI_DEFAUT
 }
 
-// Interroge HOMSLO CONTROL (3 secondes maximum) ; en cas d'échec ou de réponse invalide, valeur précédente ou de secours
+// Interroge HOMSLO CONTROL (3 secondes maximum).
+// - durée valide (1 à 90) : on la retient ;
+// - champ vide (« défaut du SaaS ») ou hors de 1 à 90 : retour à la durée par défaut de l'application ;
+// - panne, délai dépassé ou réponse invalide : on garde la dernière valeur connue.
 export async function chargerDureeEssai() {
   const r = await appeler('saas_public_info', { p_product: PRODUIT }, 3000)
   const d = Array.isArray(r.data) ? r.data[0] : r.data
-  const jours = d ? Number(d.trial_days) : NaN
-  if (r.ok && d && d.product === PRODUIT && dureeValide(jours)) {
-    dureeMemoire = jours
-    try { localStorage.setItem(CLE_ESSAI, String(jours)) } catch (e) {}
+  if (r.ok && d && d.product === PRODUIT) {
+    const jours = Number(d.trial_days)
+    if (dureeValide(jours)) {
+      dureeMemoire = jours
+      try { localStorage.setItem(CLE_ESSAI, String(jours)) } catch (e) {}
+    } else {
+      dureeMemoire = null
+      try { localStorage.removeItem(CLE_ESSAI) } catch (e) {}
+    }
   }
   return dureeEssaiActuelle()
 }
