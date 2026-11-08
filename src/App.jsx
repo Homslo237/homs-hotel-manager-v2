@@ -18,6 +18,7 @@ import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
 import { chargerHistorique, ajouterHistorique, migrerHistorique, viderAttente } from './historique'
 import { definirHotelCourant, chargerIdentite } from './identite'
 import { archiverJournal, archiverSejours, migrerJournalExistant, viderAttentes } from './archives'
+import { signalerFinEssai } from './homsloControl'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -521,6 +522,7 @@ export default function App() {
     if (hId) {
       lireAbonnement(hId).then(abo => {
         const statut = verifierStatutAbonnement(abo)
+        if (statut.statut === 'essai_expire') signalerFinEssai(hId) // prévient HOMSLO CONTROL, une seule fois
         setAbonnement(abo)
         setStatutAbonnement(statut)
         if (statut.bloque) setShowAbonnement(true)
