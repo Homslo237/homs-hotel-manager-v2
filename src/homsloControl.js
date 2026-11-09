@@ -137,6 +137,15 @@ export function dureeEssaiActuelle() {
   return DUREE_ESSAI_DEFAUT
 }
 
+// « Nouvelles inscriptions » réglé dans HOMSLO CONTROL : seul un « Non » explicite ferme les inscriptions.
+// En cas de panne, on garde la dernière valeur connue ; sans valeur connue, les inscriptions restent ouvertes.
+const CLE_OUVERT = 'homs_inscriptions_ouvertes'
+let ouvertMemoire = null
+export function inscriptionsOuvertes() {
+  if (ouvertMemoire !== null) return ouvertMemoire
+  try { return localStorage.getItem(CLE_OUVERT) !== '0' } catch (e) { return true }
+}
+
 // Interroge HOMSLO CONTROL (3 secondes maximum).
 // - durée valide (1 à 90) : on la retient ;
 // - champ vide (« défaut du SaaS ») ou hors de 1 à 90 : retour à la durée par défaut de l'application ;
@@ -145,6 +154,8 @@ export async function chargerDureeEssai() {
   const r = await appeler('saas_public_info', { p_product: PRODUIT }, 3000)
   const d = Array.isArray(r.data) ? r.data[0] : r.data
   if (r.ok && d && d.product === PRODUIT) {
+    ouvertMemoire = d.active !== false
+    try { localStorage.setItem(CLE_OUVERT, ouvertMemoire ? '1' : '0') } catch (e) {}
     const jours = Number(d.trial_days)
     if (dureeValide(jours)) {
       dureeMemoire = jours
