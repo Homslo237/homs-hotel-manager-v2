@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
-import { reportSignup, reportEvent, dureeEssaiActuelle, chargerDureeEssai } from '../homsloControl'
+import { reportSignup, reportEvent, dureeEssaiActuelle, chargerDureeEssai, inscriptionsOuvertes } from '../homsloControl'
 
 const styleAnim = `
   @keyframes fadeDown {
@@ -175,6 +175,7 @@ function EcranInscription({ onRetour, onInscriptionReussie, joursEssai }) {
   }
 
   const handleInscrire = async () => {
+    if (!inscriptionsOuvertes())    { setErreur("Les inscriptions sont fermées pour le moment."); return }
     if (!form.nomHotel.trim())      { setErreur("Entrez le nom de votre hôtel."); return }
     if (!form.nomDirecteur.trim())  { setErreur("Entrez votre nom."); return }
     if (!form.email.trim())         { setErreur("Entrez votre email."); return }
@@ -370,6 +371,7 @@ export default function Connexion({ onConnexion }) {
   const [etape, setEtape] = useState(1)
   // Durée d'essai : dernière valeur connue tout de suite, puis mise à jour depuis HOMSLO CONTROL
   const [joursEssai, setJoursEssai] = useState(dureeEssaiActuelle)
+  const [inscriptionsOk, setInscriptionsOk] = useState(inscriptionsOuvertes)
 
   const [showOublie, setShowOublie]   = useState(false)
   const [nomOublie, setNomOublie]     = useState('')
@@ -387,7 +389,7 @@ export default function Connexion({ onConnexion }) {
 
   useEffect(() => {
     let actif = true
-    chargerDureeEssai().then(j => { if (actif) setJoursEssai(j) }).catch(() => {})
+    chargerDureeEssai().then(j => { if (actif) { setJoursEssai(j); setInscriptionsOk(inscriptionsOuvertes()) } }).catch(() => {})
     return () => { actif = false }
   }, [])
 
@@ -552,15 +554,22 @@ export default function Connexion({ onConnexion }) {
           <div style={{ marginTop:'28px', textAlign:'center' }}>
             <div style={{ height:'1px', background:'rgba(255,255,255,0.1)', marginBottom:'20px' }}/>
             <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'12px', marginBottom:'12px' }}>Vous n'avez pas encore de compte ?</p>
-            <button onClick={() => setMode('inscription')} style={{
-              width:'100%', padding:'14px', borderRadius:'14px',
-              border:'1.5px solid rgba(201,168,76,0.5)',
-              background:'rgba(201,168,76,0.08)',
-              color:'#C9A84C', fontWeight:'800', fontSize:'14px',
-              cursor:'pointer', letterSpacing:'1px',
-            }}>
-              🎁 Essai gratuit {joursEssai} jours — Créer un compte
-            </button>
+            {inscriptionsOk ? (
+              <button onClick={() => setMode('inscription')} style={{
+                width:'100%', padding:'14px', borderRadius:'14px',
+                border:'1.5px solid rgba(201,168,76,0.5)',
+                background:'rgba(201,168,76,0.08)',
+                color:'#C9A84C', fontWeight:'800', fontSize:'14px',
+                cursor:'pointer', letterSpacing:'1px',
+              }}>
+                🎁 Essai gratuit {joursEssai} jours — Créer un compte
+              </button>
+            ) : (
+              <div style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'14px', padding:'14px', color:'rgba(255,255,255,0.7)', fontSize:'13px', lineHeight:'1.5' }}>
+                🔒 Les inscriptions sont fermées pour le moment.<br/>
+                Si vous avez déjà un compte, choisissez votre profil ci-dessus pour vous connecter.
+              </div>
+            )}
           </div>
         </div>
       )}
