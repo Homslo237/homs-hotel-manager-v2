@@ -3,6 +3,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswor
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { reportSignup, reportEvent, dureeEssaiActuelle, chargerDureeEssai, inscriptionsOuvertes } from '../homsloControl'
+import { appelerServeur } from '../abonnement'
 
 const styleAnim = `
   @keyframes fadeDown {
@@ -73,27 +74,8 @@ const ROLES = [
   { id:'caissier',       label:'Caissier',        emoji:'💰', couleur:'#E8634A' },
 ]
 
-// ── Abonnement d'essai ───────────────────────────────────────────────────────
-// La durée vient de HOMSLO CONTROL (voir homsloControl.js). Sans réponse : 10 jours.
-// La fin d'essai est calculée UNE FOIS, ici, à l'inscription : changer la durée plus tard ne touche pas les essais en cours.
-function creerAbonnementEssai(jours) {
-  const maintenant = new Date()
-  const finEssai = new Date(maintenant)
-  finEssai.setDate(finEssai.getDate() + jours)
-  return {
-    plan: 'essai',
-    statut: 'actif',
-    dateDebut: maintenant.toISOString(),
-    dateFinEssai: finEssai.toISOString(),
-    dateProchaineFacture: null,
-    dateFinGrace: null,
-    maxChambres: 999,
-    maxUtilisateurs: 999,
-    paiements: [],
-    createdAt: maintenant.toISOString(),
-    updatedAt: maintenant.toISOString(),
-  }
-}
+// L'abonnement d'essai est créé par le SERVEUR (api/essai-demarrer) : l'application n'écrit plus jamais l'abonnement.
+// La durée est lue par le serveur dans HOMSLO CONTROL (10 jours si CONTROL ne répond pas).
 
 function lireUtilisateurs() {
   try {
@@ -197,9 +179,9 @@ function EcranInscription({ onRetour, onInscriptionReussie, joursEssai }) {
         rccm:'', contribuable:'', mentionLegale:'', logoUrl:null,
       })
 
-      // 3. Créer l'abonnement essai automatiquement (durée réglée dans HOMSLO CONTROL)
-      const abonnement = creerAbonnementEssai(dureeEssaiActuelle())
-      await setDoc(doc(db, 'hotels', uid, 'infos', 'abonnement'), abonnement)
+      // 3. Le serveur crée l'abonnement d'essai (durée réglée dans HOMSLO CONTROL).
+      //    Si le serveur ne répond pas, il le créera à la première ouverture de l'application.
+      try { await appelerServeur('/api/essai-demarrer', { methode: 'POST' }) } catch (e) {}
 
       // 4. Prévenir HOMSLO CONTROL : « envoie et oublie », jamais bloquant
       try {
@@ -413,11 +395,6 @@ export default function Connexion({ onConnexion }) {
         onConnexion({ nom:'Directeur', role:'directeur', email:resultat.user.email, uid:resultat.user.uid, derniereConnexion:horodatage })
         return
       } catch {
-        if (mdp === 'admin1234' && emailAUtiliser === 'admin@homs.com') {
-          setLoading(false)
-          onConnexion({ nom:'Directeur', role:'directeur', email:'admin@homs.com', uid:'admin_local', derniereConnexion:horodatage })
-          return
-        }
         setLoading(false)
         setErreur('Email ou mot de passe incorrect.')
         return
