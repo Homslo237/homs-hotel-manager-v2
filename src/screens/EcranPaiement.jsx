@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { doc, setDoc } from 'firebase/firestore'
-import { db } from '../firebase'
+import { appelerServeur, formatPrix } from '../abonnement'
 
-// ── Opérateurs organisés par pays ────────────────────────────────────────────
+// ── Opérateurs organisés par pays (zone franc CFA) ───────────────────────────
 const PAYS = [
   {
     nom: 'Cameroun', emoji: '🇨🇲',
@@ -41,102 +40,59 @@ const PAYS = [
       { id:'MOOV_ML',  nom:'Moov Money',  emoji:'🔴', agregateur:'cinetpay' },
     ]
   },
-  {
-    nom: 'Ghana', emoji: '🇬🇭',
-    operateurs: [
-      { id:'MTN_MOMO_GHA',nom:'MTN Mobile Money', emoji:'🟡', agregateur:'pawapay' },
-    ]
-  },
-  {
-    nom: 'RD Congo', emoji: '🇨🇩',
-    operateurs: [
-      { id:'AIRTEL_RDC',nom:'Airtel Money', emoji:'🔴', agregateur:'pawapay' },
-    ]
-  },
 ]
 
-const PLANS_INFO = {
-  basique:  { nom:'Basique',  couleur:'#2ECC71' },
-  pro:      { nom:'Pro',      couleur:'#1B3A6B' },
-  premium:  { nom:'Premium',  couleur:'#C9A84C' },
-}
-
-export default function EcranPaiement({ utilisateur, hotelId, plan, montant, facturation, onSucces, onRetour }) {
+// offre : { code, name, price, currency, period } — affichage seulement, le serveur recalcule le prix
+export default function EcranPaiement({ utilisateur, offre, onSucces, onRetour }) {
   const [paysChoisi,   setPaysChoisi]   = useState(null)
   const [operateur,    setOperateur]    = useState(null)
   const [telephone,    setTelephone]    = useState('')
   const [etape,        setEtape]        = useState('formulaire')
   const [paiementId,   setPaiementId]   = useState(null)
-  const [agregateur,   setAgregateur]   = useState(null)
-  const [statutPay,    setStatutPay]    = useState(null)
+  const [lien,         setLien]         = useState(null)
   const [erreur,       setErreur]       = useState('')
   const [compteur,     setCompteur]     = useState(0)
 
-  const planInfo = PLANS_INFO[plan] || PLANS_INFO.basique
+  const couleur = '#C9A84C'
+  const prixTexte = formatPrix(offre.price, offre.currency)
   const paysActuel = PAYS.find(p => p.nom === paysChoisi)
 
-  // ── Vérification périodique ───────────────────────────────────────────────
+  // ── Vérification périodique : c'est le serveur qui contrôle le paiement et active l'abonnement ──
   useEffect(() => {
-    if (etape !== 'attente' || !paiementId || !agregateur) return
+    if (etape !== 'attente' || !paiementId) return
+    let enCours = false
 
     const interval = setInterval(async () => {
+      if (enCours) return
+      enCours = true
       try {
-        const res = await fetch(`/api/paiement-verifier?paiementId=${paiementId}&agregateur=${agregateur}`)
-        const data = await res.json()
-        setStatutPay(data.statut)
+        const r = await appelerServeur(`/api/paiement-verifier?paiementId=${encodeURIComponent(paiementId)}`)
         setCompteur(c => c + 1)
-        if (data.statut === 'COMPLETED') {
+        const statut = r.data && r.data.statut
+        if (statut === 'COMPLETED') {
           clearInterval(interval)
-          await activerAbonnement()
           setEtape('succes')
-        } else if (data.statut === 'FAILED') {
+        } else if (statut === 'FAILED') {
           clearInterval(interval)
-          setErreur('Le paiement a échoué. Veuillez réessayer.')
+          setErreur((r.data && r.data.erreur) || 'Le paiement a échoué. Veuillez réessayer.')
           setEtape('erreur')
         }
-      } catch {}
+      } catch (e) {
+      } finally {
+        enCours = false
+      }
     }, 5000)
 
     const timeout = setTimeout(() => {
       clearInterval(interval)
-      setErreur('Délai dépassé. Vérifiez votre téléphone et réessayez.')
+      setErreur('Délai dépassé. Si vous avez été débité, contactez Homslovision avec votre référence : ' + String(paiementId).slice(0, 8))
       setEtape('erreur')
     }, 5 * 60 * 1000)
 
     return () => { clearInterval(interval); clearTimeout(timeout) }
-  }, [etape, paiementId, agregateur])
+  }, [etape, paiementId])
 
-  // ── Activer l'abonnement Firestore ────────────────────────────────────────
-  const activerAbonnement = async () => {
-    const maintenant = new Date()
-    const prochaine  = new Date(maintenant)
-    facturation === 'mensuel'
-      ? prochaine.setMonth(prochaine.getMonth() + 1)
-      : prochaine.setFullYear(prochaine.getFullYear() + 1)
-
-    const limites = {
-      basique:  { maxChambres:10,  maxUtilisateurs:2   },
-      pro:      { maxChambres:30,  maxUtilisateurs:5   },
-      premium:  { maxChambres:999, maxUtilisateurs:999 },
-    }
-
-    await setDoc(doc(db, 'hotels', hotelId, 'infos', 'abonnement'), {
-      plan, statut:'actif', facturation,
-      dateDebut: maintenant.toISOString(),
-      dateProchaineFacture: prochaine.toISOString(),
-      dateFinGrace: null,
-      maxChambres:    limites[plan]?.maxChambres    || 10,
-      maxUtilisateurs:limites[plan]?.maxUtilisateurs || 2,
-      dernierPaiement: {
-        paiementId, montant, operateur: operateur?.id,
-        agregateur, pays: paysChoisi,
-        date: maintenant.toISOString(),
-      },
-      updatedAt: maintenant.toISOString(),
-    })
-  }
-
-  // ── Initier le paiement ───────────────────────────────────────────────────
+  // ── Initier le paiement : on n'envoie que le code de l'offre, l'opérateur et le numéro ──
   const handlePayer = async () => {
     if (!paysChoisi)          { setErreur('Choisissez votre pays.');             return }
     if (!operateur)           { setErreur('Choisissez votre opérateur.');        return }
@@ -145,29 +101,20 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
 
     setErreur('')
     setEtape('attente')
-    setStatutPay('SUBMITTED')
-    setAgregateur(operateur.agregateur)
 
     try {
-      const res = await fetch('/api/paiement-initier', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          montant,
-          telephone: telephone.replace(/\s/g,''),
-          operateur: operateur.id,
-          hotelId, plan, facturation,
-        }),
+      const r = await appelerServeur('/api/paiement-initier', {
+        methode: 'POST',
+        corps: { planCode: offre.code, operateur: operateur.id, telephone: telephone.replace(/\s/g,'') },
       })
-      const data = await res.json()
-      if (data.succes) {
-        setPaiementId(data.paiementId)
-        setAgregateur(data.agregateur)
+      if (r.data && r.data.succes) {
+        setPaiementId(r.data.paiementId)
+        setLien(r.data.lien || null)
       } else {
-        setErreur(data.erreur || 'Erreur paiement.')
+        setErreur((r.data && r.data.erreur) || 'Erreur paiement.')
         setEtape('erreur')
       }
-    } catch {
+    } catch (e) {
       setErreur('Erreur réseau. Vérifiez votre connexion.')
       setEtape('erreur')
     }
@@ -188,9 +135,9 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
       <div style={{ padding:'32px 20px 20px', textAlign:'center' }}>
         <div style={{ fontSize:'36px', marginBottom:'10px' }}>💳</div>
         <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', marginBottom:'8px' }}>Paiement Mobile Money</div>
-        <div style={{ background:`${planInfo.couleur}22`, border:`1px solid ${planInfo.couleur}55`, borderRadius:'20px', padding:'6px 20px', display:'inline-block' }}>
-          <span style={{ color:planInfo.couleur, fontWeight:'700', fontSize:'13px' }}>
-            Plan {planInfo.nom} — {montant.toLocaleString('fr-FR')} FCFA/{facturation === 'mensuel' ? 'mois' : 'an'}
+        <div style={{ background:`${couleur}22`, border:`1px solid ${couleur}55`, borderRadius:'20px', padding:'6px 20px', display:'inline-block' }}>
+          <span style={{ color:couleur, fontWeight:'700', fontSize:'13px' }}>
+            Plan {offre.name} — {prixTexte}/{offre.period === 'month' ? 'mois' : 'an'}
           </span>
         </div>
       </div>
@@ -274,7 +221,7 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
               <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'14px', padding:'16px', marginBottom:'20px', border:'1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px', marginBottom:'10px' }}>RÉCAPITULATIF</div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'rgba(255,255,255,0.7)', marginBottom:'6px' }}>
-                  <span>Plan</span><span style={{ color:'white', fontWeight:'700' }}>Plan {planInfo.nom}</span>
+                  <span>Plan</span><span style={{ color:'white', fontWeight:'700' }}>Plan {offre.name}</span>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'rgba(255,255,255,0.7)', marginBottom:'6px' }}>
                   <span>Opérateur</span><span style={{ color:'white', fontWeight:'700' }}>{operateur.nom}</span>
@@ -285,7 +232,7 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
                 <div style={{ height:'1px', background:'rgba(255,255,255,0.1)', margin:'10px 0' }}/>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'16px' }}>
                   <span style={{ color:'rgba(255,255,255,0.7)' }}>Total</span>
-                  <span style={{ color:'#C9A84C', fontWeight:'900' }}>{montant.toLocaleString('fr-FR')} FCFA</span>
+                  <span style={{ color:'#C9A84C', fontWeight:'900' }}>{prixTexte}</span>
                 </div>
               </div>
             )}
@@ -306,7 +253,7 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
                 fontWeight:'900', fontSize:'15px',
                 boxShadow: (!paysChoisi || !operateur || !telephone) ? 'none' : '0 4px 20px rgba(201,168,76,0.4)',
               }}>
-                💳 Payer {montant.toLocaleString('fr-FR')} FCFA
+                💳 Payer {prixTexte}
               </button>
             </div>
           </>
@@ -320,10 +267,18 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
               Confirmez sur votre téléphone
             </div>
             <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', lineHeight:'1.6', marginBottom:'24px' }}>
-              Une notification a été envoyée au<br/>
+              Une demande de paiement a été envoyée au<br/>
               <strong style={{ color:'#C9A84C' }}>{telephone}</strong><br/>
               Ouvrez votre application {operateur?.nom} et confirmez.
             </div>
+            {lien && (
+              <a href={lien} target="_blank" rel="noreferrer" style={{
+                display:'block', marginBottom:'16px', padding:'14px', borderRadius:'12px', textAlign:'center',
+                background:'#C9A84C', color:'#1B3A6B', fontWeight:'800', fontSize:'14px', textDecoration:'none',
+              }}>
+                🔗 Ouvrir la page de paiement
+              </a>
+            )}
             <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'16px', padding:'20px', marginBottom:'16px' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'12px' }}>
                 <div style={{ width:'20px', height:'20px', border:'3px solid rgba(255,255,255,0.2)', borderTopColor:'#C9A84C', borderRadius:'50%', animation:'spin 1s linear infinite' }}/>
@@ -348,7 +303,7 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
             <div style={{ fontSize:'72px', marginBottom:'20px' }}>🎉</div>
             <div style={{ color:'#2ECC71', fontWeight:'900', fontSize:'22px', marginBottom:'12px' }}>Paiement réussi !</div>
             <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'14px', lineHeight:'1.6', marginBottom:'28px' }}>
-              Votre abonnement <strong style={{ color:'#C9A84C' }}>Plan {planInfo.nom}</strong> est actif.<br/>
+              Votre abonnement <strong style={{ color:'#C9A84C' }}>Plan {offre.name}</strong> est actif.<br/>
               Bienvenue dans HOMS-HÔTEL MANAGER !
             </div>
             <button onClick={onSucces} style={{ width:'100%', padding:'16px', borderRadius:'14px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'900', fontSize:'16px', boxShadow:'0 4px 20px rgba(46,204,113,0.4)' }}>
@@ -365,7 +320,7 @@ export default function EcranPaiement({ utilisateur, hotelId, plan, montant, fac
             <div style={{ color:'rgba(255,255,255,0.6)', fontSize:'13px', lineHeight:'1.6', marginBottom:'24px' }}>{erreur}</div>
             <div style={{ display:'flex', gap:'10px' }}>
               <button onClick={onRetour} style={{ flex:1, padding:'14px', borderRadius:'12px', border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.6)', fontWeight:'700', fontSize:'14px', cursor:'pointer' }}>← Retour</button>
-              <button onClick={() => { setEtape('formulaire'); setErreur(''); setStatutPay(null) }} style={{ flex:2, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#C9A84C', color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>🔄 Réessayer</button>
+              <button onClick={() => { setEtape('formulaire'); setErreur(''); setPaiementId(null); setLien(null) }} style={{ flex:2, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#C9A84C', color:'#1B3A6B', fontWeight:'800', fontSize:'14px' }}>🔄 Réessayer</button>
             </div>
           </div>
         )}
