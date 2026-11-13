@@ -55,9 +55,13 @@ async function initierPawaPay(deps, p) {
   })
   const data = await r.json().catch(() => ({}))
   const refuse = data.status === 'REJECTED' || data.status === 'DUPLICATE_IGNORED'
+  const ok = r.ok && !refuse
+  if (!ok) console.error('paiement-initier pawapay', r.status, JSON.stringify(data).slice(0, 500))
+  const code = data.rejectionReason?.rejectionCode
   return {
-    ok: r.ok && !refuse,
-    erreur: data.rejectionReason?.rejectionMessage || data.message || 'Paiement refusé par l\'opérateur',
+    ok,
+    erreur: data.rejectionReason?.rejectionMessage || data.errorMessage || data.message
+      || `Paiement refusé par l'opérateur (code ${r.status}${code ? ' ' + code : ''})`,
     lien: null,
   }
 }
@@ -81,9 +85,11 @@ async function initierCinetPay(deps, p) {
     }),
   })
   const data = await r.json().catch(() => ({}))
+  const ok = r.ok && String(data.code) === '201'
+  if (!ok) console.error('paiement-initier cinetpay', r.status, JSON.stringify(data).slice(0, 500))
   return {
-    ok: r.ok && String(data.code) === '201',
-    erreur: data.message || 'Erreur de paiement',
+    ok,
+    erreur: data.message || `Erreur de paiement (code ${r.status})`,
     lien: data.data?.payment_url || null,
   }
 }
