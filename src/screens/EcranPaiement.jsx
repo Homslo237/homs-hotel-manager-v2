@@ -137,7 +137,7 @@ export default function EcranPaiement({ utilisateur, offre, onSucces, onRetour }
         <div style={{ color:'#C9A84C', fontWeight:'900', fontSize:'20px', marginBottom:'8px' }}>Paiement Mobile Money</div>
         <div style={{ background:`${couleur}22`, border:`1px solid ${couleur}55`, borderRadius:'20px', padding:'6px 20px', display:'inline-block' }}>
           <span style={{ color:couleur, fontWeight:'700', fontSize:'13px' }}>
-            Plan {offre.name} — {prixTexte}/{offre.period === 'month' ? 'mois' : 'an'}
+            {offre.name} — {prixTexte}/{offre.period === 'month' ? 'mois' : 'an'}
           </span>
         </div>
       </div>
@@ -221,7 +221,7 @@ export default function EcranPaiement({ utilisateur, offre, onSucces, onRetour }
               <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:'14px', padding:'16px', marginBottom:'20px', border:'1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'11px', fontWeight:'700', letterSpacing:'1px', marginBottom:'10px' }}>RÉCAPITULATIF</div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'rgba(255,255,255,0.7)', marginBottom:'6px' }}>
-                  <span>Plan</span><span style={{ color:'white', fontWeight:'700' }}>Plan {offre.name}</span>
+                  <span>Offre</span><span style={{ color:'white', fontWeight:'700' }}>{offre.name}</span>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', color:'rgba(255,255,255,0.7)', marginBottom:'6px' }}>
                   <span>Opérateur</span><span style={{ color:'white', fontWeight:'700' }}>{operateur.nom}</span>
@@ -303,7 +303,7 @@ export default function EcranPaiement({ utilisateur, offre, onSucces, onRetour }
             <div style={{ fontSize:'72px', marginBottom:'20px' }}>🎉</div>
             <div style={{ color:'#2ECC71', fontWeight:'900', fontSize:'22px', marginBottom:'12px' }}>Paiement réussi !</div>
             <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'14px', lineHeight:'1.6', marginBottom:'28px' }}>
-              Votre abonnement <strong style={{ color:'#C9A84C' }}>Plan {offre.name}</strong> est actif.<br/>
+              Votre abonnement <strong style={{ color:'#C9A84C' }}>{offre.name}</strong> est actif.<br/>
               Bienvenue dans HOMS-HÔTEL MANAGER !
             </div>
             <button onClick={onSucces} style={{ width:'100%', padding:'16px', borderRadius:'14px', border:'none', cursor:'pointer', background:'#2ECC71', color:'white', fontWeight:'900', fontSize:'16px', boxShadow:'0 4px 20px rgba(46,204,113,0.4)' }}>
