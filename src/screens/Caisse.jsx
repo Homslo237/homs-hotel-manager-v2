@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, Plus, X, Share2, FileText, AlertTriangle } from 'lucide-react'
 import { lireIdentite, nomEtablissement } from '../identite'
+import BoutonImprimerTicket from '../components/BoutonImprimerTicket'
+import { construireTicketHotel, formaterMontant } from '../imprimanteThermique'
 
 const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
 const maintenant = () => new Date().toTimeString().slice(0, 5)
@@ -166,6 +168,62 @@ function ModalPassation({ sejours, entrees, sorties, caisse, chambres=[], onClos
   const nbAVenir    = chambres.filter(c=>c.statut==='a_venir').length
   const nbTotal     = chambres.length
   const noShows     = sejours.filter(s=>s.statut==='no_show')
+
+  // Ticket de passation pour l'imprimante thermique de poche (mêmes chiffres que le PDF)
+  const construireTicketPassation = () => {
+    const noShowTotal = noShows.reduce((sum,s)=>sum+(s.montantNum||0),0)
+    const m = (n) => formaterMontant(n, devise)
+    const lignes = [
+      { left:'ÉTAT DES CHAMBRES', bold:true },
+      { left:'Occupées', right:String(nbOccupees) },
+      { left:'Libres', right:String(nbLibres) },
+      { left:'Réservées', right:String(nbAVenir) },
+      { left:"Taux d'occupation", right:`${nbTotal>0?Math.round(nbOccupees/nbTotal*100):0} %` },
+      { left:'' },
+      { left:'RECETTES', bold:true },
+      { left:'Séjours nuits', right:m(caisse.totalNuits||0) },
+      { left:'Séjours heures', right:m(caisse.totalHeures||0) },
+    ]
+    if (noShowTotal > 0) lignes.push({ left:'No-show conservés', right:m(noShowTotal) })
+    lignes.push({ left:'Entrées diverses', right:m(caisse.totalEntrees||0) })
+    lignes.push({ left:'Total recettes', right:m(totalRecettes), bold:true })
+    lignes.push({ left:'' })
+    lignes.push({ left:'DÉPENSES', bold:true })
+    if (sorties.length === 0) lignes.push({ left:'Aucune' })
+    sorties.forEach(s => lignes.push({ left:s.libelle, right:m(s.montant) }))
+    lignes.push({ left:'Total dépenses', right:m(totalDepenses), bold:true })
+    lignes.push({ left:'' })
+    lignes.push({ left:'PAR MODE DE PAIEMENT', bold:true })
+    lignes.push({ left:'Espèces', right:m(totalEspeces) })
+    lignes.push({ left:'Orange Money', right:m(totalOM) })
+    lignes.push({ left:'MTN MoMo', right:m(totalMOMO) })
+    lignes.push({ left:'Carte', right:m(totalCarte) })
+    lignes.push({ left:'' })
+    lignes.push({ left:'CLÉS', bold:true })
+    lignes.push({ left:`Portes : ${form.clePortesRemises||'-'} remises / ${form.clePortesTotal||'-'} disponibles` })
+    lignes.push({ left:`Caisse : ${form.cleCaisseRemises||'-'} remises / ${form.cleCaisseTotal||'-'} disponibles` })
+    lignes.push({ left:'' })
+    lignes.push({ left:`Incidents : ${form.incidents.trim()||'Aucun incident'}` })
+    lignes.push({ left:`Observations : ${form.observations.trim()||'RAS'}` })
+    lignes.push({ left:'' })
+    lignes.push({ left:`Sortant : ${form.recSortantNom.trim()||'..........'}` })
+    lignes.push({ left:'Signature : ..............' })
+    lignes.push({ left:'' })
+    lignes.push({ left:`Entrant : ${form.recEntrantNom.trim()||'..........'}` })
+    lignes.push({ left:'Signature : ..............' })
+
+    return construireTicketHotel({
+      identite: lireIdentite(),
+      titre: 'PASSATION DE SERVICE',
+      infos: [
+        { left:`N° : ${form.numeroPassation}` },
+        { left:`Date : ${aujourdhui()} à ${maintenant()}` },
+        { left:`Vacation : ${form.vacation}` },
+      ],
+      lignes,
+      total: { label:'SOLDE NET', value:m(solde) },
+    })
+  }
 
   const handleImprimer = () => {
     // Identité de l'hôtel connecté (logo, nom, contacts, infos légales)
@@ -416,6 +474,10 @@ ${identite.mentionLegale?`<div style="text-align:center;font-size:8pt;color:#444
           <button onClick={handleImprimer} style={{ width:'100%', padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'#1B3A6B', color:'white', fontWeight:'800', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginBottom:'10px' }}>
             <FileText size={18}/> Générer et imprimer le PDF
           </button>
+
+          <div style={{ marginBottom:'10px' }}>
+            <BoutonImprimerTicket construire={construireTicketPassation} libelle="🖨️ Ticket passation (imprimante de poche)"/>
+          </div>
 
           <button onClick={()=>setShowConfirm(true)} style={{ width:'100%', padding:'16px', borderRadius:'12px', border:'2px solid #E74C3C', cursor:'pointer', background:'white', color:'#E74C3C', fontWeight:'800', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
             🔒 Confirmer la clôture de caisse
