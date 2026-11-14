@@ -12,6 +12,8 @@ p,li{font-size:14px;line-height:1.5;color:rgba(255,255,255,.75)}
 button{width:100%;min-height:52px;border:0;border-radius:14px;background:#C9A84C;color:#1B3A6B;font-size:17px;font-weight:800;margin-top:10px}
 button.second{background:transparent;border:1.5px solid rgba(255,255,255,.3);color:rgba(255,255,255,.7);font-size:14px;min-height:44px}
 button:disabled{opacity:.5}
+select{width:100%;min-height:48px;margin-top:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,.3);background:#10213a;color:#fff;font-size:16px;padding:0 12px}
+label{display:block;margin-top:14px;font-size:13px;color:rgba(255,255,255,.7)}
 #msg{min-height:22px;margin-top:12px;font-size:14px;text-align:center;color:#F5D98A}
 </style>
 </head>
@@ -25,6 +27,12 @@ button:disabled{opacity:.5}
   <li>Utilisez Chrome.</li>
 </ol>
 <p>La première fois, Chrome demande de choisir l'imprimante : touchez celle dont le nom commence par <b>PPS1</b>.</p>
+<label for="noir">Noirceur de l'impression (réglage mémorisé pour l'application)</label>
+<select id="noir">
+  <option value="normal">Normale</option>
+  <option value="fonce">Foncée (recommandée)</option>
+  <option value="tres_fonce">Très foncée</option>
+</select>
 <button id="go">Imprimer un ticket de test</button>
 <button id="oubli" class="second">Choisir une autre imprimante</button>
 <div id="msg"></div>
@@ -41,21 +49,45 @@ var TEXTES = {
   UNSUPPORTED: '⚠️ Utilisez Chrome (Bluetooth web indisponible ici).',
   BUSY: 'Impression déjà en cours…', RENDER: '⚠️ Impossible de dessiner le ticket.'
 };
+var NIVEAUX = {
+  normal:     { density: 1, threshold: 165, epaisseur: 0 },
+  fonce:      { density: 2, threshold: 190, epaisseur: 0.5 },
+  tres_fonce: { density: 2, threshold: 215, epaisseur: 1 }
+};
+var CLE = 'homs_impression_noirceur', noir = document.getElementById('noir');
+try { var memo = localStorage.getItem(CLE); noir.value = NIVEAUX[memo] ? memo : 'fonce'; } catch (e) { noir.value = 'fonce'; }
+noir.onchange = function () { try { localStorage.setItem(CLE, noir.value); } catch (e) {} };
+
+function epaissir(cv, d) {
+  if (!d) return cv;
+  var c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+  var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(cv, 0, 0); g.globalCompositeOperation = 'darken'; g.drawImage(cv, d, 0);
+  return c;
+}
+
 btn.onclick = async function () {
   btn.disabled = true;
   try {
-    await HomsPrinter.printTicket({
+    var n = NIVEAUX[noir.value] || NIVEAUX.fonce;
+    HomsPrinter.config.density = n.density;
+    HomsPrinter.config.threshold = n.threshold;
+    var image = epaissir(HomsPrinter.ticketCanvas({
       title: 'HOMS-HÔTEL MANAGER', subtitle: 'Test d\'impression · Une vision d\'ensemble',
       lines: [
         { left: 'Reçu d\'entrée', bold: true }, { left: '' },
-        { left: 'Chambre', right: '12 — Confort' },
-        { left: 'Arrivée', right: '13/11/2026 14:05' },
-        { left: 'Nuitée x1', right: '10 000 FCFA' },
-        { left: 'Séjour à l\'heure x2', right: '4 000 FCFA' }
+        { left: 'Client : Séjour test impression' },
+        { left: 'Chambre : 205 (Moyen standing)' },
+        { left: 'Arrivée : 14/11/2026 à 08:29' },
+        { left: 'Durée : 2 heures' },
+        { left: 'Paiement : Orange Money' },
+        { left: 'Séjours heures', right: '7 000 FCFA' },
+        { left: 'Entrées diverses', right: '0 FCFA' }
       ],
-      total: { label: 'TOTAL', value: '14 000 FCFA' },
+      total: { label: 'TOTAL', value: '7 000 FCFA' },
       footer: 'Accents : é è ê à ç ô û — Merci de votre visite !'
-    }, { onStatus: function (phase, info) {
+    }), n.epaisseur);
+    await HomsPrinter.printCanvas(image, { onStatus: function (phase, info) {
       msg.textContent = phase === 'sending' ? 'Envoi… ' + info + ' %' : (TEXTES[phase] || '');
     }});
     msg.textContent = TEXTES.done;
