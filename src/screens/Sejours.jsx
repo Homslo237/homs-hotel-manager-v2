@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { lireIdentite, nomEtablissement } from '../identite'
+import BoutonImprimerTicket from '../components/BoutonImprimerTicket'
+import { construireTicketHotel, formaterMontant } from '../imprimanteThermique'
 
 // ─── Helpers date/heure ───────────────────────────────────────────────────────
 function versDateJS(dateFR, heure) {
@@ -204,9 +206,8 @@ Paiement: ${s.modePaiement}
 ${piedRecu(identite)}`
 }
 
-function genererRecuSortie(s, supplement, depassage, devise) {
+function genererRecuSortie(s, supplement, depassage, devise, now = maintenant()) {
   const identite = lireIdentite()
-  const now = maintenant()
   const aSuppl = supplement > 0
   const historique = s.historiqueProlongations || []
 
@@ -240,10 +241,66 @@ Total encaissé : ${s.montant} ${devise}${aSuppl ? ` + ${supplement.toLocaleStri
 ${piedRecu(identite)}`
 }
 
+// ─── Tickets pour l'imprimante thermique de poche (mêmes informations que les reçus) ───
+function ticketRecuEntree(s, devise) {
+  return construireTicketHotel({
+    identite: lireIdentite(),
+    titre: "REÇU D'ENTRÉE",
+    infos: [
+      { left: `Client : ${s.client}` },
+      { left: `Tél : ${s.telephone}` },
+      { left: `Chambre : ${s.chambre} (${s.categorie})` },
+      { left: `Arrivée : ${s.dateArrivee} à ${s.heureArrivee}` },
+      { left: `Départ : ${s.type==='nuit' ? s.dateDepart : s.dateArrivee} à ${s.heureDepart}` },
+      { left: `Durée : ${s.duree}` },
+      { left: `Paiement : ${s.modePaiement}` },
+    ],
+    total: { label: 'MONTANT', value: `${s.montant} ${devise}` },
+    pied: 'Merci de votre confiance !',
+  })
+}
+
+function ticketRecuSortie(s, supplement, depassage, devise, now) {
+  const historique = s.historiqueProlongations || []
+  const finInitiale = historique.length > 0
+    ? historique[0].avant
+    : (s.type==='nuit' ? s.dateDepart : s.heureDepart)
+  const base = versNombre(s.montantNum ?? s.montant)
+  const aSuppl = supplement > 0
+
+  const infos = [
+    { left: `Client : ${s.client}` },
+    { left: `Chambre : ${s.chambre}` },
+    { left: '' },
+    { left: 'HISTORIQUE DU SÉJOUR', bold: true },
+    { left: `Entrée initiale : ${s.type==='nuit' ? s.dateArrivee : s.heureArrivee} -> ${finInitiale}` },
+  ]
+  historique.forEach((h, i) => {
+    infos.push({ left: `Prolongation ${i+1} : ${h.avant} -> ${h.apres}`, right: `+${formaterMontant(h.montant, devise)}` })
+  })
+  infos.push({ left: '' })
+  infos.push({ left: `Sortie réelle : ${now.date} à ${now.heure}` })
+  if (aSuppl) {
+    infos.push({ left: `Dépassement : ${depassage}` })
+    infos.push({ left: 'Montant du séjour', right: formaterMontant(base, devise) })
+    infos.push({ left: 'Supplément', right: formaterMontant(supplement, devise) })
+  } else {
+    infos.push({ left: 'Dépassement : Aucun' })
+  }
+
+  return construireTicketHotel({
+    identite: lireIdentite(),
+    titre: 'REÇU DE SORTIE',
+    infos,
+    total: { label: 'TOTAL', value: formaterMontant(base + supplement, devise) },
+    pied: 'Merci de votre confiance !',
+  })
+}
+
 // ─── Modal Reçu ───────────────────────────────────────────────────────────────
 const echapper = (t) => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 
-function ModalRecu({ texte, titre, onClose }) {
+function ModalRecu({ texte, titre, onClose, ticket }) {
   const logo = lireIdentite().logoUrl
 
   const handleImprimer = () => {
@@ -280,7 +337,7 @@ function ModalRecu({ texte, titre, onClose }) {
             whiteSpace:'pre-wrap', color:'#222', margin:0, border:'1px dashed #CCC'
           }}>{texte}</pre>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', padding:'0 20px 20px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', padding: ticket ? '0 20px 10px' : '0 20px 20px' }}>
           <button onClick={handleImprimer} style={{
             display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
             padding:'12px', borderRadius:'10px', border:'none', cursor:'pointer',
@@ -292,6 +349,11 @@ function ModalRecu({ texte, titre, onClose }) {
             background:'#25D366', color:'white', fontWeight:'700', fontSize:'13px'
           }}><Share2 size={16}/> Partager</button>
         </div>
+        {ticket && (
+          <div style={{ padding:'0 20px 20px' }}>
+            <BoutonImprimerTicket construire={ticket} libelle="🖨️ Imprimante de poche"/>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -405,11 +467,11 @@ function FormulaireNouveauSejour({ onClose, onAjouter, chambresGenerees=[], tous
     }
     const succes = onAjouter(nouveau)
     if (succes === false) { alert('Cette chambre est deja occupee ou reservee !'); return }
-    setRecuEntree(genererRecuEntree(nouveau, devise))
+    setRecuEntree({ texte:genererRecuEntree(nouveau, devise), ticket:() => ticketRecuEntree(nouveau, devise) })
   }
 
   if (recuEntree) {
-    return <ModalRecu texte={recuEntree} titre="🧾 REÇU D'ENTRÉE" onClose={onClose}/>
+    return <ModalRecu texte={recuEntree.texte} titre="🧾 REÇU D'ENTRÉE" ticket={recuEntree.ticket} onClose={onClose}/>
   }
 
   return (
@@ -636,9 +698,10 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       supplement = tarif * unites
       depassage = `${Math.floor(tr.depasseMinutes/60)}h${String(tr.depasseMinutes%60).padStart(2,'0')}`
     }
-    const texte = genererRecuSortie(s, supplement, depassage, devise)
+    const now = maintenant()
+    const texte = genererRecuSortie(s, supplement, depassage, devise, now)
     if (onTerminer) onTerminer(s.id)
-    setRecuVisible({ texte, titre:"🧾 REÇU DE SORTIE" })
+    setRecuVisible({ texte, titre:"🧾 REÇU DE SORTIE", ticket:() => ticketRecuSortie(s, supplement, depassage, devise, now) })
   }
 
   // ── Palette selon le thème ──
@@ -763,7 +826,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
                 <span style={{ color:'#C9A84C', fontWeight:'800', fontSize:'13px' }}>{s.montant} {devise}</span>
                 {!isNoShow && (
                   <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                    <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s, devise), titre:"🧾 REÇU D'ENTRÉE" })}
+                    <button onClick={()=>setRecuVisible({ texte:genererRecuEntree(s, devise), titre:"🧾 REÇU D'ENTRÉE", ticket:() => ticketRecuEntree(s, devise) })}
                       style={{ display:'flex', alignItems:'center', gap:'2px', padding:'5px 8px', borderRadius:'8px', border:'none', cursor:'pointer', background: sombre?'#1A2744':'#EEF2FF', color: sombre?'#93C5FD':'#1B3A6B', fontWeight:'700', fontSize:'10px', whiteSpace:'nowrap' }}>
                       <Printer size={11}/> Entrée
                     </button>
@@ -796,7 +859,7 @@ export default function Sejours({ sejours:sejoursProps, chambresGenerees=[], onA
       {showConfetti && <Confetti onFin={()=>setShowConfetti(false)}/>}
       {showFormulaire && <FormulaireNouveauSejour onClose={()=>setShowFormulaire(false)} onAjouter={handleAjouter} chambresGenerees={chambresGenerees} tousLesSejours={sejours} devise={devise} tarifs={tarifs}/>}
       {sejourAProlonger && <ModalProlongation sejour={sejourAProlonger} onClose={()=>setSejourAProlonger(null)} onProlonger={handleProlonger} devise={devise} tarifs={tarifs}/>}
-      {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} onClose={()=>setRecuVisible(null)}/>}
+      {recuVisible && <ModalRecu texte={recuVisible.texte} titre={recuVisible.titre} ticket={recuVisible.ticket} onClose={()=>setRecuVisible(null)}/>}
     </div>
   )
 }
