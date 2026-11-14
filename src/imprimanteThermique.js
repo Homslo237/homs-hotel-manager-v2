@@ -42,11 +42,54 @@ const TEXTES = {
 export const texteStatut = (phase, info) => (phase === 'sending' ? `Envoi… ${info} %` : (TEXTES[phase] || ''))
 export const texteErreur = (e) => TEXTES[e && e.code] || `⚠️ ${(e && e.message) || 'Impression impossible'}`
 
+// ── Noirceur d'impression ────────────────────────────────────────────────────
+// density : chauffe de la tête (0 clair, 1 normal, 2 foncé) ; threshold : seuil noir/blanc (plus haut = plus de noir) ;
+// epaisseur : décalage en points pour épaissir les traits fins des petits caractères.
+// Le choix est mémorisé sur le téléphone ; la page /test-imprimante.html permet de le changer.
+export const NIVEAUX_NOIRCEUR = {
+  normal:     { density: 1, threshold: 165, epaisseur: 0,   libelle: 'Normale' },
+  fonce:      { density: 2, threshold: 190, epaisseur: 0.5, libelle: 'Foncée' },
+  tres_fonce: { density: 2, threshold: 215, epaisseur: 1,   libelle: 'Très foncée' },
+}
+export const NOIRCEUR_DEFAUT = 'fonce'
+const CLE_NOIRCEUR = 'homs_impression_noirceur'
+
+export function lireNoirceur() {
+  try { const v = localStorage.getItem(CLE_NOIRCEUR); if (NIVEAUX_NOIRCEUR[v]) return v } catch (e) {}
+  return NOIRCEUR_DEFAUT
+}
+export function ecrireNoirceur(niveau) {
+  if (!NIVEAUX_NOIRCEUR[niveau]) return false
+  try { localStorage.setItem(CLE_NOIRCEUR, niveau); return true } catch (e) { return false }
+}
+
+// Épaissit les traits : l'image est redessinée une 2e fois, décalée, en gardant le plus foncé des deux
+export function epaissir(canvas, decalage) {
+  if (!decalage) return canvas
+  const copie = document.createElement('canvas')
+  copie.width = canvas.width
+  copie.height = canvas.height
+  const g = copie.getContext('2d')
+  g.fillStyle = '#fff'
+  g.fillRect(0, 0, copie.width, copie.height)
+  g.drawImage(canvas, 0, 0)
+  g.globalCompositeOperation = 'darken'
+  g.drawImage(canvas, decalage, 0)
+  return copie
+}
+
 // ── Impression ───────────────────────────────────────────────────────────────
 // À appeler directement depuis un clic (Chrome l'exige la 1re fois pour choisir l'imprimante).
 export async function imprimerTicket(spec, onStatut) {
   const P = await chargerImprimante()
-  return P.printTicket(spec, { onStatus: onStatut })
+  const n = NIVEAUX_NOIRCEUR[lireNoirceur()]
+  P.config.density = n.density
+  P.config.threshold = n.threshold
+  let image
+  try { image = epaissir(P.ticketCanvas(spec), n.epaisseur) } catch (e) {
+    const err = new Error('Impossible de dessiner le ticket.'); err.code = 'RENDER'; throw err
+  }
+  return P.printCanvas(image, { onStatus: onStatut })
 }
 
 // L'utilisateur veut choisir une autre imprimante
