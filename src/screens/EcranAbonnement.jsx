@@ -8,7 +8,7 @@ const EMOJIS = ['🏨', '🏢', '👑']
 
 const WHATSAPP = 'https://wa.me/237696278903?text=' + encodeURIComponent('Je souhaite activer un plan HOMS')
 
-export default function EcranAbonnement({ utilisateur, onPaiementReussi }) {
+export default function EcranAbonnement({ utilisateur, onPaiementReussi, onDeconnexion }) {
   const [offres, setOffres] = useState(OFFRES_SECOURS)
   const [periode, setPeriode] = useState('month')
   const [codeChoisi, setCodeChoisi] = useState(null)
@@ -123,6 +123,15 @@ export default function EcranAbonnement({ utilisateur, onPaiementReussi }) {
           }}>
             Besoin d'aide ? Contacter Homslovision sur WhatsApp
           </a>
+        </div>
+      )}
+
+      {/* Déconnexion : l'hôtel dont l'essai est terminé doit pouvoir changer de compte */}
+      {onDeconnexion && (
+        <div style={{ textAlign:'center', paddingTop:'20px' }}>
+          <button onClick={onDeconnexion} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.5)', fontSize:'12px', textDecoration:'underline', cursor:'pointer', padding:'10px' }}>
+            Se déconnecter
+          </button>
         </div>
       )}
 
