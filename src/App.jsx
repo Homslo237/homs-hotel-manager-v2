@@ -3,12 +3,14 @@ import Splash from './screens/Splash'
 import Connexion from './screens/Connexion'
 import Onboarding from './screens/Onboarding'
 import EcranAbonnement from './screens/EcranAbonnement'
+import EcranDemo from './screens/EcranDemo'
 import Dashboard from './screens/Dashboard'
 import Chambres from './screens/Chambres'
 import Sejours from './screens/Sejours'
 import Caisse from './screens/Caisse'
 import Menu from './screens/menu/Menu'
 import NavBar from './components/NavBar'
+import BandeauDemo from './components/BandeauDemo'
 import { DEVISES, detecterDevise, trouverDevise } from './devises'
 import { db, auth } from './firebase'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
@@ -16,9 +18,10 @@ import { signOut } from 'firebase/auth'
 import { lireParams, PARAMS_DEFAUT } from './screens/menu/Menu'
 import { lireAbonnement, verifierStatutAbonnement } from './abonnement'
 import { chargerHistorique, ajouterHistorique, migrerHistorique, viderAttente } from './historique'
-import { definirHotelCourant, chargerIdentite } from './identite'
+import { definirHotelCourant, chargerIdentite, enregistrerLocal } from './identite'
 import { archiverJournal, archiverSejours, migrerJournalExistant, viderAttentes } from './archives'
 import { signalerFinEssai } from './homsloControl'
+import { construireDemo, NOMS_DEMO, HOTEL_DEMO } from './demo/donneesDemo'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -29,6 +32,24 @@ const ACCES = {
   directeur:      ['dashboard','chambres','sejours','caisse','menu'],
   receptionniste: ['dashboard','chambres','sejours','caisse','menu'],
   caissier:       ['dashboard','caisse','menu'],
+}
+
+// ─── Mode démo : jamais d'écriture sur le serveur, données fictives gardées dans le téléphone (clés « homs_demo_ ») ───
+const sansServeur = (id) => !id || id === 'admin_local' || id === HOTEL_DEMO
+
+// Lien d'entrée direct : https://…/?demo=petit  ou  ?demo=grand
+function lireParamDemo() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('demo')
+    if (!v) return null
+    return v === 'grand' ? 'grand' : 'petit'
+  } catch (e) { return null }
+}
+
+function nettoyerDemoLocal() {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('homs_demo_')).forEach(k => localStorage.removeItem(k))
+  } catch (e) {}
 }
 
 function versDate(dateFR, heure) {
@@ -84,9 +105,11 @@ function storageKey(uid, key) {
   return uid ? `homs_${uid}_${key}` : `homs_${key}`
 }
 function sauvegarderLocal(uid, data) {
+  if (uid === HOTEL_DEMO) return
   try { localStorage.setItem(storageKey(uid, 'data_v1'), JSON.stringify(data)) } catch (e) {}
 }
 function sauvegarderJournalLocal(uid, journal) {
+  if (uid === HOTEL_DEMO) return
   try { localStorage.setItem(storageKey(uid, 'journal'), JSON.stringify(journal)) } catch (e) {}
 }
 function chargerJournalLocal(uid) {
@@ -130,7 +153,7 @@ function migrerAncienLocalStorage(hId) {
 // L'historique n'est plus ici : il est rangé par mois (voir historique.js).
 // merge:true garde intact l'ancien champ « historique » tant que la migration n'a pas eu lieu.
 async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDiverses) {
-  if (!hotelId || hotelId === 'admin_local') return
+  if (sansServeur(hotelId)) return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'caisse'), {
       sejours, entreesDiverses, sortiesDiverses,
@@ -140,7 +163,7 @@ async function sauvegarderFirestore(hotelId, sejours, entreesDiverses, sortiesDi
 }
 
 async function sauvegarderJournalFirestore(hotelId, entrees) {
-  if (!hotelId || hotelId === 'admin_local') return
+  if (sansServeur(hotelId)) return
   try {
     await setDoc(doc(db, 'hotels', hotelId, 'data', 'journal'), {
       entrees, updatedAt: new Date().toISOString(),
@@ -255,6 +278,8 @@ export default function App() {
   const [showChoixDevise,   setShowChoixDevise]   = useState(false)
   const [chargementDonnees, setChargementDonnees] = useState(false)
   const [configChambres,    setConfigChambres]    = useState(PARAMS_DEFAUT.categories)
+  const [modeDemo,          setModeDemo]          = useState(false)
+  const [demoUrl]                                 = useState(lireParamDemo)
 
   const [sejours,         setSejours]         = useState([])
   const [entreesDiverses, setEntreesDiverses] = useState([])
@@ -276,11 +301,11 @@ export default function App() {
   const ajouterAuJournal = (entree, hId) => {
     const idHotel = hId || hotelIdRef.current
     const nouvelle = { ...entree, date: horodatageActuel(), id: Date.now() }
-    if (idHotel && idHotel !== 'admin_local') archiverJournal(idHotel, [nouvelle])
+    if (!sansServeur(idHotel)) archiverJournal(idHotel, [nouvelle])
     setJournal(prev => {
       const maj = [nouvelle, ...prev].slice(0, 500)
       sauvegarderJournalLocal(idHotel, maj)
-      if (idHotel && idHotel !== 'admin_local') sauvegarderJournalFirestore(idHotel, maj)
+      if (!sansServeur(idHotel)) sauvegarderJournalFirestore(idHotel, maj)
       return maj
     })
   }
@@ -305,7 +330,7 @@ export default function App() {
 
   // ── Écoute temps réel après connexion ──
   useEffect(() => {
-    if (!hotelId || hotelId === 'admin_local') return
+    if (sansServeur(hotelId)) return
     setChargementDonnees(true)
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
 
@@ -336,7 +361,7 @@ export default function App() {
 
   // ── Sauvegarde automatique (l'historique est enregistré à part, à la clôture) ──
   useEffect(() => {
-    if (!hotelId) return
+    if (!hotelId || hotelId === HOTEL_DEMO) return
     sauvegarderTout(hotelId, sejours, entreesDiverses, sortiesDiverses)
   }, [sejours, entreesDiverses, sortiesDiverses])
 
@@ -478,6 +503,10 @@ export default function App() {
   const handleConnexion = (user) => {
     const hId = user.uid && user.uid !== 'admin_local' ? user.uid : null
 
+    // ── Une vraie connexion efface toute trace de la démo ──
+    nettoyerDemoLocal()
+    setModeDemo(false)
+
     // ── Migration localStorage ancien → préfixé ──
     if (hId) migrerAncienLocalStorage(hId)
 
@@ -550,11 +579,45 @@ export default function App() {
     }
   }
 
+  // ── Démo : hôtel fictif, tout reste dans le téléphone ──
+  const demarrerDemo = (taille, role = 'directeur') => {
+    nettoyerDemoLocal()
+    const d = construireDemo(taille, new Date())
+    try { localStorage.setItem('homs_demo_params', JSON.stringify({ ...PARAMS_DEFAUT, categories: d.categories })) } catch (e) {}
+    enregistrerLocal(HOTEL_DEMO, d.identite)
+    sauvegarderDeviseLocal(HOTEL_DEMO, 'XAF')
+
+    setSejours(d.sejours); setEntreesDiverses(d.entreesDiverses); setSortiesDiverses(d.sortiesDiverses)
+    setHistorique(d.historique); setJournal(d.journal); setAlertesSonnees(d.alertesSonnees)
+    setNoShowASignaler([]); setNoShowIgnores({})
+    setAbonnement(null); setStatutAbonnement(null); setShowAbonnement(false)
+    setShowOnboarding(false); setShowChoixDevise(false); setChargementDonnees(false)
+    setConfigChambres(d.categories)
+    setCodeDevise('XAF')
+
+    setHotelId(HOTEL_DEMO)
+    definirHotelCourant(HOTEL_DEMO)
+    setUtilisateur({ nom: NOMS_DEMO[role], role, email: '', uid: null, derniereConnexion: horodatageActuel(), demo: true })
+    setThemeSombre(false)
+    setModeDemo(true)
+    setOnglet(role === 'caissier' ? 'caisse' : 'dashboard')
+    setCle(k => k + 1)
+    setEcran('app')
+  }
+
+  const changerRoleDemo = (role) => {
+    setUtilisateur(prev => ({ ...prev, nom: NOMS_DEMO[role], role }))
+    setOnglet(role === 'caissier' ? 'caisse' : 'dashboard')
+    setCle(k => k + 1)
+  }
+
   const handleDeconnexion = async () => {
     ajouterAuJournal({ type:'deconnexion', utilisateur:utilisateur?.nom||'Inconnu', role:utilisateur?.role||'', details:`${utilisateur?.nom||'Utilisateur'} s'est déconnecté` })
     if (snapshotUnsubRef.current) snapshotUnsubRef.current()
     try { await signOut(auth) } catch (e) {}
+    nettoyerDemoLocal()
     definirHotelCourant(null)
+    setModeDemo(false)
     setUtilisateur(null); setHotelId(null); setThemeSombre(false)
     setOnglet('dashboard')
     setSejours([]); setEntreesDiverses([]); setSortiesDiverses([])
@@ -567,6 +630,19 @@ export default function App() {
     setAbonnement(null)
     setStatutAbonnement(null)
     setEcran('connexion')
+  }
+
+  // Après un paiement : l'abonnement est relu (il a été activé par le serveur)
+  const apresPaiement = async () => {
+    try {
+      const abo = await lireAbonnement(hotelId)
+      const statut = verifierStatutAbonnement(abo)
+      setAbonnement(abo)
+      setStatutAbonnement(statut)
+      setShowAbonnement(!!statut.bloque)
+    } catch (e) {
+      setShowAbonnement(false)
+    }
   }
 
   const handleValiderDevise = (code) => {
@@ -583,8 +659,10 @@ export default function App() {
     const sortiesArchivees = sortiesDiverses.map(s => ({ type:'sortie', libelle:s.libelle, montant:s.montant||0, mode:s.mode, date:s.heure, cloture:horodatage, par:s.par||'' }))
     const nouvellesLignes = [...entreesSejours, ...entreesArchivees, ...sortiesArchivees]
     setHistorique(prev => [...prev, ...nouvellesLignes])
-    archiverSejours(hotelId, sejoursACloturer.map(s => ({ ...s, montantArchive: montantRestant(s), clotureLe: horodatage, clotureePar: utilisateur?.nom || '' })))
-    ajouterHistorique(hotelId, nouvellesLignes)
+    if (hotelId !== HOTEL_DEMO) {
+      archiverSejours(hotelId, sejoursACloturer.map(s => ({ ...s, montantArchive: montantRestant(s), clotureLe: horodatage, clotureePar: utilisateur?.nom || '' })))
+      ajouterHistorique(hotelId, nouvellesLignes)
+    }
     setSejours(prev => prev
       .filter(s => s.statut !== 'termine' && s.statut !== 'no_show')
       .map(s => ({ ...s, montantCloture: s.montantNum || 0 })))
@@ -600,8 +678,31 @@ export default function App() {
     setAlertesSonnees({}); setNoShowASignaler([]); setNoShowIgnores({})
   }
 
-  if (ecran === 'splash')    return <Splash onFin={() => setEcran('connexion')}/>
-  if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion}/>
+  if (ecran === 'splash') {
+    return <Splash onFin={() => { if (demoUrl) demarrerDemo(demoUrl, 'directeur'); else setEcran('connexion') }}/>
+  }
+
+  if (ecran === 'connexion') {
+    return (
+      <div style={{ background:'#0D2240' }}>
+        <Connexion onConnexion={handleConnexion}/>
+        <div style={{ height:'76px' }}/>
+        <div style={{ position:'fixed', left:0, right:0, bottom:0, zIndex:50, padding:'10px 16px calc(10px + env(safe-area-inset-bottom, 0px))', background:'linear-gradient(0deg, rgba(10,22,40,0.97) 62%, rgba(10,22,40,0))' }}>
+          <button onClick={() => setEcran('demo-choix')} style={{
+            display:'block', width:'100%', maxWidth:'400px', margin:'0 auto', padding:'14px', borderRadius:'14px',
+            border:'1.5px solid #C9A84C', background:'rgba(201,168,76,0.14)', color:'#F5D98A',
+            fontWeight:'800', fontSize:'14px', cursor:'pointer',
+          }}>
+            🎬 Voir la démo gratuite · sans inscription
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (ecran === 'demo-choix') {
+    return <EcranDemo onLancer={({ taille, role }) => demarrerDemo(taille, role)} onRetour={() => setEcran('connexion')}/>
+  }
 
   // ── Onboarding premier lancement ──
   if (showOnboarding) {
@@ -635,7 +736,7 @@ export default function App() {
       <EcranAbonnement
         utilisateur={utilisateur}
         abonnement={abonnement}
-        onPaiementReussi={() => setShowAbonnement(false)}
+        onPaiementReussi={apresPaiement}
         onDeconnexion={handleDeconnexion}
       />
     )
@@ -656,6 +757,9 @@ export default function App() {
   return (
     <div style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
 
+      {/* ── Bandeau du mode démo ── */}
+      {modeDemo && <BandeauDemo role={utilisateur?.role} onChangerRole={changerRoleDemo} onQuitter={handleDeconnexion}/>}
+
       {/* ── Bannière abonnement ── */}
       {statutAbonnement?.alerte && !showAbonnement && (
         <div onClick={() => setShowAbonnement(true)} style={{
@@ -669,7 +773,7 @@ export default function App() {
         </div>
       )}
 
-      <div key={cle} className="screen-in" style={{ paddingTop: statutAbonnement?.alerte ? '40px' : '0' }}>
+      <div key={cle} className="screen-in" style={{ paddingTop: modeDemo ? '84px' : (statutAbonnement?.alerte ? '40px' : '0') }}>
         {onglet === 'dashboard' && <Dashboard utilisateur={utilisateur} sejours={sejours} caisse={caisse} chambresStats={chambresStats} tauxOccupation={tauxOccupation} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'chambres' && accesRole.includes('chambres') && <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'sejours' && accesRole.includes('sejours') && <Sejours sejours={sejours} chambresGenerees={chambresGenerees} onAjouter={ajouterSejour} onTerminer={terminerSejour} onProlonger={prolongerSejour} onActiverReservation={activerReservation} ouvrirFormulaire={ouvrirFormulaire} onFormulaireOuvert={() => setOuvrirFormulaire(false)} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
