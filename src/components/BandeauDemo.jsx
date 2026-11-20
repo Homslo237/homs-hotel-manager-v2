@@ -7,8 +7,8 @@ const ROLES = [
 
 export default function BandeauDemo({ role, onChangerRole, onQuitter }) {
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 450,
+    <div className="homs-bandeau-demo" style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 90, // sous les fenêtres (formulaires, reçus) pour ne pas en cacher le haut
       background: '#1B3A6B', borderBottom: '2px solid #C9A84C', padding: '6px 10px 8px',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
