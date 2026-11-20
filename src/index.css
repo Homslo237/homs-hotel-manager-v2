@@ -43,3 +43,167 @@ input {
   font-family: 'Inter', sans-serif;
   outline: none;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Éléments réservés à l'ordinateur : cachés sur téléphone
+   ════════════════════════════════════════════════════════════════════════════ */
+.homs-nav-marque,
+.homs-nav-pied,
+.homs-nav-texte-ordi {
+  display: none;
+}
+
+/* Tableau de bord : une seule colonne sur téléphone */
+.dash-grille {
+  display: block;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Ordinateur et grande tablette (écran de 900 px et plus)
+   Téléphone et petite tablette : rien ne change.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 900px) {
+
+  body {
+    background: #E9EDF3;
+  }
+
+  /* L'application occupe tout l'écran au lieu d'une colonne de 480 px */
+  #root {
+    max-width: none;
+    margin: 0;
+    background: transparent;
+  }
+
+  /* ── Zone de contenu : à droite du menu latéral, colonne centrée ── */
+  .homs-app {
+    padding-bottom: 0 !important;
+  }
+  .homs-zone {
+    margin-left: 240px;
+  }
+  .homs-zone > div {
+    max-width: 780px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding-bottom: 48px !important;
+    box-shadow: 0 0 40px rgba(27, 58, 107, 0.08);
+  }
+  .homs-zone > div.ecran-large {
+    max-width: 1120px;
+  }
+
+  /* ── Tableau de bord : deux colonnes ── */
+  .dash-grille {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Menu latéral (la barre du bas devient une colonne à gauche) ── */
+  .homs-nav {
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    width: 240px !important;
+    flex-direction: column !important;
+    justify-content: flex-start;
+    padding: 0 0 16px !important;
+    border-top: none !important;
+    background: linear-gradient(180deg, #0A1628 0%, #1B3A6B 100%) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.14) !important;
+    overflow-y: auto;
+  }
+  .homs-nav-marque {
+    display: block;
+    order: -2;
+    padding: 24px 22px 18px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .homs-nav-item {
+    flex: none !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    gap: 14px !important;
+    padding: 14px 22px !important;
+    border-top: none !important;
+    border-left: 3px solid transparent !important;
+    color: rgba(255, 255, 255, 0.72) !important;
+    transition: background 0.15s, color 0.15s !important;
+  }
+  .homs-nav-item span {
+    color: inherit !important;
+    font-size: 14px !important;
+  }
+  .homs-nav-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .homs-nav-item.homs-nav-actif {
+    border-left-color: #C9A84C !important;
+    background: rgba(255, 255, 255, 0.11);
+    color: #F5D98A !important;
+  }
+  .homs-nav-point {
+    display: none;
+  }
+
+  /* Bouton « Nouveau séjour » en haut du menu */
+  .homs-nav-plus {
+    order: -1;
+    flex: none !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    margin: 6px 18px 14px !important;
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+    background: linear-gradient(90deg, #C9A84C 0%, #F5D98A 100%) !important;
+    box-shadow: 0 4px 14px rgba(201, 168, 76, 0.35);
+  }
+  .homs-nav-cercle {
+    width: 24px !important;
+    height: 24px !important;
+    margin-top: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  .homs-nav-plus svg {
+    stroke: #1B3A6B !important;
+  }
+  .homs-nav-texte-mobile {
+    display: none;
+  }
+  .homs-nav-texte-ordi {
+    display: inline;
+    color: #1B3A6B;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .homs-nav-pied {
+    display: block;
+    margin-top: auto;
+    padding: 14px 22px 4px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── Bandeau de démonstration : à droite du menu latéral ── */
+  .homs-bandeau-demo {
+    left: 240px !important;
+  }
+
+  /* ── Formulaires qui montent du bas de l'écran : centrés et de largeur raisonnable ── */
+  [style*="border-radius: 20px 20px 0px 0px"] {
+    max-width: 560px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    margin-bottom: 4vh !important;
+    border-radius: 20px !important;
+  }
+}
