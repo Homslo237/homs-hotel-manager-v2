@@ -25,7 +25,7 @@ import { construireDemo, NOMS_DEMO, HOTEL_DEMO } from './demo/donneesDemo'
 
 const styleTransition = `
   @keyframes screenIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-  .screen-in { animation: screenIn 0.25s ease both; }
+  .screen-in { animation: screenIn 0.25s ease backwards; } /* « backwards » : pas de transformation gardée après l'animation, sinon les fenêtres plein écran se calent sur toute la page */
 `
 
 const ACCES = {
@@ -682,23 +682,7 @@ export default function App() {
     return <Splash onFin={() => { if (demoUrl) demarrerDemo(demoUrl, 'directeur'); else setEcran('connexion') }}/>
   }
 
-  if (ecran === 'connexion') {
-    return (
-      <div style={{ background:'#0D2240' }}>
-        <Connexion onConnexion={handleConnexion}/>
-        <div style={{ height:'76px' }}/>
-        <div style={{ position:'fixed', left:0, right:0, bottom:0, zIndex:50, padding:'10px 16px calc(10px + env(safe-area-inset-bottom, 0px))', background:'linear-gradient(0deg, rgba(10,22,40,0.97) 62%, rgba(10,22,40,0))' }}>
-          <button onClick={() => setEcran('demo-choix')} style={{
-            display:'block', width:'100%', maxWidth:'400px', margin:'0 auto', padding:'14px', borderRadius:'14px',
-            border:'1.5px solid #C9A84C', background:'rgba(201,168,76,0.14)', color:'#F5D98A',
-            fontWeight:'800', fontSize:'14px', cursor:'pointer',
-          }}>
-            🎬 Voir la démo gratuite · sans inscription
-          </button>
-        </div>
-      </div>
-    )
-  }
+  if (ecran === 'connexion') return <Connexion onConnexion={handleConnexion} onDemo={() => setEcran('demo-choix')}/>
 
   if (ecran === 'demo-choix') {
     return <EcranDemo onLancer={({ taille, role }) => demarrerDemo(taille, role)} onRetour={() => setEcran('connexion')}/>
@@ -755,7 +739,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
+    <div className="homs-app" style={{ paddingBottom:'70px', background: themeSombre ? '#0F172A' : '#F5F7FA', minHeight:'100vh' }}>
 
       {/* ── Bandeau du mode démo ── */}
       {modeDemo && <BandeauDemo role={utilisateur?.role} onChangerRole={changerRoleDemo} onQuitter={handleDeconnexion}/>}
@@ -773,8 +757,8 @@ export default function App() {
         </div>
       )}
 
-      <div key={cle} className="screen-in" style={{ paddingTop: modeDemo ? '84px' : (statutAbonnement?.alerte ? '40px' : '0') }}>
-        {onglet === 'dashboard' && <Dashboard utilisateur={utilisateur} sejours={sejours} caisse={caisse} chambresStats={chambresStats} tauxOccupation={tauxOccupation} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
+      <div key={cle} className="screen-in homs-zone" style={{ paddingTop: modeDemo ? '84px' : (statutAbonnement?.alerte ? '40px' : '0') }}>
+        {onglet === 'dashboard' && <Dashboard utilisateur={utilisateur} sejours={sejours} caisse={caisse} chambresStats={chambresStats} tauxOccupation={tauxOccupation} historique={historique} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'chambres' && accesRole.includes('chambres') && <Chambres chambres={chambresGenerees} chambresStats={chambresStats} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'sejours' && accesRole.includes('sejours') && <Sejours sejours={sejours} chambresGenerees={chambresGenerees} onAjouter={ajouterSejour} onTerminer={terminerSejour} onProlonger={prolongerSejour} onActiverReservation={activerReservation} ouvrirFormulaire={ouvrirFormulaire} onFormulaireOuvert={() => setOuvrirFormulaire(false)} sombre={themeSombre} devise={trouverDevise(codeDevise).symbole}/>}
         {onglet === 'caisse' && accesRole.includes('caisse') && <Caisse sejours={sejoursEncaisses} entreesDiverses={entreesDiverses} sortiesDiverses={sortiesDiverses} onAjouterEntree={e => setEntreesDiverses(prev => [{ ...e, par: utilisateur?.nom || '' }, ...prev])} onAjouterSortie={s => setSortiesDiverses(prev => [{ ...s, par: utilisateur?.nom || '' }, ...prev])} caisse={caisse} onCloturerCaisse={cloturerCaisse} chambres={chambresGenerees} devise={trouverDevise(codeDevise).symbole}/>}
