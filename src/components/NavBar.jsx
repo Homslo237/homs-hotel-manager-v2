@@ -9,34 +9,47 @@ const ONGLETS = [
   { id: 'menu',      label: 'Menu',     icone: Menu      },
 ]
 
-// ─── Accès par rôle ───────────────────────────────────────────────────────────
+// ─── Accès par rôle (même règle que dans App.jsx) ─────────────────────────────
 const ACCES = {
   directeur:      ['dashboard', 'chambres', 'sejours', 'caisse', 'menu'],
   receptionniste: ['dashboard', 'chambres', 'sejours', 'caisse', 'menu'],
-  caissier:       ['dashboard', 'sejours', 'caisse', 'menu'],
+  caissier:       ['dashboard', 'caisse', 'menu'],
 }
 
+const NOMS_ROLES = { directeur: 'Directeur', receptionniste: 'Réceptionniste', caissier: 'Caissier' }
+
+// Sur téléphone : barre fixe en bas de l'écran.
+// Sur ordinateur (écran de 900 px et plus) : menu latéral à gauche. Les règles sont dans index.css (classes « homs-nav… »).
 export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
   const accesRole = ACCES[role] || ACCES.receptionniste
 
   return (
-    <div style={{
+    <div className="homs-nav" style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
       background: 'white',
       borderTop: '1px solid #E0E0E0',
       display: 'flex',
       boxShadow: '0 -2px 10px rgba(0,0,0,0.08)',
-      zIndex: 100,
+      zIndex: 90, // sous les fenêtres (formulaires, reçus, passation) qui, elles, sont à 100 et plus
       paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
+      {/* Marque : visible seulement sur ordinateur */}
+      <div className="homs-nav-marque">
+        <img src="/logo-homs.png" alt="" style={{ height: '34px', display: 'block', marginBottom: '8px' }} onError={e => { e.target.style.display = 'none' }}/>
+        <div style={{ color: '#C9A84C', fontWeight: '900', fontSize: '13px', letterSpacing: '2px' }}>HOMS-HÔTEL</div>
+        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '9px', letterSpacing: '2px', marginTop: '2px' }}>UNE VISION D'ENSEMBLE</div>
+      </div>
+
       {ONGLETS.map(o => {
         const Icone = o.icone
 
-        // ── Bouton central "+" ──
+        // ── Bouton central "+" (réservé aux rôles qui peuvent créer un séjour) ──
         if (o.id === 'sejours') {
+          if (!accesRole.includes('sejours')) return null
           return (
             <button
               key="plus"
+              className="homs-nav-plus"
               onClick={() => {
                 // Va sur l'onglet séjours ET ouvre le formulaire
                 setOnglet('sejours')
@@ -50,7 +63,7 @@ export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
                 position: 'relative',
               }}
             >
-              <div style={{
+              <div className="homs-nav-cercle" style={{
                 width: '52px', height: '52px', borderRadius: '26px',
                 background: 'linear-gradient(135deg, #1B3A6B, #2C5282)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -60,12 +73,13 @@ export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
               }}>
                 <Icone size={24} color="white" />
               </div>
-              <span style={{
+              <span className="homs-nav-texte-mobile" style={{
                 fontSize: '10px', fontWeight: '600',
                 color: '#1B3A6B', marginTop: '2px'
               }}>
                 Séjour
               </span>
+              <span className="homs-nav-texte-ordi">Nouveau séjour</span>
             </button>
           )
         }
@@ -77,6 +91,8 @@ export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
         return (
           <button
             key={o.id}
+            className={`homs-nav-item${actif ? ' homs-nav-actif' : ''}`}
+            aria-current={actif ? 'page' : undefined}
             onClick={() => setOnglet(o.id)}
             style={{
               flex: 1, padding: '10px 4px 8px',
@@ -92,7 +108,7 @@ export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
             <div style={{ position: 'relative' }}>
               <Icone size={22} />
               {actif && (
-                <div style={{
+                <div className="homs-nav-point" style={{
                   position: 'absolute', top: '-2px', right: '-4px',
                   width: '7px', height: '7px', borderRadius: '50%',
                   background: '#C9A84C', border: '1.5px solid white',
@@ -109,6 +125,9 @@ export default function NavBar({ onglet, setOnglet, role, onAjouterSejour }) {
           </button>
         )
       })}
+
+      {/* Rôle connecté : visible seulement sur ordinateur */}
+      <div className="homs-nav-pied">{NOMS_ROLES[role] || ''}</div>
     </div>
   )
 }
