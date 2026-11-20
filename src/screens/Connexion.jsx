@@ -343,7 +343,7 @@ const bgStyle = {
   position:'relative', paddingBottom:'40px',
 }
 
-export default function Connexion({ onConnexion }) {
+export default function Connexion({ onConnexion, onDemo }) {
   const [mode, setMode]   = useState('connexion')
   const [role, setRole]   = useState(null)
   const [mdp, setMdp]     = useState('')
@@ -527,6 +527,16 @@ export default function Connexion({ onConnexion }) {
               </button>
             ))}
           </div>
+
+          {onDemo && (
+            <button onClick={onDemo} style={{
+              display:'block', width:'100%', marginTop:'16px', padding:'14px', borderRadius:'14px',
+              border:'1.5px solid #C9A84C', background:'rgba(201,168,76,0.14)', color:'#F5D98A',
+              fontWeight:'800', fontSize:'14px', cursor:'pointer', letterSpacing:'0.5px',
+            }}>
+              🎬 Voir la démo gratuite · sans inscription
+            </button>
+          )}
 
           <div style={{ marginTop:'28px', textAlign:'center' }}>
             <div style={{ height:'1px', background:'rgba(255,255,255,0.1)', marginBottom:'20px' }}/>
