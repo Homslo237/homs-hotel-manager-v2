@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Home, Briefcase, Sparkles, AlertTriangle, TrendingUp, Moon, Clock, LogIn, LogOut, RefreshCw } from 'lucide-react'
 
 const STYLES = `
@@ -13,22 +13,34 @@ const STYLES = `
 const fmt = (n) => Number(n||0).toLocaleString('fr-FR')
 const heure = () => new Date().toTimeString().slice(0,5)
 
-// CA des 7 derniers jours (statique pour l'instant)
-const caJours = [
-  { jour:'Lun', montant:185000 },
-  { jour:'Mar', montant:220000 },
-  { jour:'Mer', montant:195000 },
-  { jour:'Jeu', montant:310000 },
-  { jour:'Ven', montant:275000 },
-  { jour:'Sam', montant:340000 },
-  { jour:'Auj', montant:0 }, // sera remplacé par soldeNet
-]
+const NOMS_JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
 // Renvoie la date du jour au format JJ/MM/AAAA, identique au format
 // utilisé partout ailleurs dans l'app pour dateArrivee/dateDepart.
-function dateDuJourFR() {
-  const d = new Date()
+function dateFR(d) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+}
+function dateDuJourFR() {
+  return dateFR(new Date())
+}
+
+// CA (recettes : séjours + entrées diverses) des 6 derniers jours, calculé sur l'historique des clôtures,
+// puis celui d'aujourd'hui. Un jour sans clôture compte 0.
+function caSemaine(historique, caAujourdhui) {
+  const jours = []
+  for (let k = 6; k >= 1; k--) {
+    const d = new Date()
+    d.setDate(d.getDate() - k)
+    jours.push({ jour: NOMS_JOURS[d.getDay()], cle: dateFR(d), montant: 0 })
+  }
+  const parCle = {}
+  jours.forEach(j => { parCle[j.cle] = j })
+  ;(historique || []).forEach(l => {
+    if (!l || l.type === 'sortie') return
+    const j = parCle[String(l.cloture || '').slice(0, 10)]
+    if (j) j.montant += Number(l.montant) || 0
+  })
+  return [...jours.map(({ jour, montant }) => ({ jour, montant })), { jour: 'Auj', montant: caAujourdhui }]
 }
 
 function GraphiqueCA({ data, visible }) {
@@ -107,7 +119,7 @@ function CompteurAnime({ valeur, visible }) {
   return <span>{fmt(affiche)}</span>
 }
 
-export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16, sombre=false, devise='FCFA' }) {
+export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambresStats={total:50,disponibles:37,occupees:8,nettoyer:3,problemes:2}, tauxOccupation=16, sombre=false, devise='FCFA', historique=[] }) {
   const [heureActuelle, setHeureActuelle] = useState(heure())
   const [visible, setVisible] = useState(false)
   const [refresh, setRefresh] = useState(false)
@@ -132,8 +144,9 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
   const totalSort  = Number(caisse.totalSorties|| 0)
   const tauxOcc    = Number(tauxOccupation || 0)
 
-  // Mettre le solde d'aujourd'hui dans le graphique
-  const graphData = [...caJours.slice(0,-1), { jour:'Auj', montant: soldeNet }]
+  // Graphique : CA réel des 6 derniers jours (historique des clôtures) + recettes d'aujourd'hui
+  const caAujourdhui = Number(caisse.totalSejours || 0) + totalEnt
+  const graphData = useMemo(() => caSemaine(historique, caAujourdhui), [historique, caAujourdhui])
 
   const handleRefresh = () => {
     setRefresh(true)
@@ -141,7 +154,7 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
     setTimeout(() => { setVisible(true); setRefresh(false) }, 600)
   }
 
-  const prenom = utilisateur?.email?.split('@')[0] || 'vous'
+  const prenom = utilisateur?.email?.split('@')[0] || utilisateur?.nom || 'vous'
   const sejoursEnCours = sejours.filter(s => s.statut === 'en_cours')
 
   // Arrivees du jour : reservations a venir dont l'arrivee est prevue aujourd'hui
@@ -167,7 +180,7 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
   const encartBg1      = sombre ? '#1E293B' : '#FFF8F0'
 
   return (
-    <div style={{ paddingBottom:'90px', background:bg, minHeight:'100vh' }}>
+    <div className="ecran-large" style={{ paddingBottom:'90px', background:bg, minHeight:'100vh' }}>
 
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg, #0A1628, #1B3A6B, #2C5282)', padding:'20px 20px 24px', position:'relative', overflow:'hidden' }}>
@@ -212,6 +225,8 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
       </div>
 
       <div style={{ padding:'16px 20px' }}>
+       <div className="dash-grille">
+        <div className="dash-col">
 
         {/* Carte CA */}
         <div style={{ background:'linear-gradient(135deg, #1B3A6B, #0A1628)', borderRadius:'20px', padding:'20px', marginBottom:'16px', color:'white', boxShadow:'0 8px 32px rgba(27,58,107,0.3)', overflow:'hidden', position:'relative' }}>
@@ -272,6 +287,9 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
             )
           })}
         </div>
+
+        </div>
+        <div className="dash-col">
 
         {/* Séjours à l'heure */}
         {sejoursEnCours.filter(s=>s.type==='heure').length > 0 && (
@@ -375,6 +393,8 @@ export default function Dashboard({ utilisateur, sejours=[], caisse={}, chambres
           ))}
         </div>
 
+        </div>
+       </div>
       </div>
     </div>
   )
