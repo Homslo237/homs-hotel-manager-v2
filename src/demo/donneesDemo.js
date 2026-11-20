@@ -133,20 +133,24 @@ export function construireDemo(taille = 'petit', maintenant = new Date()) {
       } else {
         const a = entier(rng, 15, Math.max(16, heures * 60 - 20))
         arr = Math.max(0, minNow - a); dep = arr + heures * 60
-        if (dep <= minNow + 5) dep = Math.min(1439, minNow + 30)
+        if (dep <= minNow + 5) dep = minNow + 30
+        dep = Math.min(1439, dep)                                  // jamais après 23:59
       }
       if (dep > minNow - 20 || i === 0) { sejours.push(sejourHeure(ch, { heureArr: arr, heureDep: dep, heures, statut: 'en_cours' })); return }
     }
     if (!prolongationFaite) {                                      // histoire : une prolongation
       prolongationFaite = true
       const s = sejourNuit(ch, { arrivee: jourPlus(aujourdhui, -1), nuits: 2, heureArr: entier(rng, 780, 1200), statut: 'en_cours' })
+      s.montantCloture = ch.tarifNuit                              // 1re nuit clôturée hier ; la prolongation d'aujourd'hui reste à encaisser
       s.historiqueProlongations = [{ avant: dateFR(aujourdhui), apres: dateFR(jourPlus(aujourdhui, 1)), montant: ch.tarifNuit, unite: 'nuit' }]
       sejours.push(s); return
     }
     const nuits = pondere(rng, [[1, 5], [2, 3], [3, 1]])
     const d = entier(rng, 0, nuits - 1)
     const heureArr = d === 0 ? Math.max(0, Math.min(minNow - 5, entier(rng, 360, Math.max(361, minNow - 10)))) : entier(rng, 720, 1350)
-    sejours.push(sejourNuit(ch, { arrivee: jourPlus(aujourdhui, -d), nuits, heureArr, statut: 'en_cours' }))
+    const s = sejourNuit(ch, { arrivee: jourPlus(aujourdhui, -d), nuits, heureArr, statut: 'en_cours' })
+    if (d > 0) s.montantCloture = s.montantNum                     // arrivé avant aujourd'hui : déjà encaissé à la clôture d'hier
+    sejours.push(s)
   })
 
   // Arrivées à venir
@@ -166,7 +170,9 @@ export function construireDemo(taille = 'petit', maintenant = new Date()) {
       const dep = Math.max(30, minNow - 20), arr = Math.max(0, dep - 120)
       sejours.push(sejourHeure(ch, { heureArr: arr, heureDep: dep, heures: 2, statut: 'termine' }))
     } else {
-      sejours.push(sejourNuit(ch, { arrivee: jourPlus(aujourdhui, -1), nuits: 1, heureArr: entier(rng, 780, 1230), statut: 'termine' }))
+      const s = sejourNuit(ch, { arrivee: jourPlus(aujourdhui, -1), nuits: 1, heureArr: entier(rng, 780, 1230), statut: 'termine' })
+      s.montantCloture = s.montantNum                              // payé hier à l'arrivée
+      sejours.push(s)
     }
   }
   // No-show déjà confirmés
